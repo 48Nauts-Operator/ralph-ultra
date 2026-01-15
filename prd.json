@@ -137,7 +137,7 @@
         "Clean process management (no orphan processes)",
         "Monitor view automatically shows new log output"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TUI-009",
