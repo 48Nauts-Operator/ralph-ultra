@@ -31,6 +31,9 @@ show_usage() {
   echo "  --skip-budget   Skip budget check"
   echo "  --skip-quota    Skip Claude Pro quota check"
   echo "  --quota-status  Show Claude Pro quota status"
+  echo "  --hybrid MODE   Enable hybrid LLM routing (aggressive|balanced|conservative)"
+  echo "  --hybrid-status Show hybrid LLM router status"
+  echo "  --hybrid-stats  Show hybrid LLM usage statistics"
   echo "  --status        Show current status"
   echo "  --report        Generate HTML report"
   echo "  --help, -h      Show this help"
@@ -51,6 +54,7 @@ show_usage() {
 NO_MONITOR=false
 SKIP_BUDGET=false
 SKIP_QUOTA=false
+HYBRID_MODE="${RALPH_HYBRID_MODE:-}"
 STATUS_ONLY=false
 REPORT_ONLY=false
 AGENT_ONLY=false
@@ -77,6 +81,16 @@ while [[ "$1" == --* ]]; do
       ;;
     --quota-status)
       exec "$SCRIPT_DIR/ralph-quota.sh" --status
+      ;;
+    --hybrid)
+      HYBRID_MODE="${2:-balanced}"
+      shift 2
+      ;;
+    --hybrid-status)
+      exec "$SCRIPT_DIR/ralph-hybrid.sh" --status
+      ;;
+    --hybrid-stats)
+      exec "$SCRIPT_DIR/ralph-hybrid.sh" --stats
       ;;
     --status)
       STATUS_ONLY=true
@@ -117,6 +131,7 @@ PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 MONITOR_SCRIPT="$SCRIPT_DIR/ralph-monitor.sh"
 BUDGET_SCRIPT="$SCRIPT_DIR/ralph-budget.sh"
 QUOTA_SCRIPT="$SCRIPT_DIR/ralph-quota.sh"
+HYBRID_SCRIPT="$SCRIPT_DIR/ralph-hybrid.sh"
 
 if [ ! -d "$PROJECT_DIR" ]; then
   error "Project directory does not exist: $PROJECT_DIR"
@@ -307,6 +322,28 @@ check_prereqs() {
   info "Using CLI: $cli"
 }
 
+run_hybrid_check() {
+  if [ -z "$HYBRID_MODE" ]; then
+    return 0
+  fi
+  
+  if [ ! -f "$HYBRID_SCRIPT" ]; then
+    warn "Hybrid script not found, skipping hybrid setup"
+    return 0
+  fi
+  
+  echo ""
+  echo -e "${CYAN}Hybrid LLM Mode: $HYBRID_MODE${NC}"
+  echo "─────────────────────────────────────────"
+  
+  export RALPH_HYBRID_MODE="$HYBRID_MODE"
+  
+  "$HYBRID_SCRIPT" --status | head -30
+  
+  echo ""
+  info "Hybrid routing enabled - local LLM will handle applicable tasks"
+}
+
 run_quota_check() {
   if [ "$SKIP_QUOTA" = true ]; then
     info "Skipping quota check (--skip-quota)"
@@ -484,6 +521,7 @@ main() {
   
   check_prereqs
   run_quota_check
+  run_hybrid_check
   run_budget_check
   archive_previous
   init_progress

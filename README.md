@@ -281,6 +281,103 @@ ralph.sh --skip-quota /path/to/project
 | Linux | `~/.claude/.credentials.json` |
 | Both | `CLAUDE_CODE_OAUTH_TOKEN` env var |
 
+## Hybrid LLM Routing (80/20 Cost Optimization)
+
+Ralph Ultra can route tasks to local LLMs for massive cost savings while preserving quality where it matters.
+
+### The 80/20 Principle
+
+| Task Type | LLM Choice | Why |
+|-----------|------------|-----|
+| **Planning/Architecture** | Opus 4.5 (API) | Needs best reasoning |
+| **Code Review** | Opus 4.5 (API) | Quality critical |
+| **Complex Debugging** | Sonnet 4.5 (API) | Needs context |
+| **Code Generation** | Local (Qwen/DeepSeek) | Local excels here |
+| **Simple Edits** | Local (fast model) | Trivial tasks |
+| **Documentation** | Local | Good enough |
+| **Search/Analysis** | Local (fast) | Speed matters |
+
+### Quick Start
+
+```bash
+# 1. Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# 2. Pull recommended models
+ollama pull qwen2.5-coder:32b    # Primary (needs 20GB+ VRAM)
+ollama pull qwen2.5-coder:7b     # Fast model for simple tasks
+
+# 3. Run Ralph with hybrid mode
+ralph.sh --hybrid balanced /path/to/project
+```
+
+### Hybrid Modes
+
+| Mode | Local % | Best For |
+|------|---------|----------|
+| `aggressive` | 90% | Maximum savings, hobby projects |
+| `balanced` | 70% | Production work, best tradeoff |
+| `conservative` | 40% | Quality-critical projects |
+| `api-only` | 0% | Current behavior (no local) |
+| `local-only` | 100% | Testing, air-gapped environments |
+
+### Usage
+
+```bash
+# Enable hybrid mode
+ralph.sh --hybrid balanced /path/to/project
+
+# Check hybrid status
+ralph.sh --hybrid-status
+
+# View savings statistics
+ralph.sh --hybrid-stats
+
+# Or use environment variable
+export RALPH_HYBRID_MODE=balanced
+ralph.sh /path/to/project
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RALPH_HYBRID_MODE` | - | Routing mode |
+| `RALPH_LOCAL_PROVIDER` | ollama | Provider: ollama, lmstudio, vllm, openai |
+| `RALPH_LOCAL_ENDPOINT` | http://localhost:11434 | Local LLM API endpoint |
+| `RALPH_LOCAL_MODEL` | qwen2.5-coder:32b | Primary model for complex tasks |
+| `RALPH_LOCAL_FAST_MODEL` | qwen2.5-coder:7b | Fast model for simple tasks |
+| `RALPH_FALLBACK_TO_API` | true | Fallback to API if local fails |
+
+### Supported Local LLM Providers
+
+| Provider | Setup |
+|----------|-------|
+| **Ollama** | `ollama serve` (easiest) |
+| **LM Studio** | Start server in app |
+| **vLLM** | `vllm serve <model>` |
+| **Any OpenAI-compatible** | Set `RALPH_LOCAL_ENDPOINT` |
+
+### Recommended Models
+
+| Model | VRAM | Quality | Speed |
+|-------|------|---------|-------|
+| `qwen2.5-coder:32b` | 20GB+ | Excellent | Moderate |
+| `qwen2.5-coder:14b` | 10GB+ | Very Good | Good |
+| `qwen2.5-coder:7b` | 5GB+ | Good | Fast |
+| `deepseek-coder-v2` | 16GB+ | Excellent | Moderate |
+| `codellama:34b` | 20GB+ | Very Good | Moderate |
+
+### Cost Savings Example
+
+For a typical 10-story PRD run:
+
+| Mode | API Cost | Local Cost | Savings |
+|------|----------|------------|---------|
+| api-only | ~$15 | $0 | - |
+| balanced | ~$5 | $0 (electricity) | **~$10 (67%)** |
+| aggressive | ~$2 | $0 (electricity) | **~$13 (87%)** |
+
 ## Troubleshooting
 
 ### No AI CLI found
