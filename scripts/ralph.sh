@@ -29,6 +29,8 @@ show_usage() {
   echo "  --branch NAME   Specify branch name (default: ralph/<project-name>)"
   echo "  --no-monitor    Run without health monitoring"
   echo "  --skip-budget   Skip budget check"
+  echo "  --skip-quota    Skip Claude Pro quota check"
+  echo "  --quota-status  Show Claude Pro quota status"
   echo "  --status        Show current status"
   echo "  --report        Generate HTML report"
   echo "  --help, -h      Show this help"
@@ -48,6 +50,7 @@ show_usage() {
 
 NO_MONITOR=false
 SKIP_BUDGET=false
+SKIP_QUOTA=false
 STATUS_ONLY=false
 REPORT_ONLY=false
 AGENT_ONLY=false
@@ -67,6 +70,13 @@ while [[ "$1" == --* ]]; do
     --skip-budget)
       SKIP_BUDGET=true
       shift
+      ;;
+    --skip-quota)
+      SKIP_QUOTA=true
+      shift
+      ;;
+    --quota-status)
+      exec "$SCRIPT_DIR/ralph-quota.sh" --status
       ;;
     --status)
       STATUS_ONLY=true
@@ -106,6 +116,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 MONITOR_SCRIPT="$SCRIPT_DIR/ralph-monitor.sh"
 BUDGET_SCRIPT="$SCRIPT_DIR/ralph-budget.sh"
+QUOTA_SCRIPT="$SCRIPT_DIR/ralph-quota.sh"
 
 if [ ! -d "$PROJECT_DIR" ]; then
   error "Project directory does not exist: $PROJECT_DIR"
@@ -296,6 +307,54 @@ check_prereqs() {
   info "Using CLI: $cli"
 }
 
+run_quota_check() {
+  if [ "$SKIP_QUOTA" = true ]; then
+    info "Skipping quota check (--skip-quota)"
+    return 0
+  fi
+  
+  if [ ! -f "$QUOTA_SCRIPT" ]; then
+    warn "Quota script not found, skipping quota check"
+    return 0
+  fi
+  
+  echo ""
+  echo -e "${CYAN}Quota Check${NC}"
+  echo "─────────────────────────────────────────"
+  
+  "$QUOTA_SCRIPT" --preflight
+  local result=$?
+  
+  case $result in
+    0)
+      return 0
+      ;;
+    1)
+      warn "Quota is high but within limits"
+      return 0
+      ;;
+    2)
+      echo ""
+      error "Quota exhausted! Cannot proceed."
+      echo ""
+      read -p "Wait for cooldown? [Y/n] " -n 1 -r
+      echo ""
+      
+      if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        "$QUOTA_SCRIPT" --wait
+        return $?
+      else
+        info "Aborted by user."
+        exit 0
+      fi
+      ;;
+    *)
+      warn "Could not check quota (continuing anyway)"
+      return 0
+      ;;
+  esac
+}
+
 run_budget_check() {
   if [ "$SKIP_BUDGET" = true ]; then
     return 0
@@ -424,6 +483,7 @@ main() {
   echo ""
   
   check_prereqs
+  run_quota_check
   run_budget_check
   archive_previous
   init_progress

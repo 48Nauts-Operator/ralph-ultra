@@ -96,6 +96,7 @@ STATE_FILE="$PROJECT_DIR/.ralph-monitor-state.json"
 EVENTS_FILE="$PROJECT_DIR/.ralph-events.json"
 REPORT_FILE="$PROJECT_DIR/ralph-report.html"
 RALPH_SCRIPT="$SCRIPT_DIR/ralph.sh"
+QUOTA_SCRIPT="$SCRIPT_DIR/ralph-quota.sh"
 RALPH_ITERATIONS=50
 
 # =============================================================================
@@ -1165,6 +1166,62 @@ record_story_cost() {
   fi
   
   log "INFO" "Cost for $story: $(format_cost "$cost") ($(format_tokens "$input") in, $(format_tokens "$output") out)"
+}
+
+# =============================================================================
+# QUOTA MONITORING (Claude Pro)
+# =============================================================================
+
+check_quota_status() {
+  if [ ! -f "$QUOTA_SCRIPT" ]; then
+    echo '{"available": true, "utilization": 0}'
+    return 0
+  fi
+  
+  "$QUOTA_SCRIPT" --preflight >/dev/null 2>&1
+  local result=$?
+  
+  case $result in
+    0|1)
+      echo '{"available": true}'
+      ;;
+    2)
+      echo '{"available": false, "reason": "quota_exhausted"}'
+      ;;
+    *)
+      echo '{"available": true, "reason": "check_failed"}'
+      ;;
+  esac
+}
+
+wait_for_quota_recovery() {
+  if [ ! -f "$QUOTA_SCRIPT" ]; then
+    return 0
+  fi
+  
+  log "WARN" "Quota exhausted - waiting for recovery..."
+  record_event "quota_pause" "Quota exhausted, waiting for cooldown" "$(get_current_story)"
+  ntfy_send_alert "stuck" "Quota exhausted - entering cooldown wait"
+  
+  "$QUOTA_SCRIPT" --wait
+  local result=$?
+  
+  if [ $result -eq 0 ]; then
+    log "OK" "Quota recovered!"
+    record_event "quota_resume" "Quota recovered, resuming" "$(get_current_story)"
+    ntfy_send_alert "restart" "Quota recovered - resuming work"
+  fi
+  
+  return $result
+}
+
+detect_quota_error() {
+  local output="$1"
+  
+  if echo "$output" | grep -qiE "(rate.?limit|429|quota.*exceeded|too.?many.?requests|usage.?limit)"; then
+    return 0
+  fi
+  return 1
 }
 
 # =============================================================================

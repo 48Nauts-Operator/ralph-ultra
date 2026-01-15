@@ -228,6 +228,59 @@ Shows:
 - 5 execution strategies with cost estimates
 - Recommendation based on your budget
 
+## Quota Management (Claude Pro)
+
+For Claude Pro subscribers, Ralph Ultra includes intelligent quota management with automatic cooldown handling.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Pre-flight check** | Checks quota before starting a run |
+| **Cross-platform** | Works on macOS (Keychain) and Linux (~/.claude/.credentials.json) |
+| **Auto-cooldown** | Detects quota exhaustion and waits for reset |
+| **Smart resume** | Automatically resumes after cooldown + buffer time |
+
+### Usage
+
+```bash
+# Check current quota status
+ralph-quota.sh --status
+
+# Check quota and wait if exhausted
+ralph-quota.sh --wait
+
+# Skip quota check when running Ralph
+ralph.sh --skip-quota /path/to/project
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RALPH_QUOTA_THRESHOLD` | 90 | Warning threshold (%) |
+| `RALPH_QUOTA_CRITICAL` | 98 | Pause threshold (%) |
+| `RALPH_COOLDOWN_BUFFER` | 5 | Extra minutes after reset |
+| `RALPH_SKIP_QUOTA_CHECK` | false | Skip quota checking |
+| `CLAUDE_CODE_OAUTH_TOKEN` | - | Override OAuth token |
+
+### How It Works
+
+1. **Before starting**: Ralph checks your Claude Pro 5-hour and 7-day utilization
+2. **If quota < 90%**: Proceeds normally
+3. **If quota 90-98%**: Warns but continues
+4. **If quota ≥ 98%**: Pauses and offers to wait for cooldown
+5. **During cooldown**: Shows progress bar with estimated resume time
+6. **After reset**: Adds 5-minute buffer then auto-resumes
+
+### Credential Storage
+
+| Platform | Location |
+|----------|----------|
+| macOS | Keychain (`Claude Code-credentials`) |
+| Linux | `~/.claude/.credentials.json` |
+| Both | `CLAUDE_CODE_OAUTH_TOKEN` env var |
+
 ## Troubleshooting
 
 ### No AI CLI found
