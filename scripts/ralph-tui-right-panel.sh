@@ -124,6 +124,9 @@ render_help() {
 
     # Wait for keypress
     read -n 1 -s
+
+    # Switch back to monitor view
+    exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
 }
 
 # Render status view
