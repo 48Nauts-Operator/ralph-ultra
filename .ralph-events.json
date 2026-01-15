@@ -1,0 +1,95 @@
+{
+  "started": "2026-01-15T23:10:25+01:00",
+  "project": "ralph-ultra",
+  "platform": "macos",
+  "events": [
+    {
+      "timestamp": "2026-01-15T23:05:53+01:00",
+      "type": "started",
+      "message": "Monitor started for ralph-ultra",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T23:05:56+01:00",
+      "type": "start",
+      "message": "Ralph started",
+      "story": "CLI-001"
+    },
+    {
+      "timestamp": "2026-01-15T23:10:25+01:00",
+      "type": "started",
+      "message": "Monitor started for ralph-ultra",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T23:10:57+01:00",
+      "type": "story_complete",
+      "message": "Completed: CLI-001 in 5m",
+      "story": "CLI-001"
+    },
+    {
+      "timestamp": "2026-01-15T23:15:58+01:00",
+      "type": "story_complete",
+      "message": "Completed: CLI-002 in 5m",
+      "story": "CLI-002"
+    },
+    {
+      "timestamp": "2026-01-15T23:20:59+01:00",
+      "type": "story_complete",
+      "message": "Completed: CLI-004 in 5m",
+      "story": "CLI-004"
+    }
+  ],
+  "stories_completed": [
+    {
+      "timestamp": "2026-01-15T23:10:57+01:00",
+      "story": "CLI-001",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "25991b6",
+        "end_commit": "04ae3e1",
+        "files_changed": 1,
+        "lines_added": 162,
+        "lines_removed": 0,
+        "files": [
+          "bin/ralph"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-15T23:15:58+01:00",
+      "story": "CLI-002",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "04ae3e1",
+        "end_commit": "ed48c2e",
+        "files_changed": 2,
+        "lines_added": 219,
+        "lines_removed": 2,
+        "files": [
+          "AGENTS.md",
+          "bin/ralph"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-15T23:20:59+01:00",
+      "story": "CLI-004",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "ed48c2e",
+        "end_commit": "ed48c2e",
+        "files_changed": 0,
+        "lines_added": 0,
+        "lines_removed": 0,
+        "files": []
+      }
+    }
+  ],
+  "restarts": [],
+  "total_restarts": 0,
+  "final_status": "running"
+}
