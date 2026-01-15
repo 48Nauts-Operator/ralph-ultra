@@ -164,7 +164,16 @@ EOF
 
 show_diff() {
   if [ ! -f "$CONFIG_FILE" ]; then
-    echo -e "${YELLOW}No existing config - will create new${NC}"
+    echo -e "${YELLOW}No existing config - will create new file${NC}"
+    echo ""
+    echo -e "${BLUE}Agents to be configured:${NC}"
+    echo "─────────────────────────────────────────"
+    local new_agents="Sisyphus oracle explore librarian frontend-ui-ux-engineer document-writer multimodal-looker"
+    for agent in $new_agents; do
+      local new_model=$(generate_config | jq -r ".agents.\"$agent\".model")
+      echo -e "  ${CYAN}+ $agent${NC}: $new_model"
+    done
+    echo ""
     return
   fi
   
@@ -172,20 +181,51 @@ show_diff() {
   echo "─────────────────────────────────────────"
   
   local new_agents="Sisyphus oracle explore librarian frontend-ui-ux-engineer document-writer multimodal-looker"
+  local has_conflicts=false
   
   for agent in $new_agents; do
     local current_model=$(jq -r ".agents.\"$agent\".model // \"(not set)\"" "$CONFIG_FILE" 2>/dev/null)
     local new_model=$(generate_config | jq -r ".agents.\"$agent\".model")
     
     if [ "$current_model" = "$new_model" ]; then
-      echo -e "  $agent: ${GREEN}$new_model${NC} (unchanged)"
+      echo -e "  $agent: ${GREEN}$new_model${NC} (already set)"
     elif [ "$current_model" = "(not set)" ]; then
-      echo -e "  $agent: ${CYAN}+ $new_model${NC} (new)"
+      echo -e "  $agent: ${CYAN}+ $new_model${NC} (will add)"
     else
-      echo -e "  $agent: ${RED}$current_model${NC} → ${GREEN}$new_model${NC}"
+      echo -e "  $agent: ${YELLOW}$current_model${NC} → ${GREEN}$new_model${NC} (will update)"
+      has_conflicts=true
     fi
   done
+  
   echo ""
+  
+  if [ "$has_conflicts" = true ]; then
+    echo -e "${YELLOW}WARNING: Some agents already have different models configured.${NC}"
+    echo -e "         Merge will update them to Ralph Ultra's recommended models."
+    echo -e "         A backup will be created before any changes."
+    echo ""
+  fi
+  
+  local existing_agents=$(jq -r '.agents // {} | keys[]' "$CONFIG_FILE" 2>/dev/null)
+  local custom_agents=""
+  for agent in $existing_agents; do
+    case "$agent" in
+      Sisyphus|oracle|explore|librarian|frontend-ui-ux-engineer|document-writer|multimodal-looker)
+        ;;
+      *)
+        custom_agents="$custom_agents $agent"
+        ;;
+    esac
+  done
+  
+  if [ -n "$custom_agents" ]; then
+    echo -e "${GREEN}Your custom agents (will be preserved):${NC}"
+    for agent in $custom_agents; do
+      local model=$(jq -r ".agents.\"$agent\".model // \"default\"" "$CONFIG_FILE" 2>/dev/null)
+      echo -e "  $agent: $model"
+    done
+    echo ""
+  fi
 }
 
 apply_config() {

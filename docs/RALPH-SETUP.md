@@ -1,6 +1,6 @@
-# Ralph System Setup Guide
+# Ralph Ultra Setup Guide
 
-A comprehensive guide to setting up Ralph - the autonomous AI agent loop with monitoring, budget planning, and cost optimization.
+A comprehensive guide to setting up Ralph Ultra - the autonomous AI agent system with health monitoring, budget planning, and cost optimization.
 
 ## Table of Contents
 
@@ -19,13 +19,14 @@ A comprehensive guide to setting up Ralph - the autonomous AI agent loop with mo
 
 ## Overview
 
-Ralph is an autonomous AI coding agent that:
+Ralph Ultra is an autonomous AI coding agent that:
 - Reads a PRD (Product Requirements Document) in JSON format
 - Implements user stories one by one
 - Self-monitors progress and health
 - Auto-restarts if stuck
 - Generates HTML reports
 - Tracks costs and timing
+- Delegates to specialized sub-agents (Oracle, Explore, Librarian)
 
 ### Components
 
@@ -64,11 +65,18 @@ sudo apt install jq tmux bc
 ### OpenCode Setup
 
 1. Install OpenCode: https://opencode.ai
-2. Authenticate with your provider:
+
+2. Install oh-my-opencode plugin:
+   ```bash
+   git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode
+   ```
+
+3. Authenticate with your provider:
    ```bash
    opencode auth
    ```
-3. Verify authentication:
+
+4. Verify authentication:
    ```bash
    ls ~/.local/share/opencode/auth.json
    ```
@@ -110,55 +118,54 @@ Create `prd.json` with your user stories:
 }
 ```
 
-### 3. Copy Ralph Scripts
+### 3. Check Budget
 
 ```bash
-mkdir -p scripts
-cp /path/to/opencode-nanobanana/scripts/ralph.sh scripts/
-cp /path/to/opencode-nanobanana/scripts/ralph-monitor.sh scripts/
-cp /path/to/opencode-nanobanana/scripts/ralph-budget.sh scripts/
-cp /path/to/opencode-nanobanana/scripts/prompt.md scripts/
-chmod +x scripts/*.sh
+ralph-budget.sh . --budget 20
 ```
 
-### 4. Check Budget
+### 4. Start Ralph Ultra with Monitoring
 
 ```bash
-./scripts/ralph-budget.sh . --budget 20
-```
+# Start the monitor (recommended)
+ralph-monitor.sh . 5
 
-### 5. Start Ralph with Monitoring
-
-```bash
-# Terminal 1: Start the monitor (recommended)
-./scripts/ralph-monitor.sh . 5
-
-# Or run Ralph directly without monitoring
-./scripts/ralph.sh 50
+# Or run Ralph Ultra directly without monitoring
+ralph.sh . 50
 ```
 
 ---
 
 ## Directory Structure
 
-After setup, your project should look like:
+Ralph Ultra installs globally to `~/.config/opencode/scripts/ralph-ultra/`.
+
+Your project only needs:
 
 ```
 your-project/
 ├── prd.json                    # User stories (required)
 ├── progress.txt                # Progress log (auto-created)
-├── opencode.json               # OpenCode permissions
-├── scripts/
-│   ├── ralph.sh                # Main agent loop
-│   ├── ralph-monitor.sh        # Health monitor
-│   ├── ralph-budget.sh         # Budget planner
-│   └── prompt.md               # Agent instructions
+├── opencode.json               # OpenCode permissions (optional)
 ├── src/                        # Your source code
 └── .ralph-*/                   # Auto-created data
     ├── .ralph-monitor-state.json
     ├── .ralph-events.json
     ├── .ralph-backups/
     └── .ralph-failures/
+```
+
+Global installation:
+
+```
+~/.config/opencode/
+├── oh-my-opencode.json         # Model configuration
+└── scripts/
+    └── ralph-ultra/
+        ├── ralph.sh            # Main agent loop
+        ├── ralph-monitor.sh    # Health monitor
+        ├── ralph-budget.sh     # Budget planner
+        └── prompt.md           # Agent instructions
 ```
 
 ---
@@ -241,10 +248,10 @@ curl -s -H "Authorization: Bearer YOUR_API_KEY" \
 
 ```bash
 # Analyze with auto-detected budget
-./scripts/ralph-budget.sh .
+ralph-budget.sh .
 
 # Analyze with specific budget
-./scripts/ralph-budget.sh . --budget 15
+ralph-budget.sh . --budget 15
 ```
 
 ### Understanding Strategies
@@ -267,17 +274,17 @@ curl -s -H "Authorization: Bearer YOUR_API_KEY" \
 
 ---
 
-## Running Ralph
+## Running Ralph Ultra
 
 ### Option 1: With Monitoring (Recommended)
 
 ```bash
 # Start monitor - checks every 5 minutes, auto-restarts if stuck
-./scripts/ralph-monitor.sh . 5
+ralph-monitor.sh . 5
 ```
 
 The monitor will:
-- Start Ralph in a tmux session
+- Start Ralph Ultra in a tmux session
 - Check health every N minutes
 - Auto-restart if stuck
 - Generate HTML reports
@@ -287,14 +294,14 @@ The monitor will:
 
 ```bash
 # Run for up to 50 iterations
-./scripts/ralph.sh 50
+ralph.sh . 50
 ```
 
 ### Option 3: Manual tmux Session
 
 ```bash
 # Create tmux session
-tmux new-session -d -s ralph -c /path/to/project "./scripts/ralph.sh 50"
+tmux new-session -d -s ralph -c /path/to/project "ralph.sh . 50"
 
 # Attach to watch
 tmux attach -t ralph
@@ -309,7 +316,7 @@ tmux attach -t ralph
 ### Check Status
 
 ```bash
-./scripts/ralph-monitor.sh --status .
+ralph-monitor.sh --status .
 ```
 
 Output shows:
@@ -323,7 +330,7 @@ Output shows:
 ### Generate HTML Report
 
 ```bash
-./scripts/ralph-monitor.sh --report .
+ralph-monitor.sh --report .
 ```
 
 Opens a beautiful HTML report showing:
@@ -401,7 +408,7 @@ If budget is limited, run in phases:
 # Edit prd.json to mark complex stories with higher priority
 
 # Phase 2: Wait for quota reset, then continue
-./scripts/ralph-monitor.sh .
+ralph-monitor.sh .
 ```
 
 ### Strategy 4: Use Prompt Caching
@@ -412,24 +419,27 @@ Anthropic's prompt caching reduces costs. The system automatically benefits from
 
 ## Troubleshooting
 
-### Ralph Won't Start
+### Ralph Ultra Won't Start
 
 ```bash
 # Check prerequisites
 command -v jq tmux opencode
 
+# Check oh-my-opencode is installed
+ls ~/.config/opencode/oh-my-opencode.json
+
+# Check Ralph Ultra is installed
+ls ~/.config/opencode/scripts/ralph-ultra/
+
 # Check prd.json exists and is valid
 jq '.' prd.json
-
-# Check ralph.sh is executable
-chmod +x scripts/ralph.sh
 ```
 
-### Ralph Gets Stuck
+### Ralph Ultra Gets Stuck
 
 ```bash
 # Check status
-./scripts/ralph-monitor.sh --status .
+ralph-monitor.sh --status .
 
 # Check failure logs
 ls -la .ralph-failures/
@@ -437,14 +447,14 @@ cat .ralph-failures/failure_*.txt | tail -100
 
 # Manual restart
 tmux kill-session -t ralph
-./scripts/ralph-monitor.sh .
+ralph-monitor.sh .
 ```
 
 ### High Costs
 
 ```bash
 # Check current strategy
-./scripts/ralph-budget.sh . --budget YOUR_REMAINING_BUDGET
+ralph-budget.sh . --budget YOUR_REMAINING_BUDGET
 
 # Switch to cheaper model config
 # Edit ~/.config/opencode/oh-my-opencode.json
@@ -498,9 +508,9 @@ opencode auth
 
 ## Best Practices
 
-1. **Always use the monitor** - Don't run Ralph directly in production
+1. **Always use the monitor** - Don't run Ralph Ultra directly in production
 2. **Start with budget planning** - Know your costs before starting
-3. **Use git branches** - Ralph creates commits; use feature branches
+3. **Use git branches** - Ralph Ultra creates commits; use feature branches
 4. **Review progress.txt** - Contains learnings for future iterations
 5. **Set up notifications** - NTFY or webhooks for remote monitoring
 6. **Back up before starting** - Monitor creates backups, but be safe
@@ -512,4 +522,5 @@ opencode auth
 
 - **Issues**: Check `.ralph-failures/` for captured context
 - **Logs**: `ralph-monitor.log` has detailed activity
-- **Reports**: `./scripts/ralph-monitor.sh --report .` for visual overview
+- **Reports**: `ralph-monitor.sh --report .` for visual overview
+- **GitHub**: https://github.com/48Nauts-Operator/ralph-ultra

@@ -6,13 +6,18 @@
 
 set -e
 
-MAX_ITERATIONS=${1:-10}
+PROJECT_DIR="${1:-.}"
+MAX_ITERATIONS="${2:-10}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROMPT_FILE="$SCRIPT_DIR/prompt.md"
+
+cd "$PROJECT_DIR" || { echo "Cannot access project directory: $PROJECT_DIR"; exit 1; }
+PROJECT_DIR="$(pwd)"
+
 PRD_FILE="prd.json"
 PROGRESS_FILE="progress.txt"
 ARCHIVE_DIR="archive"
 LAST_BRANCH_FILE=".last-branch"
-PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 
 # Colors
 RED='\033[0;31m'
@@ -141,6 +146,7 @@ main() {
   init_progress
   
   info "Starting Ralph Ultra - Max iterations: $MAX_ITERATIONS"
+  info "Project: $PROJECT_DIR"
   info "PRD: $PRD_FILE"
   info "Progress: $PROGRESS_FILE"
   echo ""
