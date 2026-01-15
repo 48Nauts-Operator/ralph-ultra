@@ -1,0 +1,162 @@
+#!/bin/bash
+# Ralph Ultra - Unified CLI
+# Main entry point for all Ralph commands
+
+set -e
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Output helpers
+error() { echo -e "${RED}[ERROR]${NC} $1" >&2; exit 1; }
+info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+
+# Determine script directories
+RALPH_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RALPH_ROOT="$(dirname "$RALPH_BIN_DIR")"
+RALPH_SCRIPTS_DIR="$RALPH_ROOT/scripts"
+RALPH_VERSION_FILE="$RALPH_ROOT/VERSION"
+
+# Ensure scripts directory exists
+if [[ ! -d "$RALPH_SCRIPTS_DIR" ]]; then
+  error "Scripts directory not found: $RALPH_SCRIPTS_DIR"
+fi
+
+# Read version
+get_version() {
+  if [[ -f "$RALPH_VERSION_FILE" ]]; then
+    cat "$RALPH_VERSION_FILE" | tr -d '\n'
+  else
+    echo "unknown"
+  fi
+}
+
+# Show version
+show_version() {
+  echo "ralph $(get_version)"
+}
+
+# Discover available commands from scripts directory
+discover_commands() {
+  local commands=()
+
+  # Built-in commands (implemented in this file or as separate scripts)
+  commands+=("run:Execute a Ralph project (wraps ralph.sh)")
+  commands+=("status:Show Ralph status (quota, hybrid, timing)")
+  commands+=("quota:Manage Claude Pro quota")
+  commands+=("hybrid:Manage hybrid LLM routing")
+  commands+=("stats:Show timing statistics")
+  commands+=("init:Initialize a new Ralph project")
+
+  printf '%s\n' "${commands[@]}"
+}
+
+# Show help
+show_help() {
+  cat << EOF
+$(show_version)
+Unified CLI for Ralph Ultra - Autonomous AI Agent System
+
+USAGE:
+  ralph <command> [options] [args]
+
+COMMANDS:
+  run       Execute a Ralph project (wraps ralph.sh)
+  status    Show Ralph status (quota, hybrid, timing)
+  quota     Manage Claude Pro quota
+  hybrid    Manage hybrid LLM routing
+  stats     Show timing statistics
+  init      Initialize a new Ralph project
+
+GLOBAL OPTIONS:
+  --help, -h     Show this help
+  --version, -v  Show version
+
+Use 'ralph <command> --help' for command-specific help.
+
+EXAMPLES:
+  ralph run /path/to/project
+  ralph status
+  ralph quota --check
+  ralph hybrid --status
+
+For more information, visit: https://github.com/yourusername/ralph-ultra
+EOF
+}
+
+# Dispatch to subcommand
+dispatch_command() {
+  local cmd="$1"
+  shift
+
+  case "$cmd" in
+    run)
+      # Delegate to ralph.sh
+      exec "$RALPH_SCRIPTS_DIR/ralph.sh" "$@"
+      ;;
+    quota)
+      # Delegate to ralph-quota.sh
+      exec "$RALPH_SCRIPTS_DIR/ralph-quota.sh" "$@"
+      ;;
+    hybrid)
+      # Delegate to ralph-hybrid.sh
+      exec "$RALPH_SCRIPTS_DIR/ralph-hybrid.sh" "$@"
+      ;;
+    stats)
+      # Delegate to ralph-timing-db.sh
+      exec "$RALPH_SCRIPTS_DIR/ralph-timing-db.sh" "$@"
+      ;;
+    status)
+      # TODO: Implement unified status command (CLI-003)
+      error "Status command not yet implemented (CLI-003)"
+      ;;
+    init)
+      # TODO: Implement interactive init command (CLI-007)
+      error "Init command not yet implemented (CLI-007)"
+      ;;
+    --help|-h|help)
+      show_help
+      exit 0
+      ;;
+    --version|-v|version)
+      show_version
+      exit 0
+      ;;
+    "")
+      show_help
+      exit 0
+      ;;
+    *)
+      error "Unknown command: $cmd
+
+Run 'ralph --help' for usage information."
+      ;;
+  esac
+}
+
+# Main entry point
+main() {
+  # Handle global flags first
+  case "${1:-}" in
+    --help|-h)
+      show_help
+      exit 0
+      ;;
+    --version|-v)
+      show_version
+      exit 0
+      ;;
+  esac
+
+  # Dispatch to subcommand
+  dispatch_command "$@"
+}
+
+main "$@"
