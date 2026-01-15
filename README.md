@@ -55,12 +55,12 @@ Ralph Ultra uses different AI models for different tasks to optimize cost:
 
 | Agent | Model | Cost | Why |
 |-------|-------|------|-----|
-| **Sisyphus** | Sonnet 4 | ~$3/M tokens | Main agent - good balance of quality and cost |
+| **Sisyphus** | Sonnet 4.5 | ~$3/M tokens | Main agent - good balance of quality and cost |
 | **oracle** | Opus 4.5 | ~$15/M tokens | Complex reasoning - used sparingly for hard problems |
-| **explore** | Haiku 3.5 | ~$0.25/M tokens | Codebase search - fast and cheap |
-| **librarian** | Haiku 3.5 | ~$0.25/M tokens | Doc lookup - fast and cheap |
-| **frontend-ui-ux-engineer** | Sonnet 4 | ~$3/M tokens | UI work |
-| **document-writer** | Sonnet 4 | ~$3/M tokens | Documentation |
+| **explore** | Haiku 4.5 | ~$0.25/M tokens | Codebase search - fast and cheap |
+| **librarian** | Haiku 4.5 | ~$0.25/M tokens | Doc lookup - fast and cheap |
+| **frontend-ui-ux-engineer** | Sonnet 4.5 | ~$3/M tokens | UI work |
+| **document-writer** | Sonnet 4.5 | ~$3/M tokens | Documentation |
 
 ### Before and After
 
@@ -80,12 +80,12 @@ Ralph Ultra uses different AI models for different tasks to optimize cost:
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "my-custom-agent": { "model": "some-model" },
-    "Sisyphus": { "model": "anthropic/claude-sonnet-4-20250514" },
-    "oracle": { "model": "anthropic/claude-opus-4-5" },
-    "explore": { "model": "anthropic/claude-3-5-haiku-20241022" },
-    "librarian": { "model": "anthropic/claude-3-5-haiku-20241022" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4-20250514" },
-    "document-writer": { "model": "anthropic/claude-sonnet-4-20250514" }
+    "Sisyphus": { "model": "anthropic/claude-sonnet-4.5" },
+    "oracle": { "model": "anthropic/claude-opus-4.5" },
+    "explore": { "model": "anthropic/claude-haiku-4.5" },
+    "librarian": { "model": "anthropic/claude-haiku-4.5" },
+    "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4.5" },
+    "document-writer": { "model": "anthropic/claude-sonnet-4.5" }
   }
 }
 ```

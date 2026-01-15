@@ -111,25 +111,25 @@ generate_config() {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "Sisyphus": {
-      "model": "anthropic/claude-sonnet-4-20250514"
+      "model": "anthropic/claude-sonnet-4.5"
     },
     "oracle": {
-      "model": "anthropic/claude-opus-4-5"
+      "model": "anthropic/claude-opus-4.5"
     },
     "explore": {
-      "model": "anthropic/claude-3-5-haiku-20241022"
+      "model": "anthropic/claude-haiku-4.5"
     },
     "librarian": {
-      "model": "anthropic/claude-3-5-haiku-20241022"
+      "model": "anthropic/claude-haiku-4.5"
     },
     "frontend-ui-ux-engineer": {
-      "model": "anthropic/claude-sonnet-4-20250514"
+      "model": "anthropic/claude-sonnet-4.5"
     },
     "document-writer": {
-      "model": "anthropic/claude-sonnet-4-20250514"
+      "model": "anthropic/claude-sonnet-4.5"
     },
     "multimodal-looker": {
-      "model": "anthropic/claude-sonnet-4-20250514"
+      "model": "anthropic/claude-sonnet-4.5"
     }
   }
 }

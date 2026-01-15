@@ -305,11 +305,11 @@ show_model_config() {
   cat << 'EOF'
   {
     "agents": {
-      "Sisyphus": { "model": "anthropic/claude-sonnet-4" },
-      "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4" },
-      "document-writer": { "model": "anthropic/claude-sonnet-4" },
-      "Coder Agent": { "model": "anthropic/claude-sonnet-4" },
-      "oracle": { "model": "anthropic/claude-opus-4-5" }
+      "Sisyphus": { "model": "anthropic/claude-sonnet-4.5" },
+      "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4.5" },
+      "document-writer": { "model": "anthropic/claude-sonnet-4.5" },
+      "Coder Agent": { "model": "anthropic/claude-sonnet-4.5" },
+      "oracle": { "model": "anthropic/claude-opus-4.5" }
     }
   }
 EOF
@@ -318,13 +318,13 @@ EOF
   cat << 'EOF'
   {
     "agents": {
-      "Sisyphus": { "model": "anthropic/claude-sonnet-4" },
-      "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4" },
-      "document-writer": { "model": "anthropic/claude-haiku-3" },
-      "Coder Agent": { "model": "anthropic/claude-sonnet-4" },
-      "oracle": { "model": "anthropic/claude-sonnet-4" },
-      "explore": { "model": "anthropic/claude-haiku-3" },
-      "librarian": { "model": "anthropic/claude-haiku-3" }
+      "Sisyphus": { "model": "anthropic/claude-sonnet-4.5" },
+      "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4.5" },
+      "document-writer": { "model": "anthropic/claude-haiku-4.5" },
+      "Coder Agent": { "model": "anthropic/claude-sonnet-4.5" },
+      "oracle": { "model": "anthropic/claude-sonnet-4.5" },
+      "explore": { "model": "anthropic/claude-haiku-4.5" },
+      "librarian": { "model": "anthropic/claude-haiku-4.5" }
     }
   }
 EOF
