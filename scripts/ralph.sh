@@ -166,7 +166,7 @@ run_ai() {
   
   case "$cli" in
     opencode)
-      OPENCODE_PERMISSION='{"*":"allow"}' opencode run "$(cat $prompt_file)" 2>&1
+      OPENCODE_PERMISSION='{"*":"allow"}' opencode --prompt "$(cat $prompt_file)" 2>&1
       ;;
     amp)
       cat "$prompt_file" | amp --dangerously-allow-all 2>&1
