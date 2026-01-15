@@ -296,6 +296,367 @@ show_project_status() {
   echo ""
 }
 
+# Initialize a new Ralph project with interactive PRD generator
+init_project() {
+  local project_dir="${1:-.}"
+  local use_template="${2:-}"
+
+  # Handle help flag
+  if [[ "$project_dir" == "--help" || "$project_dir" == "-h" ]]; then
+    cat << EOF
+ralph init - Initialize a new Ralph project
+
+USAGE:
+  ralph init [directory] [--template NAME]
+
+OPTIONS:
+  directory           Project directory (default: current directory)
+  --template NAME     Use a template (webapp, cli, api, lib)
+
+EXAMPLES:
+  ralph init                      # Initialize in current directory
+  ralph init ./my-project         # Initialize in my-project/
+  ralph init . --template webapp  # Use webapp template
+
+The interactive prompt will guide you through creating a prd.json file.
+EOF
+    return 0
+  fi
+
+  # Check for template flag
+  if [[ "$project_dir" == "--template" ]]; then
+    use_template="$2"
+    project_dir="."
+  elif [[ "$2" == "--template" ]]; then
+    use_template="$3"
+  fi
+
+  # Ensure project directory exists
+  if [[ ! -d "$project_dir" ]]; then
+    read -p "$(echo -e "${YELLOW}Directory $project_dir does not exist. Create it? [y/N]:${NC} ")" -r create_dir
+    if [[ ! "$create_dir" =~ ^[Yy]$ ]]; then
+      error "Project directory does not exist: $project_dir"
+    fi
+    mkdir -p "$project_dir" || error "Failed to create directory: $project_dir"
+    success "Created directory: $project_dir"
+  fi
+
+  cd "$project_dir" || error "Cannot access directory: $project_dir"
+
+  # Check if prd.json already exists
+  if [[ -f "prd.json" ]]; then
+    read -p "$(echo -e "${YELLOW}prd.json already exists. Overwrite? [y/N]:${NC} ")" -r overwrite
+    if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
+      error "Aborting: prd.json already exists"
+    fi
+  fi
+
+  echo ""
+  echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}║         Ralph Project Initialization             ║${NC}"
+  echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+  echo ""
+  info "Creating a new Ralph project PRD"
+  echo ""
+
+  # Use template or interactive mode
+  if [[ -n "$use_template" ]]; then
+    create_from_template "$use_template"
+  else
+    create_interactive_prd
+  fi
+}
+
+# Create PRD from template
+create_from_template() {
+  local template="$1"
+
+  case "$template" in
+    webapp)
+      cat > prd.json << 'EOF'
+{
+  "project": "my-webapp",
+  "description": "Web application with frontend and backend",
+  "branchName": "feat/webapp",
+  "techStack": ["typescript", "react", "node"],
+  "userStories": [
+    {
+      "id": "WEB-001",
+      "title": "Setup project structure",
+      "description": "Initialize repository with basic structure and dependencies",
+      "priority": 1,
+      "complexity": "simple",
+      "acceptanceCriteria": [
+        "Package.json exists with all dependencies",
+        "TypeScript configuration is set up",
+        "Basic folder structure created"
+      ],
+      "passes": false
+    }
+  ]
+}
+EOF
+      success "Created webapp template in prd.json"
+      info "Edit prd.json to customize your project"
+      ;;
+    cli)
+      cat > prd.json << 'EOF'
+{
+  "project": "my-cli",
+  "description": "Command-line interface tool",
+  "branchName": "feat/cli",
+  "techStack": ["bash", "jq"],
+  "userStories": [
+    {
+      "id": "CLI-001",
+      "title": "Create main CLI entry point",
+      "description": "Create executable script with command dispatch",
+      "priority": 1,
+      "complexity": "simple",
+      "acceptanceCriteria": [
+        "Main script exists and is executable",
+        "Help text shows available commands",
+        "Version command works"
+      ],
+      "passes": false
+    }
+  ]
+}
+EOF
+      success "Created CLI template in prd.json"
+      info "Edit prd.json to customize your project"
+      ;;
+    api)
+      cat > prd.json << 'EOF'
+{
+  "project": "my-api",
+  "description": "RESTful API service",
+  "branchName": "feat/api",
+  "techStack": ["typescript", "express", "postgresql"],
+  "userStories": [
+    {
+      "id": "API-001",
+      "title": "Setup API server",
+      "description": "Initialize Express server with basic middleware",
+      "priority": 1,
+      "complexity": "simple",
+      "acceptanceCriteria": [
+        "Server starts on configured port",
+        "Health check endpoint responds",
+        "Error handling middleware works"
+      ],
+      "passes": false
+    }
+  ]
+}
+EOF
+      success "Created API template in prd.json"
+      info "Edit prd.json to customize your project"
+      ;;
+    lib)
+      cat > prd.json << 'EOF'
+{
+  "project": "my-library",
+  "description": "Reusable library package",
+  "branchName": "feat/library",
+  "techStack": ["typescript"],
+  "userStories": [
+    {
+      "id": "LIB-001",
+      "title": "Setup library structure",
+      "description": "Initialize library with build and test setup",
+      "priority": 1,
+      "complexity": "simple",
+      "acceptanceCriteria": [
+        "TypeScript builds successfully",
+        "Tests run successfully",
+        "Package can be imported"
+      ],
+      "passes": false
+    }
+  ]
+}
+EOF
+      success "Created library template in prd.json"
+      info "Edit prd.json to customize your project"
+      ;;
+    *)
+      error "Unknown template: $template
+
+Available templates: webapp, cli, api, lib"
+      ;;
+  esac
+}
+
+# Create PRD interactively
+create_interactive_prd() {
+  local project_name description branch_name tech_stack
+  local stories=()
+
+  # Project basics
+  read -p "$(echo -e "${BLUE}Project name:${NC} ")" -r project_name
+  if [[ -z "$project_name" ]]; then
+    project_name="my-project"
+    info "Using default: $project_name"
+  fi
+
+  read -p "$(echo -e "${BLUE}Description:${NC} ")" -r description
+  if [[ -z "$description" ]]; then
+    description="A new Ralph project"
+    info "Using default: $description"
+  fi
+
+  read -p "$(echo -e "${BLUE}Branch name:${NC} ")" -r branch_name
+  if [[ -z "$branch_name" ]]; then
+    branch_name="feat/${project_name}"
+    info "Using default: $branch_name"
+  fi
+
+  read -p "$(echo -e "${BLUE}Tech stack (comma-separated, e.g., typescript,react,node):${NC} ")" -r tech_stack
+  if [[ -z "$tech_stack" ]]; then
+    tech_stack="bash"
+    info "Using default: $tech_stack"
+  fi
+
+  echo ""
+  info "Now let's add user stories (type 'done' when finished)"
+  echo ""
+
+  local story_count=0
+  while true; do
+    story_count=$((story_count + 1))
+
+    echo -e "${CYAN}━━━ Story $story_count ━━━${NC}"
+
+    read -p "$(echo -e "${BLUE}Story ID (e.g., US-001) or 'done':${NC} ")" -r story_id
+    if [[ "$story_id" == "done" || -z "$story_id" ]]; then
+      if [[ $story_count -eq 1 ]]; then
+        warn "At least one story is recommended"
+        read -p "$(echo -e "${YELLOW}Continue without stories? [y/N]:${NC} ")" -r continue_empty
+        if [[ ! "$continue_empty" =~ ^[Yy]$ ]]; then
+          continue
+        fi
+      fi
+      break
+    fi
+
+    read -p "$(echo -e "${BLUE}Title:${NC} ")" -r story_title
+    if [[ -z "$story_title" ]]; then
+      warn "Story title is required"
+      story_count=$((story_count - 1))
+      continue
+    fi
+
+    read -p "$(echo -e "${BLUE}Description:${NC} ")" -r story_desc
+    if [[ -z "$story_desc" ]]; then
+      story_desc="$story_title"
+    fi
+
+    read -p "$(echo -e "${BLUE}Priority (1-10):${NC} ")" -r story_priority
+    if [[ -z "$story_priority" ]]; then
+      story_priority="$story_count"
+    fi
+
+    read -p "$(echo -e "${BLUE}Complexity (simple/medium/complex):${NC} ")" -r story_complexity
+    if [[ -z "$story_complexity" ]]; then
+      story_complexity="medium"
+    fi
+
+    # Acceptance criteria
+    echo -e "${BLUE}Acceptance criteria (one per line, empty line to finish):${NC}"
+    local criteria=()
+    while true; do
+      read -p "  - " -r criterion
+      if [[ -z "$criterion" ]]; then
+        break
+      fi
+      criteria+=("$criterion")
+    done
+
+    if [[ ${#criteria[@]} -eq 0 ]]; then
+      criteria=("Story completed successfully")
+    fi
+
+    # Build story JSON
+    local criteria_json=""
+    for criterion in "${criteria[@]}"; do
+      if [[ -n "$criteria_json" ]]; then
+        criteria_json+=","
+      fi
+      criteria_json+="\"$criterion\""
+    done
+
+    local story_json=$(cat <<EOF
+    {
+      "id": "$story_id",
+      "title": "$story_title",
+      "description": "$story_desc",
+      "priority": $story_priority,
+      "complexity": "$story_complexity",
+      "acceptanceCriteria": [$criteria_json],
+      "passes": false
+    }
+EOF
+)
+    stories+=("$story_json")
+
+    echo ""
+  done
+
+  # Build tech stack array
+  IFS=',' read -ra tech_array <<< "$tech_stack"
+  local tech_json=""
+  for tech in "${tech_array[@]}"; do
+    tech=$(echo "$tech" | xargs) # trim whitespace
+    if [[ -n "$tech_json" ]]; then
+      tech_json+=", "
+    fi
+    tech_json+="\"$tech\""
+  done
+
+  # Build stories array
+  local stories_json=""
+  for story in "${stories[@]}"; do
+    if [[ -n "$stories_json" ]]; then
+      stories_json+=","
+    fi
+    stories_json+="$story"
+  done
+
+  # Generate prd.json
+  cat > prd.json << EOF
+{
+  "project": "$project_name",
+  "description": "$description",
+  "branchName": "$branch_name",
+  "techStack": [$tech_json],
+  "userStories": [
+$stories_json
+  ]
+}
+EOF
+
+  echo ""
+  success "Created prd.json with ${#stories[@]} user stories"
+
+  # Validate JSON
+  if command -v jq &>/dev/null; then
+    if jq empty prd.json 2>/dev/null; then
+      success "prd.json is valid JSON"
+    else
+      error "Generated prd.json is invalid. Please check the file manually."
+    fi
+  else
+    info "Install jq to validate JSON automatically"
+  fi
+
+  echo ""
+  info "Next steps:"
+  echo "  1. Review prd.json and adjust as needed"
+  echo "  2. Run: ralph run ."
+  echo ""
+}
+
 # Dispatch to subcommand
 dispatch_command() {
   local cmd="$1"
@@ -324,8 +685,9 @@ dispatch_command() {
       exit 0
       ;;
     init)
-      # TODO: Implement interactive init command (CLI-007)
-      error "Init command not yet implemented (CLI-007)"
+      # Interactive PRD generator (CLI-007)
+      init_project "$@"
+      exit 0
       ;;
     --help|-h|help)
       show_help
