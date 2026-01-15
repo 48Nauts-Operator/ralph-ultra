@@ -17,7 +17,7 @@ success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
 show_usage() {
-  echo "Usage: ralph.sh <project_dir> [max_iterations]"
+  echo "Usage: ralph.sh [options] <project_dir> [max_iterations]"
   echo ""
   echo "Arguments:"
   echo "  project_dir     Path to project (REQUIRED)"
@@ -25,15 +25,24 @@ show_usage() {
   echo "                  Auto: remaining_stories * 3, min 10, max 200"
   echo ""
   echo "Options:"
+  echo "  --worktree      Create git worktree instead of branch"
+  echo "  --branch NAME   Specify branch name (default: ralph/<project-name>)"
   echo "  --no-monitor    Run without health monitoring"
   echo "  --skip-budget   Skip budget check"
   echo "  --status        Show current status"
   echo "  --report        Generate HTML report"
   echo "  --help, -h      Show this help"
   echo ""
+  echo "Git Behavior:"
+  echo "  - If on main/master: auto-creates branch 'ralph/<project-name>'"
+  echo "  - If on feature branch: continues on current branch"
+  echo "  - With --worktree: creates separate worktree directory"
+  echo "  - Not a git repo: warns but continues"
+  echo ""
   echo "Examples:"
   echo "  ralph.sh /path/to/project"
-  echo "  ralph.sh /path/to/project 100"
+  echo "  ralph.sh --worktree /path/to/project"
+  echo "  ralph.sh --branch feature/my-feature /path/to/project"
   echo "  ralph.sh --status /path/to/project"
 }
 
@@ -42,6 +51,8 @@ SKIP_BUDGET=false
 STATUS_ONLY=false
 REPORT_ONLY=false
 AGENT_ONLY=false
+USE_WORKTREE=false
+BRANCH_NAME=""
 
 while [[ "$1" == --* ]]; do
   case "$1" in
@@ -69,6 +80,14 @@ while [[ "$1" == --* ]]; do
       AGENT_ONLY=true
       SKIP_BUDGET=true
       shift
+      ;;
+    --worktree)
+      USE_WORKTREE=true
+      shift
+      ;;
+    --branch)
+      BRANCH_NAME="$2"
+      shift 2
       ;;
     *)
       shift
@@ -99,6 +118,75 @@ if [[ "$PROJECT_DIR" == *".config/opencode"* ]]; then
   error "Cannot run Ralph Ultra in the global config directory.
        Please specify a project directory:
        ralph.sh /path/to/your/project"
+fi
+
+setup_git_branch() {
+  if [ ! -d ".git" ]; then
+    warn "Not a git repository. Consider initializing git for version control."
+    return 0
+  fi
+  
+  if ! git config user.name &>/dev/null || ! git config user.email &>/dev/null; then
+    error "Git user not configured. Run:
+       git config user.name 'Your Name'
+       git config user.email 'your@email.com'"
+  fi
+  
+  local current_branch=$(git branch --show-current 2>/dev/null)
+  local project_name=$(basename "$PROJECT_DIR")
+  local default_branch_name="ralph/${project_name}"
+  
+  if [ -n "$BRANCH_NAME" ]; then
+    default_branch_name="$BRANCH_NAME"
+  fi
+  
+  if [ "$USE_WORKTREE" = true ]; then
+    local worktree_path="../${project_name}-ralph-worktree"
+    
+    if [ -d "$worktree_path" ]; then
+      info "Worktree already exists at $worktree_path"
+      cd "$worktree_path" || error "Cannot access worktree"
+      PROJECT_DIR="$(pwd)"
+      return 0
+    fi
+    
+    info "Creating git worktree at $worktree_path on branch $default_branch_name"
+    
+    if ! git branch --list "$default_branch_name" | grep -q "$default_branch_name"; then
+      git branch "$default_branch_name" 2>/dev/null || true
+    fi
+    
+    git worktree add "$worktree_path" "$default_branch_name" 2>/dev/null || {
+      error "Failed to create worktree. Check if branch '$default_branch_name' exists."
+    }
+    
+    cd "$worktree_path" || error "Cannot access worktree"
+    PROJECT_DIR="$(pwd)"
+    success "Worktree created at $PROJECT_DIR"
+    return 0
+  fi
+  
+  if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
+    info "On $current_branch branch. Creating feature branch: $default_branch_name"
+    
+    if git branch --list "$default_branch_name" | grep -q "$default_branch_name"; then
+      git checkout "$default_branch_name" 2>/dev/null || {
+        error "Failed to checkout existing branch '$default_branch_name'"
+      }
+      success "Switched to existing branch: $default_branch_name"
+    else
+      git checkout -b "$default_branch_name" 2>/dev/null || {
+        error "Failed to create branch '$default_branch_name'"
+      }
+      success "Created and switched to branch: $default_branch_name"
+    fi
+  else
+    info "Already on feature branch: $current_branch"
+  fi
+}
+
+if [ "$AGENT_ONLY" != true ]; then
+  setup_git_branch
 fi
 
 if [ "$STATUS_ONLY" = true ]; then
