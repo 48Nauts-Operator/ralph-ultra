@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ralph Ultra Setup - Configure opencode for cost-optimized autonomous execution
+# Ralph Ultra Setup - Install scripts and configure opencode
 
 set -e
 
@@ -10,7 +10,10 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-CONFIG_FILE="$HOME/.config/opencode/oh-my-opencode.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OPENCODE_DIR="$HOME/.config/opencode"
+INSTALL_DIR="$OPENCODE_DIR/scripts/ralph-ultra"
+CONFIG_FILE="$OPENCODE_DIR/oh-my-opencode.json"
 BACKUP_SUFFIX=".backup.$(date +%Y%m%d_%H%M%S)"
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -22,57 +25,84 @@ show_banner() {
   echo ""
   echo -e "${CYAN}╔══════════════════════════════════════════════════════╗${NC}"
   echo -e "${CYAN}║           Ralph Ultra - Setup Wizard                 ║${NC}"
-  echo -e "${CYAN}║     Cost-optimized autonomous agent configuration   ║${NC}"
+  echo -e "${CYAN}║     Autonomous AI Agent with Health Monitoring      ║${NC}"
   echo -e "${CYAN}╚══════════════════════════════════════════════════════╝${NC}"
   echo ""
 }
 
 check_prereqs() {
-  if ! command -v jq &> /dev/null; then
-    error "jq is required. Install with: brew install jq (macOS) or apt install jq (Linux)"
+  local has_errors=false
+  
+  echo -e "${BLUE}Checking prerequisites...${NC}"
+  echo ""
+  
+  # jq
+  if command -v jq &> /dev/null; then
+    success "jq installed"
+  else
+    echo -e "${RED}[MISSING]${NC} jq - Install with: brew install jq (macOS) or apt install jq (Linux)"
+    has_errors=true
   fi
   
-  if ! command -v opencode &> /dev/null; then
-    warn "opencode CLI not found. Install from: https://opencode.ai"
+  # tmux
+  if command -v tmux &> /dev/null; then
+    success "tmux installed"
+  else
+    echo -e "${RED}[MISSING]${NC} tmux - Install with: brew install tmux (macOS) or apt install tmux (Linux)"
+    has_errors=true
   fi
-}
-
-show_current_config() {
-  echo -e "${BLUE}Current Configuration:${NC}"
-  echo "─────────────────────────────────────────"
   
-  if [ -f "$CONFIG_FILE" ]; then
-    echo -e "File: ${CYAN}$CONFIG_FILE${NC}"
-    echo ""
-    if command -v jq &> /dev/null; then
-      jq -r '.agents // {} | to_entries[] | "  \(.key): \(.value.model // "default")"' "$CONFIG_FILE" 2>/dev/null || echo "  (no agents configured)"
+  # opencode
+  if command -v opencode &> /dev/null; then
+    success "opencode CLI installed"
+  else
+    echo -e "${RED}[MISSING]${NC} opencode CLI"
+    echo -e "         Install from: ${CYAN}https://opencode.ai${NC}"
+    has_errors=true
+  fi
+  
+  # oh-my-opencode plugin
+  if [ -f "$CONFIG_FILE" ] || [ -d "$OPENCODE_DIR" ]; then
+    if [ -f "$CONFIG_FILE" ]; then
+      success "oh-my-opencode plugin detected"
     else
-      cat "$CONFIG_FILE"
+      warn "opencode config directory exists but oh-my-opencode.json not found"
+      echo -e "         Will create config file during installation"
     fi
   else
-    echo -e "  ${YELLOW}No configuration file found${NC}"
+    echo -e "${RED}[MISSING]${NC} oh-my-opencode plugin"
+    echo -e "         Install from: ${CYAN}https://github.com/code-yeongyu/oh-my-opencode${NC}"
+    echo ""
+    echo -e "         Quick install:"
+    echo -e "         ${YELLOW}git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode${NC}"
+    has_errors=true
   fi
+  
+  echo ""
+  
+  if [ "$has_errors" = true ]; then
+    error "Please install missing prerequisites and run setup again"
+  fi
+  
+  success "All prerequisites met!"
   echo ""
 }
 
-show_recommended_config() {
-  echo -e "${GREEN}Recommended Ralph Ultra Configuration:${NC}"
-  echo "─────────────────────────────────────────"
-  cat << 'EOF'
-  Sisyphus (main):        claude-sonnet-4      (~$3/M tokens)
-  oracle:                 claude-opus-4.5      (~$15/M tokens)
-  explore:                claude-3.5-haiku     (~$0.25/M tokens)
-  librarian:              claude-3.5-haiku     (~$0.25/M tokens)
-  frontend-ui-ux-engineer: claude-sonnet-4     (~$3/M tokens)
-  document-writer:        claude-sonnet-4      (~$3/M tokens)
-  multimodal-looker:      claude-sonnet-4      (~$3/M tokens)
-
-Cost Optimization Strategy:
-  - Main agent uses Sonnet (good balance of cost/quality)
-  - Oracle uses Opus (expensive, but used sparingly for complex reasoning)
-  - Explore/Librarian use Haiku (cheap, fast for searches)
-EOF
-  echo ""
+install_scripts() {
+  info "Installing Ralph Ultra scripts to $INSTALL_DIR"
+  
+  mkdir -p "$INSTALL_DIR"
+  
+  # Copy scripts
+  cp "$SCRIPT_DIR/ralph.sh" "$INSTALL_DIR/"
+  cp "$SCRIPT_DIR/ralph-monitor.sh" "$INSTALL_DIR/"
+  cp "$SCRIPT_DIR/ralph-budget.sh" "$INSTALL_DIR/"
+  cp "$SCRIPT_DIR/prompt.md" "$INSTALL_DIR/"
+  
+  # Make executable
+  chmod +x "$INSTALL_DIR"/*.sh
+  
+  success "Scripts installed to $INSTALL_DIR"
 }
 
 generate_config() {
@@ -106,20 +136,65 @@ generate_config() {
 EOF
 }
 
-apply_config() {
-  local config_dir=$(dirname "$CONFIG_FILE")
+show_current_config() {
+  echo -e "${BLUE}Current Model Configuration:${NC}"
+  echo "─────────────────────────────────────────"
   
-  if [ ! -d "$config_dir" ]; then
-    info "Creating config directory: $config_dir"
-    mkdir -p "$config_dir"
+  if [ -f "$CONFIG_FILE" ]; then
+    jq -r '.agents // {} | to_entries[] | "  \(.key): \(.value.model // "default")"' "$CONFIG_FILE" 2>/dev/null || echo "  (no agents configured)"
+  else
+    echo -e "  ${YELLOW}No configuration file found${NC}"
+  fi
+  echo ""
+}
+
+show_recommended_config() {
+  echo -e "${GREEN}Recommended Configuration:${NC}"
+  echo "─────────────────────────────────────────"
+  cat << 'EOF'
+  Sisyphus (main):         Sonnet 4     (~$3/M tokens)
+  oracle:                  Opus 4.5     (~$15/M tokens, used sparingly)
+  explore:                 Haiku 3.5    (~$0.25/M tokens)
+  librarian:               Haiku 3.5    (~$0.25/M tokens)
+  frontend-ui-ux-engineer: Sonnet 4     (~$3/M tokens)
+  document-writer:         Sonnet 4     (~$3/M tokens)
+EOF
+  echo ""
+}
+
+show_diff() {
+  if [ ! -f "$CONFIG_FILE" ]; then
+    echo -e "${YELLOW}No existing config - will create new${NC}"
+    return
   fi
   
+  echo -e "${BLUE}Changes to model configuration:${NC}"
+  echo "─────────────────────────────────────────"
+  
+  local new_agents="Sisyphus oracle explore librarian frontend-ui-ux-engineer document-writer multimodal-looker"
+  
+  for agent in $new_agents; do
+    local current_model=$(jq -r ".agents.\"$agent\".model // \"(not set)\"" "$CONFIG_FILE" 2>/dev/null)
+    local new_model=$(generate_config | jq -r ".agents.\"$agent\".model")
+    
+    if [ "$current_model" = "$new_model" ]; then
+      echo -e "  $agent: ${GREEN}$new_model${NC} (unchanged)"
+    elif [ "$current_model" = "(not set)" ]; then
+      echo -e "  $agent: ${CYAN}+ $new_model${NC} (new)"
+    else
+      echo -e "  $agent: ${RED}$current_model${NC} → ${GREEN}$new_model${NC}"
+    fi
+  done
+  echo ""
+}
+
+apply_config() {
   if [ -f "$CONFIG_FILE" ]; then
     info "Backing up existing config to ${CONFIG_FILE}${BACKUP_SUFFIX}"
     cp "$CONFIG_FILE" "${CONFIG_FILE}${BACKUP_SUFFIX}"
   fi
   
-  info "Writing new configuration..."
+  info "Writing model configuration..."
   generate_config > "$CONFIG_FILE"
   success "Configuration applied to $CONFIG_FILE"
 }
@@ -143,30 +218,25 @@ merge_config() {
   success "Configuration merged successfully"
 }
 
-show_diff() {
-  if [ ! -f "$CONFIG_FILE" ]; then
-    echo -e "${YELLOW}No existing config to compare${NC}"
-    return
-  fi
-  
-  echo -e "${BLUE}Changes that will be applied:${NC}"
+show_install_status() {
+  echo -e "${BLUE}Installation Status:${NC}"
   echo "─────────────────────────────────────────"
   
-  local current_agents=$(jq -r '.agents // {} | keys[]' "$CONFIG_FILE" 2>/dev/null | sort)
-  local new_agents="Sisyphus oracle explore librarian frontend-ui-ux-engineer document-writer multimodal-looker"
+  if [ -d "$INSTALL_DIR" ]; then
+    echo -e "  Scripts: ${GREEN}Installed${NC} at $INSTALL_DIR"
+    ls -1 "$INSTALL_DIR" 2>/dev/null | while read f; do
+      echo -e "    - $f"
+    done
+  else
+    echo -e "  Scripts: ${YELLOW}Not installed${NC}"
+  fi
+  echo ""
   
-  for agent in $new_agents; do
-    local current_model=$(jq -r ".agents.\"$agent\".model // \"(not set)\"" "$CONFIG_FILE" 2>/dev/null)
-    local new_model=$(generate_config | jq -r ".agents.\"$agent\".model")
-    
-    if [ "$current_model" = "$new_model" ]; then
-      echo -e "  $agent: ${GREEN}$new_model${NC} (unchanged)"
-    elif [ "$current_model" = "(not set)" ]; then
-      echo -e "  $agent: ${CYAN}+ $new_model${NC} (new)"
-    else
-      echo -e "  $agent: ${RED}$current_model${NC} → ${GREEN}$new_model${NC}"
-    fi
-  done
+  if [ -f "$CONFIG_FILE" ]; then
+    echo -e "  Config:  ${GREEN}Found${NC} at $CONFIG_FILE"
+  else
+    echo -e "  Config:  ${YELLOW}Not found${NC}"
+  fi
   echo ""
 }
 
@@ -174,33 +244,40 @@ interactive_setup() {
   show_banner
   check_prereqs
   
-  echo ""
+  show_install_status
   show_current_config
   show_recommended_config
   show_diff
   
   echo -e "${YELLOW}Choose an option:${NC}"
-  echo "  1) Apply recommended config (overwrites existing)"
-  echo "  2) Merge with existing config (preserves custom settings)"
-  echo "  3) Show config only (no changes)"
-  echo "  4) Cancel"
+  echo "  1) Full install (scripts + config) - Recommended"
+  echo "  2) Install scripts only"
+  echo "  3) Configure models only (merge with existing)"
+  echo "  4) Configure models only (overwrite)"
+  echo "  5) Show status only (no changes)"
+  echo "  6) Cancel"
   echo ""
-  read -p "Enter choice [1-4]: " choice
+  read -p "Enter choice [1-6]: " choice
   
   case "$choice" in
     1)
-      apply_config
-      ;;
-    2)
+      install_scripts
       merge_config
       ;;
+    2)
+      install_scripts
+      ;;
     3)
-      echo ""
-      echo -e "${BLUE}Recommended config (copy to $CONFIG_FILE):${NC}"
-      echo "─────────────────────────────────────────"
-      generate_config
+      merge_config
       ;;
     4)
+      apply_config
+      ;;
+    5)
+      info "No changes made"
+      exit 0
+      ;;
+    6)
       info "Cancelled"
       exit 0
       ;;
@@ -212,41 +289,76 @@ interactive_setup() {
   echo ""
   success "Setup complete!"
   echo ""
-  echo -e "${CYAN}Next steps:${NC}"
-  echo "  1. Create a prd.json for your project (use the 'prd' skill)"
-  echo "  2. Run: ./scripts/ralph-budget.sh . --budget YOUR_BUDGET"
-  echo "  3. Run: ./scripts/ralph.sh . [max_iterations]"
+  echo -e "${CYAN}Ralph Ultra is now installed globally.${NC}"
+  echo ""
+  echo -e "Usage:"
+  echo -e "  ${YELLOW}$INSTALL_DIR/ralph.sh /path/to/project${NC}"
+  echo ""
+  echo -e "Or add to your PATH:"
+  echo -e "  ${YELLOW}export PATH=\"\$PATH:$INSTALL_DIR\"${NC}"
+  echo ""
+  echo -e "Then from any project:"
+  echo -e "  ${YELLOW}ralph.sh .${NC}"
   echo ""
 }
 
+uninstall() {
+  echo -e "${YELLOW}Uninstalling Ralph Ultra...${NC}"
+  
+  if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+    success "Removed $INSTALL_DIR"
+  else
+    info "Scripts not installed"
+  fi
+  
+  echo ""
+  info "Model configuration in $CONFIG_FILE was NOT removed"
+  info "Remove manually if needed"
+}
+
 case "${1:-}" in
-  --apply|-a)
+  --install|-i)
     check_prereqs
-    apply_config
+    install_scripts
+    merge_config
+    success "Installation complete!"
     ;;
-  --merge|-m)
+  --scripts-only)
+    check_prereqs
+    install_scripts
+    ;;
+  --config-only)
     check_prereqs
     merge_config
     ;;
-  --show|-s)
-    generate_config
+  --uninstall|-u)
+    uninstall
+    ;;
+  --status|-s)
+    show_banner
+    show_install_status
+    show_current_config
     ;;
   --diff|-d)
-    check_prereqs
     show_diff
     ;;
   --help|-h)
     echo "Usage: $0 [option]"
     echo ""
     echo "Options:"
-    echo "  (none)      Interactive setup wizard"
-    echo "  --apply     Apply recommended config (overwrites)"
-    echo "  --merge     Merge with existing config"
-    echo "  --show      Print recommended config to stdout"
-    echo "  --diff      Show what would change"
-    echo "  --help      Show this help"
+    echo "  (none)          Interactive setup wizard"
+    echo "  --install       Full install (scripts + config)"
+    echo "  --scripts-only  Install scripts only"
+    echo "  --config-only   Configure models only"
+    echo "  --uninstall     Remove Ralph Ultra scripts"
+    echo "  --status        Show installation status"
+    echo "  --diff          Show config changes"
+    echo "  --help          Show this help"
     echo ""
-    echo "Config file: $CONFIG_FILE"
+    echo "Paths:"
+    echo "  Scripts: $INSTALL_DIR"
+    echo "  Config:  $CONFIG_FILE"
     ;;
   *)
     interactive_setup
