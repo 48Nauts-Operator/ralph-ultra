@@ -6,6 +6,8 @@ Ralph Ultra is an autonomous AI agent system for executing PRD-based development
 It consists of bash scripts that orchestrate AI coding agents with health monitoring,
 cost optimization, and learning capabilities.
 
+**Repository:** https://github.com/48Nauts-Operator/ralph-ultra
+
 ## Repository Structure
 
 ```
