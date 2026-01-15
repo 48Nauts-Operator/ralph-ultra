@@ -41,6 +41,7 @@ NO_MONITOR=false
 SKIP_BUDGET=false
 STATUS_ONLY=false
 REPORT_ONLY=false
+AGENT_ONLY=false
 
 while [[ "$1" == --* ]]; do
   case "$1" in
@@ -62,6 +63,11 @@ while [[ "$1" == --* ]]; do
       ;;
     --report)
       REPORT_ONLY=true
+      shift
+      ;;
+    --agent-only)
+      AGENT_ONLY=true
+      SKIP_BUDGET=true
       shift
       ;;
     *)
@@ -330,14 +336,47 @@ main() {
   archive_previous
   init_progress
   
-  if [ "$NO_MONITOR" = true ]; then
+  if [ "$AGENT_ONLY" = true ]; then
+    run_agent_loop
+  elif [ "$NO_MONITOR" = true ]; then
     warn "Running WITHOUT health monitoring (--no-monitor)"
     echo ""
     run_agent_loop
   else
-    info "Starting with health monitoring..."
+    info "Starting Ralph Ultra with health monitoring..."
+    info "Monitor runs as separate background process"
     echo ""
-    exec "$MONITOR_SCRIPT" "$PROJECT_DIR" 5
+    
+    # Start monitor in background (separate process)
+    nohup "$MONITOR_SCRIPT" "$PROJECT_DIR" 5 > "$LOG_DIR/ralph-monitor-runner.log" 2>&1 &
+    MONITOR_PID=$!
+    
+    echo "$MONITOR_PID" > "$PROJECT_DIR/.ralph-monitor.pid"
+    success "Monitor started (PID: $MONITOR_PID)"
+    info "Monitor log: $LOG_DIR/ralph-monitor-runner.log"
+    echo ""
+    
+    # Give monitor time to start
+    sleep 2
+    
+    # Check if monitor started successfully
+    if kill -0 "$MONITOR_PID" 2>/dev/null; then
+      info "Attaching to Ralph session (Ctrl+B, D to detach)..."
+      sleep 3
+      
+      # Wait for tmux session to be created by monitor
+      for i in {1..10}; do
+        if tmux has-session -t ralph 2>/dev/null; then
+          tmux attach -t ralph
+          exit 0
+        fi
+        sleep 1
+      done
+      
+      warn "Tmux session not ready yet. Attach manually with: tmux attach -t ralph"
+    else
+      error "Monitor failed to start. Check $LOG_DIR/ralph-monitor-runner.log"
+    fi
   fi
 }
 

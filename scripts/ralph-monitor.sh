@@ -1735,22 +1735,20 @@ backup_progress() {
 }
 
 restart_ralph() {
-  local reason="$1"
-  local current=$(get_current_story)
+  local reason="${1:-Unknown}"
   
   log "WARN" "Restarting Ralph: $reason"
-  capture_failure_context "$current" "$reason"
-  record_restart "$reason" "$current"
-  record_event "restart" "Restarting: $reason" "$current"
-  webhook_restart "$current" "$reason"
-  backup_progress
+  notify "Restarting Ralph: $reason"
   
   # Kill existing session
   tmux kill-session -t ralph 2>/dev/null || true
   sleep 2
   
+  # Capture failure context
+  capture_failure_context "$reason"
+  
   # Start new session
-  tmux new-session -d -s ralph -c "$PROJECT_DIR" "$RALPH_SCRIPT $RALPH_ITERATIONS"
+  tmux new-session -d -s ralph -c "$PROJECT_DIR" "$RALPH_SCRIPT --agent-only $PROJECT_DIR $RALPH_ITERATIONS"
   sleep 3
   
   # Verify restart
@@ -1772,7 +1770,7 @@ start_ralph() {
   fi
   
   log "INFO" "Starting Ralph..."
-  tmux new-session -d -s ralph -c "$PROJECT_DIR" "$RALPH_SCRIPT $RALPH_ITERATIONS"
+  tmux new-session -d -s ralph -c "$PROJECT_DIR" "$RALPH_SCRIPT --agent-only $PROJECT_DIR $RALPH_ITERATIONS"
   sleep 3
   
   if check_stage1_session; then
