@@ -4,6 +4,21 @@
 
 Ralph Ultra is an enhanced version of the Ralph autonomous coding agent. It adds production-grade features for running AI agents unattended on large projects.
 
+## Quick Install
+
+**Option 1: Let your AI do it**
+
+In your opencode/claude session, just say:
+```
+Please install Ralph Ultra from https://github.com/48Nauts-Operator/ralph-ultra
+```
+
+**Option 2: Manual setup**
+
+See [Installation](#installation) below.
+
+---
+
 ## Features
 
 | Feature | Description |
