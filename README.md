@@ -118,7 +118,23 @@ ralph.sh --skip-budget /path/to/project  # Skip budget question
 ralph.sh --no-monitor /path/to/project   # Run without monitoring (not recommended)
 ralph.sh --status /path/to/project  # Check current status
 ralph.sh --report /path/to/project  # Generate HTML report
+ralph.sh --worktree /path/to/project     # Create git worktree instead of branch
+ralph.sh --branch feature/x /path/to/project  # Specify custom branch name
 ```
+
+### Git Safety (Branch Protection)
+
+Ralph Ultra automatically protects your main branch:
+
+| Scenario | Behavior |
+|----------|----------|
+| On `main` or `master` | Auto-creates `ralph/<project-name>` branch |
+| On feature branch | Continues on current branch |
+| With `--worktree` | Creates separate worktree directory |
+| With `--branch NAME` | Uses specified branch name |
+| Not a git repo | Warns but continues |
+
+This prevents accidental commits to main when running autonomously.
 
 ### What gets created in your project
 
