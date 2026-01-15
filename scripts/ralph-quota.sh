@@ -102,7 +102,7 @@ get_oauth_token() {
   # Priority 1: Environment variable (allows override)
   token=$(get_token_env)
   if [ -n "$token" ]; then
-    log_info "Using OAuth token from CLAUDE_CODE_OAUTH_TOKEN env var"
+    log_info "Using OAuth token from CLAUDE_CODE_OAUTH_TOKEN env var" >&2
     echo "$token"
     return 0
   fi
@@ -112,7 +112,7 @@ get_oauth_token() {
     macos)
       token=$(get_token_macos)
       if [ -n "$token" ]; then
-        log_info "Using OAuth token from macOS Keychain"
+        log_info "Using OAuth token from macOS Keychain" >&2
         echo "$token"
         return 0
       fi
@@ -120,7 +120,7 @@ get_oauth_token() {
     linux)
       token=$(get_token_linux)
       if [ -n "$token" ]; then
-        log_info "Using OAuth token from ~/.claude/.credentials.json"
+        log_info "Using OAuth token from ~/.claude/.credentials.json" >&2
         echo "$token"
         return 0
       fi
