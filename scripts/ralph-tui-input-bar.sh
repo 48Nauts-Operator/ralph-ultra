@@ -243,11 +243,76 @@ handle_logs() {
 }
 
 handle_run() {
-    echo -e "${YELLOW}Run command will be implemented in TUI-008${NC}"
+    local pid_file="$PROJECT_DIR/.ralph-run.pid"
+
+    # Check if Ralph is already running
+    if [[ -f "$pid_file" ]]; then
+        local pid=$(cat "$pid_file" 2>/dev/null)
+        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+            echo -e "${RED}Ralph is already running (PID: $pid)${NC}"
+            echo -e "${DIM}Use /stop to stop the current run${NC}"
+            return 1
+        else
+            # PID file exists but process is not running - clean up
+            rm -f "$pid_file"
+        fi
+    fi
+
+    # Start Ralph in background
+    echo -e "${CYAN}Starting Ralph Ultra...${NC}"
+
+    # Run ralph.sh in background and capture PID
+    # We need to redirect output to the log file
+    nohup "$SCRIPT_DIR/ralph.sh" "$PROJECT_DIR" > "$PROJECT_DIR/logs/ralph-monitor.log" 2>&1 &
+    local ralph_pid=$!
+
+    # Save PID to file
+    echo "$ralph_pid" > "$pid_file"
+
+    echo -e "${GREEN}Ralph started (PID: $ralph_pid)${NC}"
+    echo -e "${DIM}Monitor view will show live output${NC}"
+
+    # Switch to monitor view to show the output
+    handle_monitor
 }
 
 handle_stop() {
-    echo -e "${YELLOW}Stop command will be implemented in TUI-008${NC}"
+    local pid_file="$PROJECT_DIR/.ralph-run.pid"
+
+    # Check if PID file exists
+    if [[ ! -f "$pid_file" ]]; then
+        echo -e "${RED}Ralph is not running${NC}"
+        echo -e "${DIM}Use /run to start Ralph${NC}"
+        return 1
+    fi
+
+    local pid=$(cat "$pid_file" 2>/dev/null)
+
+    # Check if process is actually running
+    if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+        echo -e "${RED}Ralph process not found (was PID: $pid)${NC}"
+        rm -f "$pid_file"
+        return 1
+    fi
+
+    # Send SIGTERM to gracefully stop
+    echo -e "${CYAN}Stopping Ralph (PID: $pid)...${NC}"
+    kill -TERM "$pid" 2>/dev/null
+
+    # Wait a bit for graceful shutdown
+    sleep 2
+
+    # Check if still running, force kill if needed
+    if kill -0 "$pid" 2>/dev/null; then
+        echo -e "${YELLOW}Process still running, forcing shutdown...${NC}"
+        kill -9 "$pid" 2>/dev/null
+        sleep 1
+    fi
+
+    # Clean up PID file
+    rm -f "$pid_file"
+
+    echo -e "${GREEN}Ralph stopped${NC}"
 }
 
 handle_report() {
