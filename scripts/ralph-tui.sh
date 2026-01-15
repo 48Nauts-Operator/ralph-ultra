@@ -135,8 +135,8 @@ create_session() {
     # Left pane: PRD progress viewer (with watch mode for auto-refresh)
     tmux send-keys -t "$SESSION_NAME:0.0" "'$SCRIPT_DIR/ralph-tui-left-panel.sh' --watch '$project_path'" C-m
 
-    # Right pane: Live monitor
-    tmux send-keys -t "$SESSION_NAME:0.1" "echo 'Initializing live monitor...'" C-m
+    # Right pane: Live monitor (default view)
+    tmux send-keys -t "$SESSION_NAME:0.1" "'$SCRIPT_DIR/ralph-tui-right-panel.sh' monitor '$project_path'" C-m
 
     # Bottom pane: Input prompt
     tmux send-keys -t "$SESSION_NAME:0.2" "echo 'Type /help for available commands'" C-m
