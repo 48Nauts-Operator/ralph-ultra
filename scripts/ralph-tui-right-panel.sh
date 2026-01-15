@@ -137,7 +137,156 @@ render_status() {
     echo -e "${BOLD}${CYAN}║${NC}  ${BOLD}System Status${NC}                                            ${BOLD}${CYAN}║${NC}"
     echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${DIM}Status view will be implemented in TUI-006${NC}"
+
+    # Claude Pro Quota Section
+    echo -e "${BOLD}Claude Pro Quota:${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    # Run quota check and parse output (strip ANSI codes for parsing)
+    local quota_output quota_clean
+    quota_output=$("$SCRIPT_DIR/ralph-quota.sh" --status 2>&1) || true
+    # Strip ANSI color codes: \033[...m or \e[...m
+    quota_clean=$(echo "$quota_output" | sed 's/\x1b\[[0-9;]*m//g')
+
+    # Extract 5-hour quota
+    local five_hour_util five_hour_reset
+    if [[ "$quota_clean" =~ Utilization:[[:space:]]*([0-9.]+)% ]]; then
+        five_hour_util="${BASH_REMATCH[1]}"
+    else
+        five_hour_util="N/A"
+    fi
+
+    if [[ "$quota_clean" =~ Resets[[:space:]]in:[[:space:]]*([0-9]+h[[:space:]]+[0-9]+m) ]]; then
+        five_hour_reset="${BASH_REMATCH[1]}"
+    else
+        five_hour_reset="N/A"
+    fi
+
+    # Extract 7-day quota (look for second occurrence)
+    local seven_day_util seven_day_reset
+    # Use awk to get the second Utilization line
+    seven_day_util=$(echo "$quota_clean" | grep "Utilization:" | tail -1 | sed -n 's/.*Utilization:[[:space:]]*\([0-9.]*\)%.*/\1/p')
+    seven_day_reset=$(echo "$quota_clean" | grep "Resets in:" | tail -1 | sed -n 's/.*Resets in:[[:space:]]*\([0-9]*h[[:space:]]*[0-9]*m\).*/\1/p')
+
+    if [[ -z "$seven_day_util" ]]; then
+        seven_day_util="N/A"
+    fi
+    if [[ -z "$seven_day_reset" ]]; then
+        seven_day_reset="N/A"
+    fi
+
+    # Color code based on utilization
+    local five_hour_color="$GREEN"
+    if [[ "$five_hour_util" != "N/A" ]]; then
+        if (( $(echo "$five_hour_util >= 98" | bc -l 2>/dev/null || echo 0) )); then
+            five_hour_color="$RED"
+        elif (( $(echo "$five_hour_util >= 90" | bc -l 2>/dev/null || echo 0) )); then
+            five_hour_color="$YELLOW"
+        fi
+    fi
+
+    local seven_day_color="$GREEN"
+    if [[ "$seven_day_util" != "N/A" ]]; then
+        if (( $(echo "$seven_day_util >= 98" | bc -l 2>/dev/null || echo 0) )); then
+            seven_day_color="$RED"
+        elif (( $(echo "$seven_day_util >= 90" | bc -l 2>/dev/null || echo 0) )); then
+            seven_day_color="$YELLOW"
+        fi
+    fi
+
+    echo -e "  5-Hour:  ${five_hour_color}${five_hour_util}%${NC}  ${DIM}(resets in ${five_hour_reset})${NC}"
+    echo -e "  7-Day:   ${seven_day_color}${seven_day_util}%${NC}  ${DIM}(resets in ${seven_day_reset})${NC}"
+    echo ""
+
+    # Hybrid LLM Section
+    echo -e "${BOLD}Hybrid LLM Configuration:${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    local hybrid_output
+    hybrid_output=$("$SCRIPT_DIR/ralph-hybrid.sh" --status 2>&1) || true
+
+    # Extract hybrid mode
+    local hybrid_mode hybrid_provider hybrid_local_available
+    if [[ "$hybrid_output" =~ Mode:[[:space:]]*([a-z]+) ]]; then
+        hybrid_mode="${BASH_REMATCH[1]}"
+    else
+        hybrid_mode="disabled"
+    fi
+
+    if [[ "$hybrid_output" =~ Provider:[[:space:]]*([a-z]+) ]]; then
+        hybrid_provider="${BASH_REMATCH[1]}"
+    else
+        hybrid_provider="N/A"
+    fi
+
+    if [[ "$hybrid_output" =~ "Local LLM is not available" ]]; then
+        hybrid_local_available="no"
+    elif [[ "$hybrid_output" =~ "Local LLM Status:" ]]; then
+        hybrid_local_available="yes"
+    else
+        hybrid_local_available="unknown"
+    fi
+
+    # Extract statistics
+    local total_requests local_requests api_requests
+    if [[ "$hybrid_output" =~ Total[[:space:]]Requests:[[:space:]]*([0-9]+) ]]; then
+        total_requests="${BASH_REMATCH[1]}"
+    else
+        total_requests="0"
+    fi
+
+    if [[ "$hybrid_output" =~ Local:[[:space:]]*([0-9]+) ]]; then
+        local_requests="${BASH_REMATCH[1]}"
+    else
+        local_requests="0"
+    fi
+
+    if [[ "$hybrid_output" =~ API:[[:space:]]*([0-9]+) ]]; then
+        api_requests="${BASH_REMATCH[1]}"
+    else
+        api_requests="0"
+    fi
+
+    # Display hybrid status
+    echo -e "  Mode:            ${BOLD}${hybrid_mode}${NC}"
+    echo -e "  Provider:        ${hybrid_provider}"
+    echo -e "  Local Available: ${hybrid_local_available}"
+    echo -e "  Requests:        Total: ${total_requests}, Local: ${local_requests}, API: ${api_requests}"
+    echo ""
+
+    # Timing Database Section
+    echo -e "${BOLD}Timing Database:${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    local timing_output
+    timing_output=$("$SCRIPT_DIR/ralph-timing-db.sh" --stats 2>&1) || true
+
+    # Extract timing stats
+    local total_runs avg_duration success_rate total_hours
+    if [[ "$timing_output" =~ total_runs[[:space:]]+projects.*[[:space:]]([0-9]+)[[:space:]]+[0-9]+[[:space:]]+([0-9.]+) ]]; then
+        total_runs="${BASH_REMATCH[1]}"
+        avg_duration="${BASH_REMATCH[2]}"
+    else
+        total_runs="0"
+        avg_duration="0"
+    fi
+
+    # Try to extract success rate and total hours from the table
+    if [[ "$timing_output" =~ total_hours[[:space:]]+success_rate.*[[:space:]]([0-9.]+)[[:space:]]+([0-9.]+)[[:space:]]*$ ]]; then
+        total_hours="${BASH_REMATCH[1]}"
+        success_rate="${BASH_REMATCH[2]}"
+    else
+        total_hours="0"
+        success_rate="100.0"
+    fi
+
+    echo -e "  Total Runs:      ${BOLD}${total_runs}${NC}"
+    echo -e "  Avg Duration:    ${avg_duration} minutes"
+    echo -e "  Total Runtime:   ${total_hours} hours"
+    echo -e "  Success Rate:    ${GREEN}${success_rate}%${NC}"
+    echo ""
+
+    echo -e "${DIM}Type /monitor to return to live monitor view${NC}"
 }
 
 # Render logs browser view

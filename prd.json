@@ -103,7 +103,7 @@
         "Data fetched from existing ralph-quota.sh, ralph-hybrid.sh, ralph-timing-db.sh",
         "/monitor switches back to live monitor view"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TUI-007",
