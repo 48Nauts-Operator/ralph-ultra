@@ -78,6 +78,8 @@ One command does everything:
 ralph.sh /path/to/project
 ```
 
+Iterations are **auto-calculated** based on remaining stories (stories × 3, min 10, max 200). Override with a second argument if needed.
+
 ### What happens when you run Ralph Ultra
 
 1. **Validates project** - Checks project path exists and has `prd.json`
@@ -91,8 +93,8 @@ ralph.sh /path/to/project
 ### Command Options
 
 ```bash
-ralph.sh /path/to/project           # Full run (default 50 iterations)
-ralph.sh /path/to/project 100       # Run with 100 iterations
+ralph.sh /path/to/project           # Full run (auto-calculates iterations)
+ralph.sh /path/to/project 100       # Override with 100 iterations
 ralph.sh --skip-budget /path/to/project  # Skip budget question
 ralph.sh --no-monitor /path/to/project   # Run without monitoring (not recommended)
 ralph.sh --status /path/to/project  # Check current status

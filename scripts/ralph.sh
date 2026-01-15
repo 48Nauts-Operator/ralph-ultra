@@ -21,7 +21,8 @@ show_usage() {
   echo ""
   echo "Arguments:"
   echo "  project_dir     Path to project (REQUIRED)"
-  echo "  max_iterations  Maximum iterations (default: 50)"
+  echo "  max_iterations  Maximum iterations (auto-calculated if not provided)"
+  echo "                  Auto: remaining_stories * 3, min 10, max 200"
   echo ""
   echo "Options:"
   echo "  --no-monitor    Run without health monitoring"
@@ -75,7 +76,7 @@ if [ -z "$1" ]; then
 fi
 
 PROJECT_DIR="$1"
-MAX_ITERATIONS="${2:-50}"
+USER_ITERATIONS="$2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 MONITOR_SCRIPT="$SCRIPT_DIR/ralph-monitor.sh"
@@ -108,6 +109,37 @@ mkdir -p "$LOG_DIR"
 PRD_FILE="prd.json"
 PROGRESS_FILE="progress.txt"
 ARCHIVE_DIR="archive"
+
+calculate_iterations() {
+  if [ -n "$USER_ITERATIONS" ]; then
+    echo "$USER_ITERATIONS"
+    return
+  fi
+  
+  if [ ! -f "$PRD_FILE" ]; then
+    echo "50"
+    return
+  fi
+  
+  local remaining=$(jq '[.userStories[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo "0")
+  
+  if [ "$remaining" -eq 0 ]; then
+    echo "10"
+    return
+  fi
+  
+  local iterations=$((remaining * 3))
+  
+  if [ "$iterations" -lt 10 ]; then
+    iterations=10
+  elif [ "$iterations" -gt 200 ]; then
+    iterations=200
+  fi
+  
+  echo "$iterations"
+}
+
+MAX_ITERATIONS=$(calculate_iterations)
 LAST_BRANCH_FILE=".ralph-last-branch"
 
 detect_cli() {
