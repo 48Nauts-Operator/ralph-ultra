@@ -34,14 +34,33 @@ See [Installation](#installation) below.
 
 ## Prerequisites
 
-| Requirement | Install |
-|-------------|---------|
-| **jq** | `brew install jq` (macOS) or `apt install jq` (Linux) |
-| **tmux** | `brew install tmux` (macOS) or `apt install tmux` (Linux) |
-| **opencode** | https://opencode.ai |
-| **oh-my-opencode** | https://github.com/code-yeongyu/oh-my-opencode |
+| Requirement | Install | Notes |
+|-------------|---------|-------|
+| **jq** | `brew install jq` (macOS) or `apt install jq` (Linux) | JSON processing |
+| **tmux** | `brew install tmux` (macOS) or `apt install tmux` (Linux) | Session management |
+| **Claude CLI** | `npm install -g @anthropic-ai/claude-code` | **Recommended** - works headlessly |
+| **OpenCode** | https://opencode.ai | Alternative (has known CLI issues) |
 
-### Installing oh-my-opencode
+### AI CLI Installation
+
+Ralph Ultra supports multiple AI CLIs. **Claude CLI is recommended** as it works reliably in headless/automation mode.
+
+**Option 1: Claude CLI (Recommended)**
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**Option 2: OpenCode CLI**
+```bash
+# Via npm
+npm install -g opencode
+
+# Or download from https://opencode.ai
+```
+
+> **Note**: OpenCode's `opencode run` command has known issues in headless mode (see [#8502](https://github.com/anomalyco/opencode/issues/8502), [#8203](https://github.com/anomalyco/opencode/issues/8203)). Claude CLI is preferred until these are fixed.
+
+### oh-my-opencode (Optional, for OpenCode users)
 
 ```bash
 git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode
@@ -56,9 +75,9 @@ cd ralph-ultra
 ```
 
 The setup wizard will:
-1. **Check prerequisites** - Verify jq, tmux, opencode, and oh-my-opencode are installed
+1. **Check prerequisites** - Verify jq, tmux, and at least one AI CLI (claude or opencode)
 2. **Install scripts** - Copy Ralph Ultra to `~/.config/opencode/scripts/ralph-ultra/`
-3. **Configure models** - Add cost-optimized agent models to `oh-my-opencode.json`
+3. **Configure models** - Add cost-optimized agent models (if using oh-my-opencode)
 
 ### Add to PATH
 
@@ -195,16 +214,30 @@ Shows:
 
 ## Troubleshooting
 
-### Setup fails with "oh-my-opencode not found"
+### No AI CLI found
+
+Ralph Ultra looks for CLIs in this order: `claude` > `opencode` > `amp`
 
 ```bash
-git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode
+# Check what's installed
+which claude opencode amp
+
+# Install Claude CLI (recommended)
+npm install -g @anthropic-ai/claude-code
 ```
 
-### Agent not starting
+### OpenCode `run` command hangs or fails
 
+This is a known issue. Use Claude CLI instead:
 ```bash
-which opencode  # Verify CLI is installed
+npm install -g @anthropic-ai/claude-code
+```
+
+### Setup fails with "oh-my-opencode not found"
+
+Only needed if using OpenCode:
+```bash
+git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode
 ```
 
 ### Check current status

@@ -149,12 +149,12 @@ MAX_ITERATIONS=$(calculate_iterations)
 LAST_BRANCH_FILE=".ralph-last-branch"
 
 detect_cli() {
-  if command -v opencode &> /dev/null; then
+  if command -v claude &> /dev/null; then
+    echo "claude"
+  elif command -v opencode &> /dev/null; then
     echo "opencode"
   elif command -v amp &> /dev/null; then
     echo "amp"
-  elif command -v claude &> /dev/null; then
-    echo "claude"
   else
     echo "none"
   fi
@@ -165,17 +165,21 @@ run_ai() {
   local cli=$(detect_cli)
   
   case "$cli" in
+    claude)
+      claude --print --dangerously-skip-permissions "$(cat $prompt_file)" 2>&1
+      ;;
     opencode)
-      OPENCODE_PERMISSION='{"*":"allow"}' opencode --prompt "$(cat $prompt_file)" 2>&1
+      (
+        unset OPENCODE_SERVER_PASSWORD OPENCODE_SERVER_USERNAME
+        export OPENCODE_PERMISSION='{"*":"allow"}'
+        opencode run --title "Ralph: $(basename $PROJECT_DIR)" "$(cat $prompt_file)"
+      ) 2>&1
       ;;
     amp)
       cat "$prompt_file" | amp --dangerously-allow-all 2>&1
       ;;
-    claude)
-      claude --print --dangerously-skip-permissions "$(cat $prompt_file)" 2>&1
-      ;;
     none)
-      error "No AI CLI found. Install one of: opencode, amp, claude"
+      error "No AI CLI found. Install: claude (recommended), opencode, or amp"
       ;;
   esac
 }

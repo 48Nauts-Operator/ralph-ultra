@@ -32,6 +32,7 @@ show_banner() {
 
 check_prereqs() {
   local has_errors=false
+  local has_ai_cli=false
   
   echo -e "${BLUE}Checking prerequisites...${NC}"
   echo ""
@@ -52,30 +53,37 @@ check_prereqs() {
     has_errors=true
   fi
   
-  # opencode
-  if command -v opencode &> /dev/null; then
-    success "opencode CLI installed"
+  # AI CLI - check for claude (preferred) or opencode
+  if command -v claude &> /dev/null; then
+    success "Claude CLI installed (recommended)"
+    has_ai_cli=true
   else
-    echo -e "${RED}[MISSING]${NC} opencode CLI"
-    echo -e "         Install from: ${CYAN}https://opencode.ai${NC}"
+    warn "Claude CLI not found - Install with: npm install -g @anthropic-ai/claude-code"
+  fi
+  
+  if command -v opencode &> /dev/null; then
+    if [ "$has_ai_cli" = true ]; then
+      info "OpenCode CLI also available (fallback)"
+    else
+      warn "OpenCode CLI installed (has known headless issues, Claude CLI recommended)"
+      has_ai_cli=true
+    fi
+  fi
+  
+  if [ "$has_ai_cli" = false ]; then
+    echo -e "${RED}[MISSING]${NC} AI CLI - Install at least one:"
+    echo -e "         ${GREEN}Recommended:${NC} npm install -g @anthropic-ai/claude-code"
+    echo -e "         Alternative:  https://opencode.ai"
     has_errors=true
   fi
   
-  # oh-my-opencode plugin
-  if [ -f "$CONFIG_FILE" ] || [ -d "$OPENCODE_DIR" ]; then
-    if [ -f "$CONFIG_FILE" ]; then
-      success "oh-my-opencode plugin detected"
-    else
-      warn "opencode config directory exists but oh-my-opencode.json not found"
-      echo -e "         Will create config file during installation"
-    fi
+  # oh-my-opencode plugin (optional now)
+  if [ -f "$CONFIG_FILE" ]; then
+    success "oh-my-opencode config detected"
+  elif [ -d "$OPENCODE_DIR" ]; then
+    info "OpenCode config directory exists (oh-my-opencode.json will be created)"
   else
-    echo -e "${RED}[MISSING]${NC} oh-my-opencode plugin"
-    echo -e "         Install from: ${CYAN}https://github.com/code-yeongyu/oh-my-opencode${NC}"
-    echo ""
-    echo -e "         Quick install:"
-    echo -e "         ${YELLOW}git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode${NC}"
-    has_errors=true
+    info "oh-my-opencode not found (optional - only needed for OpenCode model config)"
   fi
   
   echo ""
