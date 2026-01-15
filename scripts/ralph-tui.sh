@@ -132,8 +132,8 @@ create_session() {
     tmux set-environment -t "$SESSION_NAME" RALPH_PROJECT_PATH "$project_path"
 
     # Initialize panes with placeholder content
-    # Left pane: PRD progress viewer
-    tmux send-keys -t "$SESSION_NAME:0.0" "echo 'Loading PRD progress...'" C-m
+    # Left pane: PRD progress viewer (with watch mode for auto-refresh)
+    tmux send-keys -t "$SESSION_NAME:0.0" "'$SCRIPT_DIR/ralph-tui-left-panel.sh' --watch '$project_path'" C-m
 
     # Right pane: Live monitor
     tmux send-keys -t "$SESSION_NAME:0.1" "echo 'Initializing live monitor...'" C-m

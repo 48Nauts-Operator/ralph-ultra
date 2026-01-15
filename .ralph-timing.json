@@ -11,6 +11,14 @@
     "CLI-004": {
       "actual": 5,
       "estimate": 20
+    },
+    "CLI-006": {
+      "actual": 73,
+      "estimate": 20
+    },
+    "TUI-001": {
+      "actual": 5,
+      "estimate": 20
     }
   },
   "averages": {

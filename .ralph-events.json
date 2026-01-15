@@ -1,5 +1,5 @@
 {
-  "started": "2026-01-15T23:10:25+01:00",
+  "started": "2026-01-16T00:34:42+01:00",
   "project": "ralph-ultra",
   "platform": "macos",
   "events": [
@@ -38,6 +38,30 @@
       "type": "story_complete",
       "message": "Completed: CLI-004 in 5m",
       "story": "CLI-004"
+    },
+    {
+      "timestamp": "2026-01-16T00:34:42+01:00",
+      "type": "started",
+      "message": "Monitor started for ralph-ultra",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-16T00:34:45+01:00",
+      "type": "start",
+      "message": "Ralph started",
+      "story": "TUI-001"
+    },
+    {
+      "timestamp": "2026-01-16T00:34:45+01:00",
+      "type": "story_complete",
+      "message": "Completed: CLI-006 in 73m",
+      "story": "CLI-006"
+    },
+    {
+      "timestamp": "2026-01-16T00:39:47+01:00",
+      "type": "story_complete",
+      "message": "Completed: TUI-001 in 5m",
+      "story": "TUI-001"
     }
   ],
   "stories_completed": [
@@ -86,6 +110,36 @@
         "lines_added": 0,
         "lines_removed": 0,
         "files": []
+      }
+    },
+    {
+      "timestamp": "2026-01-16T00:34:45+01:00",
+      "story": "CLI-006",
+      "duration": 73,
+      "estimate": 20,
+      "git": {
+        "start_commit": "bb7fba9",
+        "end_commit": "bb7fba9",
+        "files_changed": 0,
+        "lines_added": 0,
+        "lines_removed": 0,
+        "files": []
+      }
+    },
+    {
+      "timestamp": "2026-01-16T00:39:47+01:00",
+      "story": "TUI-001",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "bb7fba9",
+        "end_commit": "2c6a356",
+        "files_changed": 1,
+        "lines_added": 217,
+        "lines_removed": 0,
+        "files": [
+          "scripts/ralph-tui.sh"
+        ]
       }
     }
   ],
