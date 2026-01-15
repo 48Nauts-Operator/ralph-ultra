@@ -1,42 +1,120 @@
 #!/bin/bash
 # Ralph Ultra - Autonomous AI Agent System
-# Enhanced with: health monitoring, budget planning, sub-agent delegation
-# Works with: amp, opencode, claude
-# Usage: ./ralph.sh [project_dir] [max_iterations]
+# Usage: ralph.sh <project_dir> [max_iterations]
 
 set -e
 
-PROJECT_DIR="${1:-.}"
-MAX_ITERATIONS="${2:-10}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROMPT_FILE="$SCRIPT_DIR/prompt.md"
-
-cd "$PROJECT_DIR" || { echo "Cannot access project directory: $PROJECT_DIR"; exit 1; }
-PROJECT_DIR="$(pwd)"
-
-PRD_FILE="prd.json"
-PROGRESS_FILE="progress.txt"
-ARCHIVE_DIR="archive"
-LAST_BRANCH_FILE=".last-branch"
-
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-# Detect available AI CLI
+show_usage() {
+  echo "Usage: ralph.sh <project_dir> [max_iterations]"
+  echo ""
+  echo "Arguments:"
+  echo "  project_dir     Path to project (REQUIRED)"
+  echo "  max_iterations  Maximum iterations (default: 50)"
+  echo ""
+  echo "Options:"
+  echo "  --no-monitor    Run without health monitoring"
+  echo "  --skip-budget   Skip budget check"
+  echo "  --status        Show current status"
+  echo "  --report        Generate HTML report"
+  echo "  --help, -h      Show this help"
+  echo ""
+  echo "Examples:"
+  echo "  ralph.sh /path/to/project"
+  echo "  ralph.sh /path/to/project 100"
+  echo "  ralph.sh --status /path/to/project"
+}
+
+NO_MONITOR=false
+SKIP_BUDGET=false
+STATUS_ONLY=false
+REPORT_ONLY=false
+
+while [[ "$1" == --* ]]; do
+  case "$1" in
+    --help|-h)
+      show_usage
+      exit 0
+      ;;
+    --no-monitor)
+      NO_MONITOR=true
+      shift
+      ;;
+    --skip-budget)
+      SKIP_BUDGET=true
+      shift
+      ;;
+    --status)
+      STATUS_ONLY=true
+      shift
+      ;;
+    --report)
+      REPORT_ONLY=true
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$1" ]; then
+  show_usage
+  exit 1
+fi
+
+PROJECT_DIR="$1"
+MAX_ITERATIONS="${2:-50}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROMPT_FILE="$SCRIPT_DIR/prompt.md"
+MONITOR_SCRIPT="$SCRIPT_DIR/ralph-monitor.sh"
+BUDGET_SCRIPT="$SCRIPT_DIR/ralph-budget.sh"
+
+if [ ! -d "$PROJECT_DIR" ]; then
+  error "Project directory does not exist: $PROJECT_DIR"
+fi
+
+cd "$PROJECT_DIR" || error "Cannot access project directory: $PROJECT_DIR"
+PROJECT_DIR="$(pwd)"
+
+if [[ "$PROJECT_DIR" == *".config/opencode"* ]]; then
+  error "Cannot run Ralph Ultra in the global config directory.
+       Please specify a project directory:
+       ralph.sh /path/to/your/project"
+fi
+
+if [ "$STATUS_ONLY" = true ]; then
+  exec "$MONITOR_SCRIPT" --status "$PROJECT_DIR"
+fi
+
+if [ "$REPORT_ONLY" = true ]; then
+  exec "$MONITOR_SCRIPT" --report "$PROJECT_DIR"
+fi
+
+LOG_DIR="$PROJECT_DIR/logs"
+mkdir -p "$LOG_DIR"
+
+PRD_FILE="prd.json"
+PROGRESS_FILE="progress.txt"
+ARCHIVE_DIR="archive"
+LAST_BRANCH_FILE=".ralph-last-branch"
+
 detect_cli() {
-  if command -v amp &> /dev/null; then
-    echo "amp"
-  elif command -v opencode &> /dev/null; then
+  if command -v opencode &> /dev/null; then
     echo "opencode"
+  elif command -v amp &> /dev/null; then
+    echo "amp"
   elif command -v claude &> /dev/null; then
     echo "claude"
   else
@@ -44,39 +122,37 @@ detect_cli() {
   fi
 }
 
-# Run AI command based on detected CLI
 run_ai() {
   local prompt_file="$1"
   local cli=$(detect_cli)
   
   case "$cli" in
+    opencode)
+      OPENCODE_PERMISSION='{"*":"allow"}' opencode run "$(cat $prompt_file)" 2>&1
+      ;;
     amp)
       cat "$prompt_file" | amp --dangerously-allow-all 2>&1
       ;;
-    opencode)
-      # OpenCode CLI - use 'run' command for non-interactive mode
-      # Permissions are configured via OPENCODE_PERMISSION env var or opencode.json
-      # Set OPENCODE_PERMISSION='{"*":"allow"}' to allow all, or configure in opencode.json
-      OPENCODE_PERMISSION='{"*":"allow"}' opencode run "$(cat $prompt_file)" 2>&1
-      ;;
     claude)
-      # Claude Code CLI usage
       claude --print --dangerously-skip-permissions "$(cat $prompt_file)" 2>&1
       ;;
     none)
-      error "No AI CLI found. Install one of: amp, opencode, claude"
+      error "No AI CLI found. Install one of: opencode, amp, claude"
       ;;
   esac
 }
 
-# Check prerequisites
 check_prereqs() {
   if ! command -v jq &> /dev/null; then
-    error "jq is required but not installed. Install with: brew install jq"
+    error "jq is required. Install with: brew install jq"
+  fi
+  
+  if ! command -v tmux &> /dev/null; then
+    error "tmux is required. Install with: brew install tmux"
   fi
   
   if [ ! -f "$PRD_FILE" ]; then
-    error "prd.json not found. Create one using the 'prd' skill first."
+    error "prd.json not found in $PROJECT_DIR"
   fi
   
   if [ ! -f "$PROMPT_FILE" ]; then
@@ -85,12 +161,60 @@ check_prereqs() {
   
   local cli=$(detect_cli)
   if [ "$cli" = "none" ]; then
-    error "No AI CLI found. Install one of: amp, opencode, claude"
+    error "No AI CLI found. Install one of: opencode, amp, claude"
   fi
   info "Using CLI: $cli"
 }
 
-# Archive previous run if branch changed
+run_budget_check() {
+  if [ "$SKIP_BUDGET" = true ]; then
+    return 0
+  fi
+  
+  echo ""
+  echo -e "${CYAN}Budget Check${NC}"
+  echo "─────────────────────────────────────────"
+  
+  local story_count=$(jq '[.userStories[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo "0")
+  
+  if [ "$story_count" -eq 0 ]; then
+    info "All stories already completed!"
+    return 0
+  fi
+  
+  info "Remaining stories: $story_count"
+  echo ""
+  
+  read -p "Do you want to set a maximum budget? [y/N] " -n 1 -r
+  echo ""
+  
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    read -p "Enter max budget in USD (e.g., 20): " budget_input
+    
+    if [ -n "$budget_input" ]; then
+      echo ""
+      info "Running budget analysis..."
+      echo ""
+      
+      "$BUDGET_SCRIPT" "$PROJECT_DIR" --budget "$budget_input"
+      
+      echo ""
+      read -p "Continue with execution? [Y/n] " -n 1 -r
+      echo ""
+      
+      if [[ $REPLY =~ ^[Nn]$ ]]; then
+        info "Aborted by user."
+        exit 0
+      fi
+    fi
+  else
+    echo ""
+    info "Skipping budget check. Running with default settings."
+  fi
+  
+  echo ""
+}
+
 archive_previous() {
   if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
     local current_branch=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
@@ -107,14 +231,12 @@ archive_previous() {
       [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$archive_folder/"
       success "Archived to: $archive_folder"
       
-      # Reset progress file
-      echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+      echo "# Ralph Ultra Progress Log" > "$PROGRESS_FILE"
       echo "Started: $(date)" >> "$PROGRESS_FILE"
       echo "---" >> "$PROGRESS_FILE"
     fi
   fi
   
-  # Track current branch
   if [ -f "$PRD_FILE" ]; then
     local current_branch=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
     if [ -n "$current_branch" ]; then
@@ -123,52 +245,30 @@ archive_previous() {
   fi
 }
 
-# Initialize progress file
 init_progress() {
   if [ ! -f "$PROGRESS_FILE" ]; then
-    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+    echo "# Ralph Ultra Progress Log" > "$PROGRESS_FILE"
     echo "Started: $(date)" >> "$PROGRESS_FILE"
     echo "---" >> "$PROGRESS_FILE"
   fi
 }
 
-# Main loop
-main() {
-  echo ""
-  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
-  echo -e "${BLUE}║      Ralph Ultra - AI Agent Loop     ║${NC}"
-  echo -e "${BLUE}║    Universal Edition (amp/oc/claude) ║${NC}"
-  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
-  echo ""
-  
-  check_prereqs
-  archive_previous
-  init_progress
-  
-  info "Starting Ralph Ultra - Max iterations: $MAX_ITERATIONS"
-  info "Project: $PROJECT_DIR"
-  info "PRD: $PRD_FILE"
-  info "Progress: $PROGRESS_FILE"
-  echo ""
-
+run_agent_loop() {
   for i in $(seq 1 $MAX_ITERATIONS); do
     echo ""
     echo "═══════════════════════════════════════════════════════"
     echo "  Ralph Ultra - Iteration $i of $MAX_ITERATIONS"
     echo "═══════════════════════════════════════════════════════"
     
-    # Run AI with the ralph prompt
     OUTPUT=$(run_ai "$PROMPT_FILE") || true
     
-    # Echo output for visibility
     echo "$OUTPUT"
     
-    # Check for completion signal
     if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
       echo ""
       success "Ralph Ultra completed all tasks!"
       echo "Completed at iteration $i of $MAX_ITERATIONS"
-      exit 0
+      return 0
     fi
     
     info "Iteration $i complete. Continuing..."
@@ -178,8 +278,35 @@ main() {
   echo ""
   warn "Ralph Ultra reached max iterations ($MAX_ITERATIONS) without completing all tasks."
   echo "Check $PROGRESS_FILE for status."
-  exit 1
+  return 1
 }
 
-# Run
+main() {
+  echo ""
+  echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}║      Ralph Ultra - AI Agent Loop     ║${NC}"
+  echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
+  echo ""
+  
+  info "Project: $PROJECT_DIR"
+  info "Max iterations: $MAX_ITERATIONS"
+  info "Logs: $LOG_DIR"
+  echo ""
+  
+  check_prereqs
+  run_budget_check
+  archive_previous
+  init_progress
+  
+  if [ "$NO_MONITOR" = true ]; then
+    warn "Running WITHOUT health monitoring (--no-monitor)"
+    echo ""
+    run_agent_loop
+  else
+    info "Starting with health monitoring..."
+    echo ""
+    exec "$MONITOR_SCRIPT" "$PROJECT_DIR" 5
+  fi
+}
+
 main "$@"

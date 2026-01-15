@@ -1,12 +1,11 @@
 #!/bin/bash
 # Ralph Ultra Monitor - Health monitoring, auto-restart, cost tracking
 # Works on: macOS and Linux (Ubuntu)
-# Usage: ./ralph-monitor.sh [project_dir] [check_interval_minutes]
+# Usage: ralph-monitor.sh <project_dir> [check_interval_minutes]
 #
 # Examples:
-#   ./ralph-monitor.sh                    # Use current directory, 5 min interval
-#   ./ralph-monitor.sh /path/to/project   # Specific project, 5 min interval
-#   ./ralph-monitor.sh . 10               # Current directory, 10 min interval
+#   ralph-monitor.sh /path/to/project       # Specific project, 5 min interval
+#   ralph-monitor.sh /path/to/project 10    # Specific project, 10 min interval
 
 set -e
 
@@ -17,9 +16,12 @@ set -e
 handle_early_flags() {
   case "${1:-}" in
     --help|-h)
-      echo "Usage: $0 [project_dir] [check_interval_minutes]"
-      echo "       $0 --status [project_dir]"
-      echo "       $0 --report [project_dir]"
+      echo "Usage: $0 <project_dir> [check_interval_minutes]"
+      echo "       $0 --status <project_dir>"
+      echo "       $0 --report <project_dir>"
+      echo ""
+      echo "Arguments:"
+      echo "  project_dir    Path to project (REQUIRED)"
       echo ""
       echo "Options:"
       echo "  --status, -s   Show current status without starting monitor"
@@ -34,14 +36,10 @@ handle_early_flags() {
       echo "  WEBHOOK_TYPE   Webhook type: slack, discord, or generic"
       echo ""
       echo "Examples:"
-      echo "  $0                     # Monitor current directory, 5 min interval"
-      echo "  $0 /path/to/project    # Monitor specific project"
-      echo "  $0 . 10                # Current directory, 10 min interval"
-      echo "  $0 --status .          # Show status only"
-      echo "  $0 --report .          # Generate HTML report"
-      echo ""
-      echo "  # With Slack webhook"
-      echo "  WEBHOOK_URL=https://hooks.slack.com/... WEBHOOK_TYPE=slack $0"
+      echo "  $0 /path/to/project       # Monitor project, 5 min interval"
+      echo "  $0 /path/to/project 10    # Monitor project, 10 min interval"
+      echo "  $0 --status /path/to/project"
+      echo "  $0 --report /path/to/project"
       exit 0
       ;;
     --status|-s|--report|-r)
@@ -52,11 +50,17 @@ handle_early_flags() {
 }
 
 if ! handle_early_flags "$1"; then
-  PROJECT_DIR="${2:-.}"
+  PROJECT_DIR="${2:-}"
   EARLY_FLAG="$1"
 else
-  PROJECT_DIR="${1:-.}"
+  PROJECT_DIR="${1:-}"
   EARLY_FLAG=""
+fi
+
+if [ -z "$PROJECT_DIR" ]; then
+  echo "ERROR: Project directory is required."
+  echo "Usage: $0 <project_dir> [check_interval_minutes]"
+  exit 1
 fi
 
 # =============================================================================
@@ -70,19 +74,28 @@ NTFY_SERVER="${NTFY_SERVER:-}"
 NTFY_TOPIC="${NTFY_TOPIC:-}"
 NTFY_ENABLED="${NTFY_ENABLED:-false}"
 
-# Resolve to absolute path
 PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)" || {
-  echo "ERROR: Cannot access directory: ${2:-.}"
+  echo "ERROR: Cannot access directory: $PROJECT_DIR"
   exit 1
 }
 
+if [[ "$PROJECT_DIR" == *".config/opencode"* ]]; then
+  echo "ERROR: Cannot run Ralph Ultra Monitor in the global config directory."
+  echo "       Please specify a project directory."
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="$PROJECT_DIR/ralph-monitor.log"
-TIMING_FILE="$PROJECT_DIR/ralph-timing.json"
+
+LOG_DIR="$PROJECT_DIR/logs"
+mkdir -p "$LOG_DIR"
+
+LOG_FILE="$LOG_DIR/ralph-monitor.log"
+TIMING_FILE="$PROJECT_DIR/.ralph-timing.json"
 STATE_FILE="$PROJECT_DIR/.ralph-monitor-state.json"
 EVENTS_FILE="$PROJECT_DIR/.ralph-events.json"
 REPORT_FILE="$PROJECT_DIR/ralph-report.html"
-RALPH_SCRIPT="$PROJECT_DIR/scripts/ralph.sh"
+RALPH_SCRIPT="$SCRIPT_DIR/ralph.sh"
 RALPH_ITERATIONS=50
 
 # =============================================================================

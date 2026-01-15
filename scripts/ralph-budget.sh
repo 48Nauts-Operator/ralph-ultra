@@ -2,12 +2,12 @@
 # Ralph Ultra Budget Planner - Quota-aware execution planning
 # Checks available quota and recommends execution strategy
 #
-# Usage: ./ralph-budget.sh [project_dir] [--budget N]
+# Usage: ralph-budget.sh <project_dir> [--budget N]
 
 set -e
 
 MANUAL_BUDGET=""
-PROJECT_DIR="."
+PROJECT_DIR=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -16,15 +16,18 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help|-h)
-      echo "Usage: $0 [project_dir] [--budget N]"
+      echo "Usage: $0 <project_dir> [--budget N]"
+      echo ""
+      echo "Arguments:"
+      echo "  project_dir      Path to project (REQUIRED)"
       echo ""
       echo "Options:"
       echo "  --budget, -b N   Set manual budget in USD"
       echo "  --help, -h       Show this help"
       echo ""
       echo "Examples:"
-      echo "  $0 .              # Analyze current directory"
-      echo "  $0 . --budget 20  # Plan with \$20 budget"
+      echo "  $0 /path/to/project"
+      echo "  $0 /path/to/project --budget 20"
       exit 0
       ;;
     *)
@@ -36,7 +39,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)"
+if [ -z "$PROJECT_DIR" ]; then
+  echo "ERROR: Project directory is required."
+  echo "Usage: $0 <project_dir> [--budget N]"
+  exit 1
+fi
+
+PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)" || {
+  echo "ERROR: Cannot access directory: $PROJECT_DIR"
+  exit 1
+}
+
+if [[ "$PROJECT_DIR" == *".config/opencode"* ]]; then
+  echo "ERROR: Cannot run in the global config directory."
+  echo "       Please specify a project directory."
+  exit 1
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

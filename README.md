@@ -46,6 +46,41 @@ The setup wizard will:
 1. **Check prerequisites** - Verify jq, tmux, opencode, and oh-my-opencode are installed
 2. **Install scripts** - Copy Ralph Ultra to `~/.config/opencode/scripts/ralph-ultra/`
 3. **Configure models** - Add cost-optimized agent models to `oh-my-opencode.json` (see below)
+4. **Add to PATH** - Optionally add Ralph Ultra to your shell PATH
+
+### Add to PATH (recommended)
+
+Add this to your `.bashrc` or `.zshrc`:
+
+```bash
+export PATH="$PATH:$HOME/.config/opencode/scripts/ralph-ultra"
+```
+
+Then restart your terminal or run `source ~/.bashrc`.
+
+## Usage
+
+Ralph Ultra requires a project path. One command does everything - starts the agent with health monitoring automatically.
+
+```bash
+ralph.sh /path/to/project           # Run with monitoring (default 50 iterations)
+ralph.sh /path/to/project 100       # Run with 100 iterations
+ralph.sh --status /path/to/project  # Check current status
+ralph.sh --report /path/to/project  # Generate HTML report
+ralph.sh --no-monitor /path/to/project  # Run without monitoring (not recommended)
+```
+
+### What gets created in your project
+
+```
+your-project/
+├── prd.json              # You create this (required)
+├── progress.txt          # Progress log
+├── logs/                 # All log files
+│   └── ralph-monitor.log
+├── ralph-report.html     # HTML progress report
+└── .ralph-*/             # Internal state files
+```
 
 ## What Gets Configured
 
@@ -96,67 +131,9 @@ Ralph Ultra uses different AI models for different tasks to optimize cost:
 - You can review changes with `./scripts/setup.sh --diff` before applying
 - A backup is created before any changes
 
-## Usage
-
-Ralph Ultra scripts run **from anywhere** but operate **on your project directory**. All logs, progress files, and data are created in your project folder - never in the global scripts location.
-
-```bash
-# Run on current directory
-~/.config/opencode/scripts/ralph-ultra/ralph.sh .
-
-# Run on specific project with 50 iterations
-~/.config/opencode/scripts/ralph-ultra/ralph.sh /path/to/project 50
-
-# With health monitoring
-~/.config/opencode/scripts/ralph-ultra/ralph-monitor.sh /path/to/project &
-~/.config/opencode/scripts/ralph-ultra/ralph.sh /path/to/project 50
-```
-
-### Add to PATH (recommended)
-
-```bash
-export PATH="$PATH:$HOME/.config/opencode/scripts/ralph-ultra"
-```
-
-Then simply:
-
-```bash
-ralph.sh .                    # Current directory
-ralph.sh /path/to/project 50  # Specific project, 50 iterations
-ralph-monitor.sh . &          # Monitor current directory
-ralph-budget.sh . --budget 20 # Budget check
-```
-
-### What gets created in your project
-
-```
-your-project/
-├── prd.json              # You create this (required)
-├── progress.txt          # Auto-created by Ralph Ultra
-├── ralph-monitor.log     # Monitor activity log
-├── ralph-report.html     # HTML progress report
-└── .ralph-*/             # Internal state files
-```
-
-## Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `ralph.sh` | Main agent loop - executes PRD stories one by one |
-| `ralph-monitor.sh` | Health monitor with auto-restart |
-| `ralph-budget.sh` | Budget planner and strategy advisor |
-| `setup.sh` | Install Ralph Ultra globally |
-| `prompt.md` | Agent instructions |
-
-## Monitor Commands
-
-```bash
-ralph-monitor.sh /path/to/project &      # Start monitoring
-ralph-monitor.sh --status /path/to/project   # Check status
-ralph-monitor.sh --report /path/to/project   # Generate HTML report
-```
-
 ## Budget Planning
+
+Check your budget before running:
 
 ```bash
 ralph-budget.sh /path/to/project --budget 20
@@ -187,13 +164,6 @@ git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode
 
 ```bash
 which opencode  # Verify CLI is installed
-```
-
-### Monitor not detecting activity
-
-```bash
-tmux list-sessions | grep ralph
-tail -f ralph-monitor.log
 ```
 
 ### Check what setup would change
