@@ -138,8 +138,8 @@ create_session() {
     # Right pane: Live monitor (default view)
     tmux send-keys -t "$SESSION_NAME:0.1" "'$SCRIPT_DIR/ralph-tui-right-panel.sh' monitor '$project_path'" C-m
 
-    # Bottom pane: Input prompt
-    tmux send-keys -t "$SESSION_NAME:0.2" "echo 'Type /help for available commands'" C-m
+    # Bottom pane: Interactive input bar
+    tmux send-keys -t "$SESSION_NAME:0.2" "'$SCRIPT_DIR/ralph-tui-input-bar.sh' '$project_path'" C-m
 
     # Focus on input pane
     tmux select-pane -t "$SESSION_NAME:0.2"
