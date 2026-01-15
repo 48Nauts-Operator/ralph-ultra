@@ -1,0 +1,9 @@
+*.log
+.ralph-failures/
+ralph-report.html
+.last-branch
+progress.txt
+prd.json
+archive/
+.opencode/
+.DS_Store
