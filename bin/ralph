@@ -18,8 +18,16 @@ info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
-# Determine script directories
-RALPH_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Determine script directories (handle symlinks)
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+# Resolve symlinks to get the real path
+while [[ -L "$SCRIPT_PATH" ]]; do
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  # Handle relative symlinks
+  [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+RALPH_BIN_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 RALPH_ROOT="$(dirname "$RALPH_BIN_DIR")"
 RALPH_SCRIPTS_DIR="$RALPH_ROOT/scripts"
 RALPH_VERSION_FILE="$RALPH_ROOT/VERSION"
