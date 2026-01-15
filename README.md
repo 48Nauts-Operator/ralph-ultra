@@ -378,6 +378,61 @@ For a typical 10-story PRD run:
 | balanced | ~$5 | $0 (electricity) | **~$10 (67%)** |
 | aggressive | ~$2 | $0 (electricity) | **~$13 (87%)** |
 
+## Persistent Timing Database
+
+Ralph Ultra learns from every run and stores timing data globally for better predictions across all projects.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Global learning** | Data persists across all projects in `~/.ralph-ultra/` |
+| **Pattern recognition** | Learns timing for patterns like "integration", "auth", "api" |
+| **Dual backend** | SQLite (if available) or JSON (zero deps) |
+| **Predictive ETAs** | Uses historical data for accurate time estimates |
+| **Migration** | Import existing per-project timing data |
+
+### Usage
+
+```bash
+# View statistics
+ralph-timing-db.sh --stats
+
+# Predict duration for a story
+ralph-timing-db.sh --predict "US-042-integration-tests"
+
+# Migrate existing project data
+ralph-timing-db.sh --migrate /path/to/project
+
+# Force backend
+RALPH_TIMING_BACKEND=sqlite ralph-timing-db.sh --stats
+RALPH_TIMING_BACKEND=json ralph-timing-db.sh --stats
+```
+
+### Backends
+
+| Backend | Pros | Cons |
+|---------|------|------|
+| **SQLite** (default if available) | Fast queries, aggregations, SQL support | Requires sqlite3 |
+| **JSON** (fallback) | Zero dependencies, portable | Slower for large datasets |
+
+### What's Tracked
+
+- Story completion times (actual vs estimated)
+- Complexity patterns (integration, auth, api, frontend, etc.)
+- Success/failure rates
+- Per-project statistics
+- Performance trends over time
+
+### Storage Location
+
+```
+~/.ralph-ultra/
+├── timing.db           # SQLite database (if available)
+├── timing-db.json      # JSON database (fallback)
+└── ...
+```
+
 ## Troubleshooting
 
 ### No AI CLI found

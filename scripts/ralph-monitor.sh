@@ -97,6 +97,7 @@ EVENTS_FILE="$PROJECT_DIR/.ralph-events.json"
 REPORT_FILE="$PROJECT_DIR/ralph-report.html"
 RALPH_SCRIPT="$SCRIPT_DIR/ralph.sh"
 QUOTA_SCRIPT="$SCRIPT_DIR/ralph-quota.sh"
+TIMING_DB_SCRIPT="$SCRIPT_DIR/ralph-timing-db.sh"
 RALPH_ITERATIONS=50
 
 # =============================================================================
@@ -1564,6 +1565,31 @@ record_completion() {
   else
     log "OK" "Learned: $story done in ${duration}m (estimate: ${base_estimate}m, exact match)"
   fi
+  
+  record_to_global_db "$story" "$duration" "$base_estimate"
+}
+
+record_to_global_db() {
+  local story="$1"
+  local duration="$2"
+  local estimate="$3"
+  
+  if [ ! -f "$TIMING_DB_SCRIPT" ]; then
+    return 0
+  fi
+  
+  local complexity="medium"
+  if echo "$story" | grep -qiE "(integration|provider|complex|video)"; then
+    complexity="heavy"
+  elif echo "$story" | grep -qiE "(platform|tool|analyze|design)"; then
+    complexity="complex"
+  elif echo "$story" | grep -qiE "(setup|config)"; then
+    complexity="simple"
+  fi
+  
+  local model="${RALPH_MODEL:-unknown}"
+  
+  "$TIMING_DB_SCRIPT" --record "$PROJECT_DIR" "$story" "$duration" "$estimate" "$complexity" "$model" "1" 2>/dev/null || true
 }
 
 get_learned_timeout() {
@@ -1576,6 +1602,15 @@ get_learned_timeout() {
       return
     fi
   fi
+  
+  if [ -f "$TIMING_DB_SCRIPT" ]; then
+    local global_prediction=$("$TIMING_DB_SCRIPT" --predict "$story" 2>/dev/null)
+    if [ -n "$global_prediction" ] && [ "$global_prediction" != "30" ]; then
+      echo $(( global_prediction + 15 ))
+      return
+    fi
+  fi
+  
   echo ""
 }
 

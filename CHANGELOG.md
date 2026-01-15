@@ -5,6 +5,23 @@ All notable changes to Ralph Ultra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-15
+
+### Added
+- **Persistent Timing Database** (`ralph-timing-db.sh`)
+  - Global learning across all projects stored in `~/.ralph-ultra/`
+  - Dual backend: SQLite (recommended) or JSON (zero dependencies)
+  - Pattern recognition for timing predictions (integration, auth, api, frontend, etc.)
+  - Migration tool for existing per-project timing data
+  - Predictive ETAs based on historical patterns
+  - Analytics dashboard with `--stats` command
+  - SQL queries supported with SQLite backend
+
+### Changed
+- ralph-monitor.sh now records completions to global timing database
+- ETA predictions now use global historical data when available
+- Better accuracy for time estimates across similar projects
+
 ## [1.2.0] - 2026-01-15
 
 ### Added
