@@ -19,8 +19,6 @@ Ralph Ultra is an enhanced version of the Ralph autonomous coding agent. It adds
 
 ## Prerequisites
 
-Before installing Ralph Ultra, you need:
-
 | Requirement | Install |
 |-------------|---------|
 | **jq** | `brew install jq` (macOS) or `apt install jq` (Linux) |
@@ -45,10 +43,9 @@ cd ralph-ultra
 The setup wizard will:
 1. **Check prerequisites** - Verify jq, tmux, opencode, and oh-my-opencode are installed
 2. **Install scripts** - Copy Ralph Ultra to `~/.config/opencode/scripts/ralph-ultra/`
-3. **Configure models** - Add cost-optimized agent models to `oh-my-opencode.json` (see below)
-4. **Add to PATH** - Optionally add Ralph Ultra to your shell PATH
+3. **Configure models** - Add cost-optimized agent models to `oh-my-opencode.json`
 
-### Add to PATH (recommended)
+### Add to PATH
 
 Add this to your `.bashrc` or `.zshrc`:
 
@@ -60,14 +57,31 @@ Then restart your terminal or run `source ~/.bashrc`.
 
 ## Usage
 
-Ralph Ultra requires a project path. One command does everything - starts the agent with health monitoring automatically.
+One command does everything:
 
 ```bash
-ralph.sh /path/to/project           # Run with monitoring (default 50 iterations)
+ralph.sh /path/to/project
+```
+
+### What happens when you run Ralph Ultra
+
+1. **Validates project** - Checks project path exists and has `prd.json`
+2. **Creates logs directory** - All logs go to `project/logs/`
+3. **Budget check** - Asks if you want to set a max budget, runs cost analysis
+4. **Starts health monitoring** - Launches monitor in tmux session
+5. **Executes agent loop** - Works through PRD stories one by one
+6. **Sends notifications** - Webhooks/NTFY on completion, errors, restarts
+7. **Generates HTML report** - Creates `ralph-report.html` with full summary
+
+### Command Options
+
+```bash
+ralph.sh /path/to/project           # Full run (default 50 iterations)
 ralph.sh /path/to/project 100       # Run with 100 iterations
+ralph.sh --skip-budget /path/to/project  # Skip budget question
+ralph.sh --no-monitor /path/to/project   # Run without monitoring (not recommended)
 ralph.sh --status /path/to/project  # Check current status
 ralph.sh --report /path/to/project  # Generate HTML report
-ralph.sh --no-monitor /path/to/project  # Run without monitoring (not recommended)
 ```
 
 ### What gets created in your project
@@ -75,82 +89,92 @@ ralph.sh --no-monitor /path/to/project  # Run without monitoring (not recommende
 ```
 your-project/
 ├── prd.json              # You create this (required)
-├── progress.txt          # Progress log
+├── progress.txt          # Progress log with learnings
 ├── logs/                 # All log files
 │   └── ralph-monitor.log
-├── ralph-report.html     # HTML progress report
+├── ralph-report.html     # HTML progress report (generated at end)
+├── archive/              # Previous runs archived here
 └── .ralph-*/             # Internal state files
 ```
 
-## What Gets Configured
+## Notifications
 
-### Model Configuration Explained
+### NTFY Push Notifications
+
+```bash
+export NTFY_ENABLED=true
+export NTFY_TOPIC="ralph-myproject"
+export NTFY_SERVER="https://ntfy.sh"  # Optional, defaults to ntfy.sh
+
+ralph.sh /path/to/project
+```
+
+You'll receive push notifications for:
+- Story completions
+- Errors and restarts
+- Final completion
+
+### Slack Webhook
+
+```bash
+export RALPH_SLACK_WEBHOOK="https://hooks.slack.com/services/XXX/YYY/ZZZ"
+
+ralph.sh /path/to/project
+```
+
+### Discord Webhook
+
+```bash
+export RALPH_DISCORD_WEBHOOK="https://discord.com/api/webhooks/XXX/YYY"
+
+ralph.sh /path/to/project
+```
+
+### Generic Webhook
+
+```bash
+export RALPH_WEBHOOK_URL="https://your-server.com/webhook"
+
+ralph.sh /path/to/project
+```
+
+Sends JSON payload:
+```json
+{
+  "event": "story_complete|error|restart|complete",
+  "project": "project-name",
+  "story": "STORY-001",
+  "message": "Details..."
+}
+```
+
+## Model Configuration
 
 Ralph Ultra uses different AI models for different tasks to optimize cost:
 
 | Agent | Model | Cost | Why |
 |-------|-------|------|-----|
-| **Sisyphus** | Sonnet 4.5 | ~$3/M tokens | Main agent - good balance of quality and cost |
-| **oracle** | Opus 4.5 | ~$15/M tokens | Complex reasoning - used sparingly for hard problems |
-| **explore** | Haiku 4.5 | ~$0.25/M tokens | Codebase search - fast and cheap |
-| **librarian** | Haiku 4.5 | ~$0.25/M tokens | Doc lookup - fast and cheap |
+| **Sisyphus** | Sonnet 4.5 | ~$3/M tokens | Main agent - balanced |
+| **oracle** | Opus 4.5 | ~$15/M tokens | Complex reasoning - sparingly |
+| **explore** | Haiku 4.5 | ~$0.25/M tokens | Codebase search - cheap |
+| **librarian** | Haiku 4.5 | ~$0.25/M tokens | Doc lookup - cheap |
 | **frontend-ui-ux-engineer** | Sonnet 4.5 | ~$3/M tokens | UI work |
 | **document-writer** | Sonnet 4.5 | ~$3/M tokens | Documentation |
 
-### Before and After
-
-**Your existing `oh-my-opencode.json` might look like:**
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  "agents": {
-    "my-custom-agent": { "model": "some-model" }
-  }
-}
-```
-
-**After setup, Ralph Ultra ADDS (does not overwrite) these entries:**
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  "agents": {
-    "my-custom-agent": { "model": "some-model" },
-    "Sisyphus": { "model": "anthropic/claude-sonnet-4.5" },
-    "oracle": { "model": "anthropic/claude-opus-4.5" },
-    "explore": { "model": "anthropic/claude-haiku-4.5" },
-    "librarian": { "model": "anthropic/claude-haiku-4.5" },
-    "frontend-ui-ux-engineer": { "model": "anthropic/claude-sonnet-4.5" },
-    "document-writer": { "model": "anthropic/claude-sonnet-4.5" }
-  }
-}
-```
-
-**Important:** 
-- Setup will **warn you** if any of these agents are already configured
-- Your existing agent configurations are **preserved**
-- You can review changes with `./scripts/setup.sh --diff` before applying
-- A backup is created before any changes
+Setup **merges** these into your existing `oh-my-opencode.json` - your custom agents are preserved.
 
 ## Budget Planning
 
-Check your budget before running:
+Ralph Ultra asks about budget before starting. You can also run manually:
 
 ```bash
 ralph-budget.sh /path/to/project --budget 20
 ```
 
-Output includes:
-- Story count by complexity
-- 5 execution strategies with estimated costs
+Shows:
+- Remaining stories by complexity
+- 5 execution strategies with cost estimates
 - Recommendation based on your budget
-
-## Webhook Notifications
-
-```bash
-export RALPH_SLACK_WEBHOOK="https://hooks.slack.com/services/..."
-export RALPH_DISCORD_WEBHOOK="https://discord.com/api/webhooks/..."
-export RALPH_NTFY_TOPIC="your-topic"
-```
 
 ## Troubleshooting
 
@@ -166,10 +190,23 @@ git clone https://github.com/code-yeongyu/oh-my-opencode ~/.config/opencode
 which opencode  # Verify CLI is installed
 ```
 
-### Check what setup would change
+### Check current status
 
 ```bash
-./scripts/setup.sh --diff
+ralph.sh --status /path/to/project
+```
+
+### View monitor logs
+
+```bash
+tail -f /path/to/project/logs/ralph-monitor.log
+```
+
+### Attach to tmux session
+
+```bash
+tmux attach -t ralph
+# Detach with: Ctrl+B, then D
 ```
 
 ## License
