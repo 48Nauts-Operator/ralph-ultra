@@ -413,10 +413,12 @@ generate_html_report() {
     total_files_changed=$(echo "$events_data" | jq '[.stories_completed[].git.files_changed // 0] | add // 0')
     total_lines_added=$(echo "$events_data" | jq '[.stories_completed[].git.lines_added // 0] | add // 0')
     total_lines_removed=$(echo "$events_data" | jq '[.stories_completed[].git.lines_removed // 0] | add // 0')
-    total_cost=$(echo "$events_data" | jq '[.stories_completed[].cost.total // 0] | add // 0')
-    total_input_tokens=$(echo "$events_data" | jq '[.stories_completed[].cost.input_tokens // 0] | add // 0')
-    total_output_tokens=$(echo "$events_data" | jq '[.stories_completed[].cost.output_tokens // 0] | add // 0')
   fi
+  
+  local cost_data=$(get_all_sessions_cost)
+  total_cost=$(echo "$cost_data" | jq -r '.cost // 0' 2>/dev/null)
+  total_input_tokens=$(echo "$cost_data" | jq -r '.tokens.input // 0' 2>/dev/null)
+  total_output_tokens=$(echo "$cost_data" | jq -r '.tokens.output // 0' 2>/dev/null)
   
   init_timing_file
   local eta_info=$(calculate_eta_with_confidence)
@@ -1001,8 +1003,43 @@ webhook_complete() {
 # =============================================================================
 
 OPENCODE_MESSAGE_DIR="${HOME}/.local/share/opencode/storage/message"
+CLAUDE_PROJECTS_DIR="${HOME}/.claude/projects"
 
-get_session_cost() {
+CLAUDE_COST_PER_1K_INPUT=0.003
+CLAUDE_COST_PER_1K_OUTPUT=0.015
+
+get_claude_project_dir() {
+  local project_path="$1"
+  local encoded=$(echo "$project_path" | tr '/' '-' | tr '_' '-')
+  echo "${CLAUDE_PROJECTS_DIR}/${encoded}"
+}
+
+get_claude_session_cost() {
+  local project_dir=$(get_claude_project_dir "$PROJECT_DIR")
+  
+  if [ ! -d "$project_dir" ]; then
+    echo '{"cost":0,"tokens":{"input":0,"output":0}}'
+    return
+  fi
+  
+  local total_input=0
+  local total_output=0
+  
+  for session_file in "$project_dir"/*.jsonl; do
+    if [ -f "$session_file" ]; then
+      local input=$(grep '"input_tokens":' "$session_file" 2>/dev/null | grep -o '"input_tokens":[0-9]*' | grep -o '[0-9]*' | awk '{s+=$1} END {print s}')
+      local output=$(grep '"output_tokens":' "$session_file" 2>/dev/null | grep -o '"output_tokens":[0-9]*' | grep -o '[0-9]*' | awk '{s+=$1} END {print s}')
+      total_input=$((total_input + ${input:-0}))
+      total_output=$((total_output + ${output:-0}))
+    fi
+  done
+  
+  local total_cost=$(echo "scale=4; ($total_input * $CLAUDE_COST_PER_1K_INPUT / 1000) + ($total_output * $CLAUDE_COST_PER_1K_OUTPUT / 1000)" | bc 2>/dev/null || echo "0")
+  
+  echo "{\"cost\":$total_cost,\"tokens\":{\"input\":$total_input,\"output\":$total_output}}"
+}
+
+get_opencode_session_cost() {
   local session_id="$1"
   
   if [ ! -d "$OPENCODE_MESSAGE_DIR/$session_id" ]; then
@@ -1029,6 +1066,11 @@ get_session_cost() {
   echo "{\"cost\":$total_cost,\"tokens\":{\"input\":$total_input,\"output\":$total_output}}"
 }
 
+get_session_cost() {
+  local session_id="$1"
+  get_opencode_session_cost "$session_id"
+}
+
 get_current_session_id() {
   local project_hash=$(echo -n "$PROJECT_DIR" | shasum | cut -d' ' -f1)
   local session_dir="${HOME}/.local/share/opencode/storage/session/$project_hash"
@@ -1041,19 +1083,29 @@ get_current_session_id() {
 }
 
 get_all_sessions_cost() {
-  local project_hash=$(echo -n "$PROJECT_DIR" | shasum | cut -d' ' -f1)
-  local session_dir="${HOME}/.local/share/opencode/storage/session/$project_hash"
-  
   local total_cost=0
   local total_input=0
   local total_output=0
+  
+  local claude_data=$(get_claude_session_cost)
+  if [ -n "$claude_data" ]; then
+    local c_cost=$(echo "$claude_data" | jq -r '.cost // 0' 2>/dev/null)
+    local c_input=$(echo "$claude_data" | jq -r '.tokens.input // 0' 2>/dev/null)
+    local c_output=$(echo "$claude_data" | jq -r '.tokens.output // 0' 2>/dev/null)
+    total_cost=$(echo "$total_cost + ${c_cost:-0}" | bc 2>/dev/null || echo "$total_cost")
+    total_input=$((total_input + ${c_input:-0}))
+    total_output=$((total_output + ${c_output:-0}))
+  fi
+  
+  local project_hash=$(echo -n "$PROJECT_DIR" | shasum | cut -d' ' -f1)
+  local session_dir="${HOME}/.local/share/opencode/storage/session/$project_hash"
   
   if [ -d "$session_dir" ]; then
     for session_file in "$session_dir"/*.json; do
       if [ -f "$session_file" ]; then
         local session_id=$(jq -r '.id' "$session_file" 2>/dev/null)
         if [ -n "$session_id" ] && [ -d "$OPENCODE_MESSAGE_DIR/$session_id" ]; then
-          local session_data=$(get_session_cost "$session_id")
+          local session_data=$(get_opencode_session_cost "$session_id")
           local cost=$(echo "$session_data" | jq -r '.cost' 2>/dev/null)
           local input=$(echo "$session_data" | jq -r '.tokens.input' 2>/dev/null)
           local output=$(echo "$session_data" | jq -r '.tokens.output' 2>/dev/null)
