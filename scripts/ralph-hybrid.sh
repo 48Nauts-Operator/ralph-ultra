@@ -257,7 +257,7 @@ query_ollama() {
       }
     }')
   
-  local start_time=$(date +%s%3N)
+  local start_time=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || date +%s)000
   
   local response
   response=$(curl -s --max-time "$RALPH_LOCAL_TIMEOUT" \
@@ -265,7 +265,7 @@ query_ollama() {
     -H "Content-Type: application/json" \
     -d "$payload" 2>/dev/null)
   
-  local end_time=$(date +%s%3N)
+  local end_time=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || date +%s)000
   local duration=$((end_time - start_time))
   
   if [ -z "$response" ]; then
@@ -309,7 +309,7 @@ query_openai_compatible() {
       max_tokens: 4096
     }')
   
-  local start_time=$(date +%s%3N)
+  local start_time=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || date +%s)000
   
   local response
   response=$(curl -s --max-time "$RALPH_LOCAL_TIMEOUT" \
@@ -317,7 +317,7 @@ query_openai_compatible() {
     -H "Content-Type: application/json" \
     -d "$payload" 2>/dev/null)
   
-  local end_time=$(date +%s%3N)
+  local end_time=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || date +%s)000
   local duration=$((end_time - start_time))
   
   if [ -z "$response" ]; then
