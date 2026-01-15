@@ -91,6 +91,211 @@ For more information, visit: https://github.com/yourusername/ralph-ultra
 EOF
 }
 
+# Show unified status
+show_status() {
+  local project_path="${1:-}"
+
+  # Handle help flag
+  if [[ "$project_path" == "--help" || "$project_path" == "-h" ]]; then
+    cat << EOF
+ralph status - Show Ralph system and project status
+
+USAGE:
+  ralph status                Show global status (quota, hybrid, timing)
+  ralph status <project>      Show project-specific status
+
+EXAMPLES:
+  ralph status                # Global system status
+  ralph status .              # Current project status
+  ralph status /path/to/proj  # Specific project status
+
+The global status shows:
+  - Claude Pro quota usage and cooldowns
+  - Hybrid LLM routing configuration and stats
+  - Timing database statistics
+
+The project status shows:
+  - PRD progress (completed/remaining stories)
+  - Monitor session status
+  - Recent timing data
+  - Event logs
+EOF
+    return 0
+  fi
+
+  # If project path provided, show project-specific status
+  if [[ -n "$project_path" ]]; then
+    show_project_status "$project_path"
+    return
+  fi
+
+  # Otherwise show global status
+  echo ""
+  echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}║              Ralph Ultra Status                  ║${NC}"
+  echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+  echo ""
+
+  # 1. Quota Status
+  echo -e "${BLUE}━━━ Quota Status ━━━${NC}"
+  if [[ -f "$RALPH_SCRIPTS_DIR/ralph-quota.sh" ]]; then
+    # Source the script to get functions
+    (
+      source "$RALPH_SCRIPTS_DIR/ralph-quota.sh"
+      show_status 2>/dev/null || echo "  Quota check unavailable"
+    )
+  else
+    warn "ralph-quota.sh not found"
+  fi
+
+  echo ""
+
+  # 2. Hybrid LLM Status
+  echo -e "${BLUE}━━━ Hybrid LLM Status ━━━${NC}"
+  if [[ -f "$RALPH_SCRIPTS_DIR/ralph-hybrid.sh" ]]; then
+    (
+      source "$RALPH_SCRIPTS_DIR/ralph-hybrid.sh"
+      show_status 2>/dev/null || echo "  Hybrid status unavailable"
+    )
+  else
+    warn "ralph-hybrid.sh not found"
+  fi
+
+  echo ""
+
+  # 3. Timing Database Status
+  echo -e "${BLUE}━━━ Timing Database ━━━${NC}"
+  if [[ -f "$RALPH_SCRIPTS_DIR/ralph-timing-db.sh" ]]; then
+    (
+      source "$RALPH_SCRIPTS_DIR/ralph-timing-db.sh"
+      show_status 2>/dev/null || echo "  Timing stats unavailable"
+    )
+  else
+    warn "ralph-timing-db.sh not found"
+  fi
+
+  echo ""
+}
+
+# Show project-specific status
+show_project_status() {
+  local project_path="$1"
+
+  # Validate project directory
+  if [[ ! -d "$project_path" ]]; then
+    error "Project directory not found: $project_path"
+  fi
+
+  cd "$project_path" || error "Cannot access project directory: $project_path"
+
+  echo ""
+  echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}║           Ralph Project Status                   ║${NC}"
+  echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+  echo ""
+
+  info "Project: $(pwd)"
+  echo ""
+
+  # Check for PRD file
+  if [[ -f "prd.json" ]]; then
+    echo -e "${BLUE}━━━ PRD Status ━━━${NC}"
+
+    if command -v jq &>/dev/null; then
+      local project_name=$(jq -r '.project // "unknown"' prd.json 2>/dev/null)
+      local branch_name=$(jq -r '.branchName // "unknown"' prd.json 2>/dev/null)
+      local total_stories=$(jq '[.userStories[]] | length' prd.json 2>/dev/null)
+      local completed=$(jq '[.userStories[] | select(.passes == true)] | length' prd.json 2>/dev/null)
+      local remaining=$((total_stories - completed))
+
+      echo "  Project:    $project_name"
+      echo "  Branch:     $branch_name"
+      echo "  Stories:    $completed/$total_stories completed ($remaining remaining)"
+
+      if [[ $completed -gt 0 ]]; then
+        local progress=$((completed * 100 / total_stories))
+        echo -e "  Progress:   ${GREEN}${progress}%${NC}"
+      fi
+
+      # Show incomplete stories
+      if [[ $remaining -gt 0 ]]; then
+        echo ""
+        echo "  Next stories:"
+        jq -r '.userStories[] | select(.passes == false) | "    [\(.priority)] \(.id): \(.title)"' prd.json 2>/dev/null | head -5
+      fi
+    else
+      echo "  PRD exists (install jq for details)"
+    fi
+  else
+    warn "No prd.json found in this directory"
+  fi
+
+  echo ""
+
+  # Check for Ralph monitor state
+  if [[ -f ".ralph-monitor-state.json" ]]; then
+    echo -e "${BLUE}━━━ Monitor Status ━━━${NC}"
+
+    if command -v jq &>/dev/null; then
+      local status=$(jq -r '.status // "unknown"' .ralph-monitor-state.json 2>/dev/null)
+      local iteration=$(jq -r '.current_iteration // 0' .ralph-monitor-state.json 2>/dev/null)
+      local current_story=$(jq -r '.current_story // "none"' .ralph-monitor-state.json 2>/dev/null)
+
+      echo "  Status:         $status"
+      echo "  Iteration:      $iteration"
+      echo "  Current Story:  $current_story"
+
+      if [[ -f ".ralph-monitor.pid" ]]; then
+        local pid=$(cat .ralph-monitor.pid)
+        if ps -p "$pid" &>/dev/null; then
+          echo -e "  Monitor PID:    ${GREEN}$pid (running)${NC}"
+        else
+          echo -e "  Monitor PID:    ${YELLOW}$pid (stale)${NC}"
+        fi
+      fi
+    else
+      echo "  Monitor state exists (install jq for details)"
+    fi
+  else
+    info "No active monitor session"
+  fi
+
+  echo ""
+
+  # Check for timing data
+  if [[ -f ".ralph-timing.json" ]]; then
+    echo -e "${BLUE}━━━ Last Run Timing ━━━${NC}"
+
+    if command -v jq &>/dev/null; then
+      local duration=$(jq -r '.duration // "unknown"' .ralph-timing.json 2>/dev/null)
+      local story_id=$(jq -r '.story_id // "unknown"' .ralph-timing.json 2>/dev/null)
+      local ended_at=$(jq -r '.ended_at // "unknown"' .ralph-timing.json 2>/dev/null)
+
+      echo "  Story:      $story_id"
+      echo "  Duration:   ${duration}s"
+      echo "  Ended:      $ended_at"
+    else
+      echo "  Timing data exists (install jq for details)"
+    fi
+  fi
+
+  echo ""
+
+  # Check for events log
+  if [[ -f ".ralph-events.json" ]]; then
+    echo -e "${BLUE}━━━ Recent Events ━━━${NC}"
+
+    if command -v jq &>/dev/null; then
+      echo "  Last 5 events:"
+      jq -r '.events[-5:] | .[] | "    [\(.timestamp)] \(.type): \(.message)"' .ralph-events.json 2>/dev/null || echo "    No events"
+    else
+      echo "  Events exist (install jq for details)"
+    fi
+  fi
+
+  echo ""
+}
+
 # Dispatch to subcommand
 dispatch_command() {
   local cmd="$1"
@@ -114,8 +319,9 @@ dispatch_command() {
       exec "$RALPH_SCRIPTS_DIR/ralph-timing-db.sh" "$@"
       ;;
     status)
-      # TODO: Implement unified status command (CLI-003)
-      error "Status command not yet implemented (CLI-003)"
+      # Implement unified status command (CLI-003)
+      show_status "$@"
+      exit 0
       ;;
     init)
       # TODO: Implement interactive init command (CLI-007)

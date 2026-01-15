@@ -180,6 +180,17 @@ jq -r '.field // "default"'
 # Returns: {"route": "local|api", "model": "...", "reason": "..."}
 ```
 
+### Unified Status Commands
+When implementing status commands that aggregate multiple sources:
+```bash
+# Source scripts in subshells to call their show_status functions
+(
+  source "$RALPH_SCRIPTS_DIR/ralph-quota.sh"
+  show_status 2>/dev/null || echo "  Status unavailable"
+)
+```
+**Note:** Each script should have its own `show_status()` function that can be sourced independently.
+
 ## Git Workflow
 
 - Commit messages: `feat:`, `fix:`, `docs:`, `refactor:`
