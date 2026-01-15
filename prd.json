@@ -120,7 +120,7 @@
         "Enter key opens selected log in pager (less)",
         "q returns to log browser, /monitor returns to live view"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TUI-008",

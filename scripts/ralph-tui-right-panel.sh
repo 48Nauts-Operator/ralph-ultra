@@ -289,15 +289,141 @@ render_status() {
     echo -e "${DIM}Type /monitor to return to live monitor view${NC}"
 }
 
+# Format file size for display
+format_size() {
+    local size="$1"
+    if (( size < 1024 )); then
+        echo "${size}B"
+    elif (( size < 1048576 )); then
+        echo "$(( size / 1024 ))KB"
+    else
+        echo "$(( size / 1048576 ))MB"
+    fi
+}
+
+# Format modification time for display
+format_mtime() {
+    local file="$1"
+    # Use stat with cross-platform flags
+    if stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$file" 2>/dev/null; then
+        : # BSD/macOS format
+    elif stat -c "%y" "$file" 2>/dev/null | cut -d'.' -f1; then
+        : # GNU/Linux format
+    else
+        echo "unknown"
+    fi
+}
+
 # Render logs browser view
 render_logs() {
-    clear
+    local logs_dir="$PROJECT_DIR/logs"
+    local selected_index=0
 
-    echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${CYAN}║${NC}  ${BOLD}Log Files${NC}                                                ${BOLD}${CYAN}║${NC}"
-    echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "${DIM}Log browser will be implemented in TUI-007${NC}"
+    # Check if logs directory exists
+    if [[ ! -d "$logs_dir" ]]; then
+        clear
+        echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${BOLD}${CYAN}║${NC}  ${BOLD}Log Files${NC}                                                ${BOLD}${CYAN}║${NC}"
+        echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${RED}Logs directory not found: ${logs_dir}${NC}"
+        echo ""
+        echo -e "${DIM}Press any key to return to monitor view...${NC}"
+        read -n 1 -s
+        exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+    fi
+
+    # Get list of log files, sorted by modification time (newest first)
+    local log_files=()
+    while IFS= read -r file; do
+        log_files+=("$file")
+    done < <(find "$logs_dir" -maxdepth 1 -type f -name "*.log" -print0 | xargs -0 ls -t 2>/dev/null)
+
+    # If no log files found
+    if [[ ${#log_files[@]} -eq 0 ]]; then
+        clear
+        echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${BOLD}${CYAN}║${NC}  ${BOLD}Log Files${NC}                                                ${BOLD}${CYAN}║${NC}"
+        echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${DIM}No log files found in ${logs_dir}${NC}"
+        echo ""
+        echo -e "${DIM}Press any key to return to monitor view...${NC}"
+        read -n 1 -s
+        exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+    fi
+
+    # Main navigation loop
+    while true; do
+        clear
+
+        # Header
+        echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${BOLD}${CYAN}║${NC}  ${BOLD}Log Files${NC}  ${DIM}(${#log_files[@]} files)${NC}                              ${BOLD}${CYAN}║${NC}"
+        echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${DIM}j/k: navigate  Enter: view  /monitor: return  q: back${NC}"
+        echo ""
+
+        # List log files
+        local index=0
+        for file in "${log_files[@]}"; do
+            local basename="${file##*/}"
+            local size
+            size=$(stat -f "%z" "$file" 2>/dev/null || stat -c "%s" "$file" 2>/dev/null || echo 0)
+            local size_formatted
+            size_formatted=$(format_size "$size")
+            local mtime
+            mtime=$(format_mtime "$file")
+
+            # Highlight selected file
+            if [[ $index -eq $selected_index ]]; then
+                echo -e "${YELLOW}▸${NC} ${BOLD}${basename}${NC}"
+                echo -e "  ${DIM}${size_formatted}  ${mtime}${NC}"
+            else
+                echo -e "  ${basename}"
+                echo -e "  ${DIM}${size_formatted}  ${mtime}${NC}"
+            fi
+
+            (( index++ ))
+        done
+
+        # Read user input
+        read -rsn1 input
+
+        case "$input" in
+            j)
+                # Move down
+                if (( selected_index < ${#log_files[@]} - 1 )); then
+                    (( selected_index++ ))
+                fi
+                ;;
+            k)
+                # Move up
+                if (( selected_index > 0 )); then
+                    (( selected_index-- ))
+                fi
+                ;;
+            "")
+                # Enter key - view selected log
+                local selected_file="${log_files[$selected_index]}"
+                less +G "$selected_file"
+                ;;
+            q)
+                # Return to monitor view
+                exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+                ;;
+            /)
+                # Check if it's a slash command (read rest of command)
+                local cmd=""
+                echo -n "/"
+                read -r cmd
+                if [[ "$cmd" == "monitor" ]]; then
+                    exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+                fi
+                ;;
+        esac
+    done
 }
 
 # Main dispatcher
