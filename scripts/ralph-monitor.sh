@@ -94,7 +94,8 @@ LOG_FILE="$LOG_DIR/ralph-monitor.log"
 TIMING_FILE="$PROJECT_DIR/.ralph-timing.json"
 STATE_FILE="$PROJECT_DIR/.ralph-monitor-state.json"
 EVENTS_FILE="$PROJECT_DIR/.ralph-events.json"
-REPORT_FILE="$PROJECT_DIR/ralph-report.html"
+REPORT_TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+REPORT_FILE="$PROJECT_DIR/ralph-report_${REPORT_TIMESTAMP}.html"
 RALPH_SCRIPT="$SCRIPT_DIR/ralph.sh"
 QUOTA_SCRIPT="$SCRIPT_DIR/ralph-quota.sh"
 TIMING_DB_SCRIPT="$SCRIPT_DIR/ralph-timing-db.sh"
@@ -2267,6 +2268,8 @@ case "$EARLY_FLAG" in
       echo "Run the monitor first to collect data."
       exit 1
     fi
+    REPORT_TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+    REPORT_FILE="$PROJECT_DIR/ralph-report_${REPORT_TIMESTAMP}.html"
     generate_html_report
     echo "Report generated: $REPORT_FILE"
     if command -v open &>/dev/null; then
