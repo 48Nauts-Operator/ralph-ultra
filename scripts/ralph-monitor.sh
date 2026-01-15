@@ -1244,7 +1244,11 @@ validate_prd_structure() {
 get_ai_pid() {
   local pid=""
   
-  # Try opencode first (both run and prompt variants)
+  # Try claude first (preferred CLI) - process shows as just "claude"
+  pid=$(pgrep -x "claude" 2>/dev/null | head -1)
+  [ -n "$pid" ] && echo "$pid" && return
+  
+  # Try opencode (both run and prompt variants)
   pid=$(pgrep -f "opencode run" 2>/dev/null | head -1)
   [ -n "$pid" ] && echo "$pid" && return
   
@@ -1253,10 +1257,6 @@ get_ai_pid() {
   
   # Try amp
   pid=$(pgrep -f "amp.*dangerously" 2>/dev/null | head -1)
-  [ -n "$pid" ] && echo "$pid" && return
-  
-  # Try claude
-  pid=$(pgrep -f "claude.*dangerously" 2>/dev/null | head -1)
   [ -n "$pid" ] && echo "$pid" && return
   
   echo ""
