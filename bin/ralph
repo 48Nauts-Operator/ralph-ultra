@@ -95,7 +95,7 @@ EXAMPLES:
   ralph quota --check
   ralph hybrid --status
 
-For more information, visit: https://github.com/yourusername/ralph-ultra
+For more information, visit: https://github.com/48Nauts-Operator/ralph-ultra
 EOF
 }
 
@@ -147,11 +147,8 @@ EOF
   # 1. Quota Status
   echo -e "${BLUE}━━━ Quota Status ━━━${NC}"
   if [[ -f "$RALPH_SCRIPTS_DIR/ralph-quota.sh" ]]; then
-    # Source the script to get functions
-    (
-      source "$RALPH_SCRIPTS_DIR/ralph-quota.sh"
-      show_status 2>/dev/null || echo "  Quota check unavailable"
-    )
+    # Run quota check directly (not show_status which has extra output)
+    "$RALPH_SCRIPTS_DIR/ralph-quota.sh" --check 2>/dev/null || echo "  Quota check unavailable"
   else
     warn "ralph-quota.sh not found"
   fi
@@ -161,10 +158,7 @@ EOF
   # 2. Hybrid LLM Status
   echo -e "${BLUE}━━━ Hybrid LLM Status ━━━${NC}"
   if [[ -f "$RALPH_SCRIPTS_DIR/ralph-hybrid.sh" ]]; then
-    (
-      source "$RALPH_SCRIPTS_DIR/ralph-hybrid.sh"
-      show_status 2>/dev/null || echo "  Hybrid status unavailable"
-    )
+    "$RALPH_SCRIPTS_DIR/ralph-hybrid.sh" --status 2>/dev/null || echo "  Hybrid status unavailable"
   else
     warn "ralph-hybrid.sh not found"
   fi
@@ -174,10 +168,7 @@ EOF
   # 3. Timing Database Status
   echo -e "${BLUE}━━━ Timing Database ━━━${NC}"
   if [[ -f "$RALPH_SCRIPTS_DIR/ralph-timing-db.sh" ]]; then
-    (
-      source "$RALPH_SCRIPTS_DIR/ralph-timing-db.sh"
-      show_status 2>/dev/null || echo "  Timing stats unavailable"
-    )
+    "$RALPH_SCRIPTS_DIR/ralph-timing-db.sh" --status 2>/dev/null || echo "  Timing stats unavailable"
   else
     warn "ralph-timing-db.sh not found"
   fi

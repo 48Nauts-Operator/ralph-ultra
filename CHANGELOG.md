@@ -5,6 +5,26 @@ All notable changes to Ralph Ultra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-15
+
+### Added
+- **Unified CLI** (`bin/ralph`) - Single entry point for all Ralph commands
+  - `ralph run <project>` - Execute a Ralph project
+  - `ralph status` - Show unified status (quota, hybrid, timing)
+  - `ralph status <project>` - Show project-specific status (PRD progress, events)
+  - `ralph quota` - Manage Claude Pro quota
+  - `ralph hybrid` - Manage hybrid LLM routing
+  - `ralph stats` - Show timing analytics
+  - `ralph init` - Interactive PRD generator with templates (webapp, cli, api, lib)
+- **Install script** (`install.sh`) - Easy PATH installation
+  - Symlink or copy installation options
+  - Automatic ~/bin or /usr/local/bin detection
+  - Uninstall support
+
+### Changed
+- CLI status command now shows clean, non-duplicated output
+- Scripts can be invoked directly or through unified CLI
+
 ## [1.3.0] - 2026-01-15
 
 ### Added
