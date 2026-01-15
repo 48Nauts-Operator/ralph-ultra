@@ -285,5 +285,8 @@ MIT
 
 ## Credits
 
-- Original Ralph concept from [opencode](https://opencode.ai)
 - Enhanced by the 48Nauts team
+
+---
+
+This project was inspired by https://github.com/snarktank/ralph
