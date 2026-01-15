@@ -228,10 +228,17 @@ npm install -g @anthropic-ai/claude-code
 
 ### OpenCode `run` command hangs or fails
 
-This is a known issue. Use Claude CLI instead:
+**Known Issue (as of Jan 2026)**: OpenCode's `opencode run` command has bugs that prevent headless/automated execution:
+
+- **[#8502](https://github.com/anomalyco/opencode/issues/8502)**: "Session not found" error - occurs when `OPENCODE_SERVER_PASSWORD` env var is set
+- **[#8203](https://github.com/anomalyco/opencode/issues/8203)**: Command hangs forever on API errors instead of exiting
+
+**Workaround**: Use Claude CLI instead (recommended):
 ```bash
 npm install -g @anthropic-ai/claude-code
 ```
+
+Ralph Ultra will automatically prefer Claude CLI when available.
 
 ### Setup fails with "oh-my-opencode not found"
 
@@ -258,6 +265,20 @@ tail -f /path/to/project/logs/ralph-monitor.log
 tmux attach -t ralph
 # Detach with: Ctrl+B, then D
 ```
+
+## Known Issues
+
+### OpenCode CLI (January 2026)
+
+The `opencode run` command currently has issues that prevent reliable headless execution:
+
+| Issue | Description | Status |
+|-------|-------------|--------|
+| [#8502](https://github.com/anomalyco/opencode/issues/8502) | "Session not found" when auth env vars set | Open |
+| [#8203](https://github.com/anomalyco/opencode/issues/8203) | Hangs forever on API errors | Open |
+| [#8383](https://github.com/anomalyco/opencode/issues/8383) | Stuck without error messages | Open |
+
+**Recommendation**: Use Claude CLI (`npm install -g @anthropic-ai/claude-code`) until these are resolved. Ralph Ultra automatically prefers Claude CLI when available.
 
 ## License
 
