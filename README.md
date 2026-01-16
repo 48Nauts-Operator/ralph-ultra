@@ -19,6 +19,68 @@ See [Installation](#installation) below.
 
 ---
 
+## Interactive Terminal UI (NEW in v1.5.0)
+
+Ralph Ultra now includes an **interactive Terminal UI (TUI)** for real-time project monitoring and control.
+
+### Quick Start
+
+```bash
+ralph tui                    # Launch in current directory
+ralph tui /path/to/project  # Launch for specific project
+```
+
+### What You Get
+
+| Panel | Shows |
+|-------|-------|
+| **Top Bar** | Version, quota %, hybrid status, running state |
+| **Left Panel** | PRD progress, story status (✓ complete, ▸ in progress, pending) |
+| **Right Panel** | Live logs, system status, log browser |
+| **Input Bar** | Slash commands and interactive control |
+
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help`, `/h` | Show help overlay |
+| `/quit`, `/q` | Exit TUI |
+| `/monitor` | Switch to live monitor view |
+| `/status` | Show system status (quota, hybrid, timing) |
+| `/logs` | Browse log files |
+| `/run` | Start Ralph on current project |
+| `/stop` | Stop running Ralph process |
+| `/report [--open]` | Generate HTML report |
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `1` | Switch to monitor view |
+| `2` | Switch to status view |
+| `3` | Switch to logs view |
+| `?` | Show help |
+| `r` | Run Ralph |
+| `s` | Stop Ralph |
+| `Tab` | Cycle through views |
+
+### Requirements
+
+- **tmux** (`brew install tmux` on macOS, `apt install tmux` on Linux)
+- Project with `prd.json`
+
+### TUI vs. Standard Mode
+
+| Feature | TUI Mode | Standard Mode |
+|---------|----------|---------------|
+| **Interactivity** | Full interactive control | Fire-and-forget |
+| **Monitoring** | Real-time visual dashboard | Log files only |
+| **Control** | Start/stop from TUI | Separate commands |
+| **Reports** | Generate on-demand | Auto-generated at end |
+| **Use Case** | Active development | CI/CD, automation |
+
+---
+
 ## Features
 
 | Feature | Description |
