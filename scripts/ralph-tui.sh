@@ -114,42 +114,55 @@ create_session() {
 
     info "Creating TUI session for: $project_path"
 
-    # Create new session in detached mode
-    tmux new-session -d -s "$SESSION_NAME" -c "$project_path"
+    # Get terminal size, default to 120x40 if not available
+    local term_width term_height right_width
+    term_width=$(tput cols 2>/dev/null || echo 120)
+    term_height=$(tput lines 2>/dev/null || echo 40)
+    right_width=$((term_width * 70 / 100))
+    
+    # Create new session in detached mode with explicit size
+    tmux new-session -d -s "$SESSION_NAME" -x "$term_width" -y "$term_height" -c "$project_path"
 
-    # Split top for status bar (1 line)
-    tmux split-window -v -t "$SESSION_NAME:0" -l 1 -c "$project_path"
+    # Split horizontally: left 30%, right 70%
+    tmux split-window -h -t "$SESSION_NAME:0" -l "$right_width" -c "$project_path"
 
-    # Split the bottom pane horizontally: create right pane (60%)
-    tmux split-window -h -t "$SESSION_NAME:0.1" -p 60 -c "$project_path"
+    # Split the right pane vertically for input bar (5 lines from bottom)
+    tmux split-window -v -t "$SESSION_NAME:0.1" -l 5 -c "$project_path"
 
-    # Split the right pane vertically for input bar (3 lines from bottom)
-    tmux split-window -v -t "$SESSION_NAME:0.2" -l 3 -c "$project_path"
+    # Pane layout:
+    # 0.0 = Left (PRD Progress, 40%)
+    # 0.1 = Right Top (Live Monitor, 60% wide, most of height)
+    # 0.2 = Right Bottom (Command Input, 5 lines)
 
     # Set pane titles
-    tmux select-pane -t "$SESSION_NAME:0.0" -T "Status Bar"
-    tmux select-pane -t "$SESSION_NAME:0.1" -T "PRD Progress"
-    tmux select-pane -t "$SESSION_NAME:0.2" -T "Live Monitor"
-    tmux select-pane -t "$SESSION_NAME:0.3" -T "Command Input"
+    tmux select-pane -t "$SESSION_NAME:0.0" -T "PRD Progress"
+    tmux select-pane -t "$SESSION_NAME:0.1" -T "Live Monitor"
+    tmux select-pane -t "$SESSION_NAME:0.2" -T "Command Input"
 
     # Set environment variable for project path
     tmux set-environment -t "$SESSION_NAME" RALPH_PROJECT_PATH "$project_path"
 
-    # Initialize panes with placeholder content
-    # Top pane: Status bar (auto-refreshing)
-    tmux send-keys -t "$SESSION_NAME:0.0" "'$SCRIPT_DIR/ralph-tui-status-bar.sh' '$project_path'" C-m
+    # Enable mouse support for resizing panes
+    tmux set-option -t "$SESSION_NAME" mouse on
 
+    # Bind keyboard shortcuts (work from any pane)
+    tmux bind-key -T root 1 send-keys -t "$SESSION_NAME:0.2" "/monitor" C-m
+    tmux bind-key -T root 2 send-keys -t "$SESSION_NAME:0.2" "/status" C-m
+    tmux bind-key -T root 3 send-keys -t "$SESSION_NAME:0.2" "/logs" C-m
+    tmux bind-key -T root ? send-keys -t "$SESSION_NAME:0.2" "/help" C-m
+
+    # Initialize panes with their scripts
     # Left pane: PRD progress viewer (with watch mode for auto-refresh)
-    tmux send-keys -t "$SESSION_NAME:0.1" "'$SCRIPT_DIR/ralph-tui-left-panel.sh' --watch '$project_path'" C-m
+    tmux send-keys -t "$SESSION_NAME:0.0" "'$SCRIPT_DIR/ralph-tui-left-panel.sh' --watch '$project_path'" C-m
 
-    # Right pane: Live monitor (default view)
-    tmux send-keys -t "$SESSION_NAME:0.2" "'$SCRIPT_DIR/ralph-tui-right-panel.sh' monitor '$project_path'" C-m
+    # Right top pane: Live monitor (default view)
+    tmux send-keys -t "$SESSION_NAME:0.1" "'$SCRIPT_DIR/ralph-tui-right-panel.sh' monitor '$project_path'" C-m
 
-    # Bottom pane: Interactive input bar
-    tmux send-keys -t "$SESSION_NAME:0.3" "'$SCRIPT_DIR/ralph-tui-input-bar.sh' '$project_path'" C-m
+    # Right bottom pane: Interactive input bar
+    tmux send-keys -t "$SESSION_NAME:0.2" "'$SCRIPT_DIR/ralph-tui-input-bar.sh' '$project_path'" C-m
 
     # Focus on input pane
-    tmux select-pane -t "$SESSION_NAME:0.3"
+    tmux select-pane -t "$SESSION_NAME:0.2"
 
     success "TUI session created successfully"
 }
