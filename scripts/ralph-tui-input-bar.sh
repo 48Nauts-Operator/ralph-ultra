@@ -317,7 +317,60 @@ handle_stop() {
 
 handle_report() {
     local args="$1"
-    echo -e "${YELLOW}Report command will be implemented in TUI-010${NC}"
+
+    # Check for --open flag
+    local open_report=false
+    if [[ "$args" == *"--open"* ]]; then
+        open_report=true
+    fi
+
+    # Show generating message
+    echo -e "${CYAN}Generating HTML report...${NC}"
+
+    # Generate report using ralph-monitor.sh
+    # We need to capture the output to get the report file path
+    local monitor_script="$SCRIPT_DIR/ralph-monitor.sh"
+
+    if [[ ! -f "$monitor_script" ]]; then
+        echo -e "${RED}Error: ralph-monitor.sh not found${NC}"
+        return 1
+    fi
+
+    # Run ralph-monitor.sh --report
+    # Capture both stdout and the result
+    local output
+    if output=$("$monitor_script" --report "$PROJECT_DIR" 2>&1); then
+        # Extract report file path from output
+        # Output format: "Report generated: /path/to/report.html"
+        local report_file
+        report_file=$(echo "$output" | grep -o "Report generated:.*" | sed 's/Report generated: //')
+
+        if [[ -n "$report_file" ]] && [[ -f "$report_file" ]]; then
+            echo -e "${GREEN}✓ Report generated${NC}"
+            echo -e "${DIM}Path: $report_file${NC}"
+
+            # Open report if --open flag was provided
+            if [[ "$open_report" == true ]]; then
+                if command -v open &>/dev/null; then
+                    open "$report_file"
+                    echo -e "${DIM}Opening in default browser...${NC}"
+                elif command -v xdg-open &>/dev/null; then
+                    xdg-open "$report_file"
+                    echo -e "${DIM}Opening in default browser...${NC}"
+                else
+                    echo -e "${YELLOW}Cannot open browser automatically${NC}"
+                    echo -e "${DIM}Open manually: $report_file${NC}"
+                fi
+            fi
+        else
+            echo -e "${YELLOW}Report generated but file path not found${NC}"
+            echo "$output"
+        fi
+    else
+        echo -e "${RED}Failed to generate report${NC}"
+        echo "$output"
+        return 1
+    fi
 }
 
 # Main input loop with readline support

@@ -169,7 +169,7 @@
         "/report --open generates and opens in default browser",
         "Error handling if report generation fails"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TUI-011",
