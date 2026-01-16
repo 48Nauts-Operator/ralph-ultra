@@ -61,9 +61,11 @@ cmd_run() {
         echo -e "${YELLOW}Ralph is already running${NC}"
         return
     fi
-    echo -e "${GREEN}Starting Ralph...${NC}"
-    cd "$PROJECT_DIR" && nohup "$SCRIPT_DIR/ralph.sh" "$PROJECT_DIR" > /dev/null 2>&1 &
-    echo -e "${GREEN}Ralph started in background${NC}"
+    echo -e "${GREEN}Starting Ralph in right panel...${NC}"
+    tmux send-keys -t ralph-tui:0.1 C-c
+    sleep 0.2
+    tmux send-keys -t ralph-tui:0.1 "cd '$PROJECT_DIR' && '$SCRIPT_DIR/ralph.sh' --skip-budget --agent-only '$PROJECT_DIR'" C-m
+    echo -e "${GREEN}Ralph running in right panel${NC}"
 }
 
 cmd_stop() {
