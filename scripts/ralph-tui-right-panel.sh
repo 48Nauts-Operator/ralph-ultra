@@ -65,7 +65,55 @@ colorize_log_line() {
     fi
 }
 
-# Render live monitor view
+# Handle keyboard shortcuts (global across all views)
+handle_keyboard_shortcut() {
+    local key="$1"
+
+    case "$key" in
+        1)
+            # Switch to monitor view
+            exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+            ;;
+        2)
+            # Switch to status view
+            exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" status "$PROJECT_DIR"
+            ;;
+        3)
+            # Switch to logs view
+            exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" logs "$PROJECT_DIR"
+            ;;
+        '?')
+            # Show help
+            exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" help "$PROJECT_DIR"
+            ;;
+        r)
+            # Run Ralph - send command to input bar pane
+            tmux send-keys -t ralph-tui:0.3 "/run" C-m
+            ;;
+        s)
+            # Stop Ralph - send command to input bar pane
+            tmux send-keys -t ralph-tui:0.3 "/stop" C-m
+            ;;
+        $'\t')
+            # Tab: cycle through views (monitor -> status -> logs -> monitor)
+            case "$VIEW_MODE" in
+                monitor)
+                    exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" status "$PROJECT_DIR"
+                    ;;
+                status)
+                    exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" logs "$PROJECT_DIR"
+                    ;;
+                logs|help)
+                    exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+                    ;;
+            esac
+            ;;
+    esac
+
+    return 0
+}
+
+# Render live monitor view with keyboard shortcuts
 render_monitor() {
     clear
 
@@ -79,13 +127,41 @@ render_monitor() {
     if [[ ! -f "$LOG_FILE" ]]; then
         echo -e "${DIM}Waiting for activity...${NC}"
         echo -e "${DIM}Log file: ${LOG_FILE}${NC}"
+        echo ""
+        echo -e "${DIM}Keyboard shortcuts: 1=monitor 2=status 3=logs ?=help Tab=cycle r=run s=stop${NC}"
+
+        # Wait for keypress with shortcuts
+        while true; do
+            read -rsn1 -t 2 key || continue
+            handle_keyboard_shortcut "$key"
+        done
         return
     fi
 
-    # Stream log file with tail -f
-    # Use -n 50 to show last 50 lines initially
-    tail -n 50 -f "$LOG_FILE" 2>/dev/null | while IFS= read -r line; do
+    # Display initial log content and keyboard hint
+    echo -e "${DIM}Keyboard shortcuts: 1=monitor 2=status 3=logs ?=help Tab=cycle r=run s=stop${NC}"
+    echo ""
+
+    # Show last 50 lines
+    tail -n 50 "$LOG_FILE" 2>/dev/null | while IFS= read -r line; do
         colorize_log_line "$line"
+    done
+
+    # Start tail -f in background and capture its PID
+    tail -f "$LOG_FILE" 2>/dev/null | while IFS= read -r line; do
+        colorize_log_line "$line"
+    done &
+    local tail_pid=$!
+
+    # Listen for keyboard shortcuts while tail runs
+    while kill -0 $tail_pid 2>/dev/null; do
+        # Check for keypress with timeout (non-blocking)
+        if read -rsn1 -t 1 key; then
+            # Kill tail process
+            kill $tail_pid 2>/dev/null
+            # Handle the shortcut
+            handle_keyboard_shortcut "$key"
+        fi
     done
 }
 
@@ -122,11 +198,14 @@ render_help() {
     echo ""
     echo -e "${DIM}Press any key to return to monitor view...${NC}"
 
-    # Wait for keypress
-    read -n 1 -s
-
-    # Switch back to monitor view
-    exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+    # Wait for keypress and handle shortcuts
+    while true; do
+        read -rsn1 key
+        # Try shortcuts first
+        handle_keyboard_shortcut "$key" || true
+        # If not a shortcut (function returns 1), just return to monitor
+        exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
+    done
 }
 
 # Render status view
@@ -286,7 +365,13 @@ render_status() {
     echo -e "  Success Rate:    ${GREEN}${success_rate}%${NC}"
     echo ""
 
-    echo -e "${DIM}Type /monitor to return to live monitor view${NC}"
+    echo -e "${DIM}Keyboard shortcuts: 1=monitor 2=status 3=logs ?=help Tab=cycle r=run s=stop${NC}"
+
+    # Wait for keyboard shortcuts
+    while true; do
+        read -rsn1 -t 2 key || continue
+        handle_keyboard_shortcut "$key"
+    done
 }
 
 # Format file size for display
@@ -362,7 +447,8 @@ render_logs() {
         echo -e "${BOLD}${CYAN}║${NC}  ${BOLD}Log Files${NC}  ${DIM}(${#log_files[@]} files)${NC}                              ${BOLD}${CYAN}║${NC}"
         echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
         echo ""
-        echo -e "${DIM}j/k: navigate  Enter: view  /monitor: return  q: back${NC}"
+        echo -e "${DIM}j/k: navigate  Enter: view  q: back${NC}"
+        echo -e "${DIM}Shortcuts: 1=monitor 2=status 3=logs ?=help Tab=cycle r=run s=stop${NC}"
         echo ""
 
         # List log files
@@ -421,6 +507,10 @@ render_logs() {
                 if [[ "$cmd" == "monitor" ]]; then
                     exec "$SCRIPT_DIR/ralph-tui-right-panel.sh" monitor "$PROJECT_DIR"
                 fi
+                ;;
+            *)
+                # Try keyboard shortcuts
+                handle_keyboard_shortcut "$input" || true
                 ;;
         esac
     done

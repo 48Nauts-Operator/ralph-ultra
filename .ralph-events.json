@@ -86,6 +86,12 @@
       "type": "story_complete",
       "message": "Completed: TUI-007 in 5m",
       "story": "TUI-007"
+    },
+    {
+      "timestamp": "2026-01-16T01:04:57+01:00",
+      "type": "story_complete",
+      "message": "Completed: TUI-009 in 5m",
+      "story": "TUI-009"
     }
   ],
   "stories_completed": [
@@ -241,6 +247,31 @@
           "prd.json",
           "scripts/ralph-tui-input-bar.sh",
           "scripts/ralph-tui-right-panel.sh"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-16T01:04:57+01:00",
+      "story": "TUI-009",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "5f07dd2",
+        "end_commit": "d838d78",
+        "files_changed": 10,
+        "lines_added": 461,
+        "lines_removed": 31,
+        "files": [
+          ".ralph-events.json",
+          ".ralph-monitor-state.json",
+          ".ralph-timing.json",
+          ".ralph-tui-history",
+          "logs/notifications.jsonl",
+          "prd.json",
+          "ralph-report_2026-01-16_00-34-42.html",
+          "scripts/ralph-tui-input-bar.sh",
+          "scripts/ralph-tui-status-bar.sh",
+          "scripts/ralph-tui.sh"
         ]
       }
     }
