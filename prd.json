@@ -203,7 +203,7 @@
         "README.md updated with TUI documentation",
         "CHANGELOG.md updated for v1.5.0"
       ],
-      "passes": false
+      "passes": true
     }
   ]
 }
