@@ -187,7 +187,7 @@
         "Tab cycles through panel views",
         "Shortcuts work when input bar not focused"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TUI-012",
