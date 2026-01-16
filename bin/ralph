@@ -57,6 +57,7 @@ discover_commands() {
 
   # Built-in commands (implemented in this file or as separate scripts)
   commands+=("run:Execute a Ralph project (wraps ralph.sh)")
+  commands+=("tui:Launch interactive Terminal UI dashboard")
   commands+=("status:Show Ralph status (quota, hybrid, timing)")
   commands+=("quota:Manage Claude Pro quota")
   commands+=("hybrid:Manage hybrid LLM routing")
@@ -77,6 +78,7 @@ USAGE:
 
 COMMANDS:
   run       Execute a Ralph project (wraps ralph.sh)
+  tui       Launch interactive Terminal UI dashboard
   status    Show Ralph status (quota, hybrid, timing)
   quota     Manage Claude Pro quota
   hybrid    Manage hybrid LLM routing
@@ -91,6 +93,7 @@ Use 'ralph <command> --help' for command-specific help.
 
 EXAMPLES:
   ralph run /path/to/project
+  ralph tui
   ralph status
   ralph quota --check
   ralph hybrid --status
@@ -174,6 +177,84 @@ EOF
   fi
 
   echo ""
+}
+
+# Launch TUI
+launch_tui() {
+  local project_path="${1:-.}"
+
+  # Handle help flag
+  if [[ "$project_path" == "--help" || "$project_path" == "-h" ]]; then
+    cat << EOF
+ralph tui - Launch interactive Terminal UI dashboard
+
+USAGE:
+  ralph tui                   Launch TUI for current directory
+  ralph tui <project>         Launch TUI for specific project
+
+DESCRIPTION:
+  The TUI provides an interactive dashboard for monitoring Ralph projects:
+  - Left panel: PRD progress with story status
+  - Right panel: Live logs, status, reports
+  - Top bar: Quota, hybrid mode, running state
+  - Input bar: Slash commands for control
+
+SLASH COMMANDS:
+  /help, /h         Show help overlay
+  /quit, /q         Exit TUI
+  /monitor          Switch to live monitor view
+  /status           Show system status (quota, hybrid, timing)
+  /logs             Browse log files
+  /run              Start Ralph on current project
+  /stop             Stop running Ralph process
+  /report [--open]  Generate HTML report
+
+KEYBOARD SHORTCUTS:
+  1                 Switch to monitor view
+  2                 Switch to status view
+  3                 Switch to logs view
+  ?                 Show help
+  r                 Run Ralph
+  s                 Stop Ralph
+  Tab               Cycle through views
+
+EXAMPLES:
+  ralph tui                   # Launch in current directory
+  ralph tui /path/to/project  # Launch for specific project
+  ralph tui --help            # Show this help
+
+REQUIREMENTS:
+  - tmux must be installed
+  - Project must have prd.json
+EOF
+    return 0
+  fi
+
+  # Resolve project path
+  if [[ ! -d "$project_path" ]]; then
+    error "Project directory not found: $project_path"
+  fi
+
+  project_path="$(cd "$project_path" && pwd)"
+
+  # Check for prd.json
+  if [[ ! -f "$project_path/prd.json" ]]; then
+    error "No prd.json found in: $project_path
+
+Use 'ralph init' to create a new project."
+  fi
+
+  # Check for tmux
+  if ! command -v tmux &>/dev/null; then
+    error "tmux is required for TUI mode.
+
+Install with:
+  macOS:  brew install tmux
+  Linux:  apt install tmux"
+  fi
+
+  # Launch TUI
+  exec "$RALPH_SCRIPTS_DIR/ralph-tui.sh" "$project_path"
 }
 
 # Show project-specific status
@@ -665,6 +746,11 @@ dispatch_command() {
     run)
       # Delegate to ralph.sh
       exec "$RALPH_SCRIPTS_DIR/ralph.sh" "$@"
+      ;;
+    tui)
+      # Launch TUI
+      launch_tui "$@"
+      exit 0
       ;;
     quota)
       # Delegate to ralph-quota.sh

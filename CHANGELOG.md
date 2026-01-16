@@ -5,6 +5,30 @@ All notable changes to Ralph Ultra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-16
+
+### Added
+- **Interactive Terminal UI (TUI)** (`ralph tui`)
+  - Real-time dashboard with split panels (left: PRD progress, right: live logs/status)
+  - Top status bar showing version, quota %, hybrid mode, running state
+  - Interactive input bar with slash commands
+  - Slash commands: `/help`, `/quit`, `/monitor`, `/status`, `/logs`, `/run`, `/stop`, `/report`
+  - Keyboard shortcuts: `1-3` for view switching, `?` for help, `r/s` for run/stop, `Tab` for cycling
+  - Live log streaming with color-coded output (green: success, red: error, yellow: warning)
+  - System status view (quota, hybrid LLM, timing database)
+  - Log file browser with j/k navigation and less integration
+  - Process management from TUI (start/stop Ralph runs)
+  - Report generation with optional browser opening
+  - Auto-refreshing status bar (30s interval)
+  - tmux-based session management with graceful cleanup
+  - Project path validation requiring prd.json
+  - Session reattachment support
+
+### Changed
+- `ralph` CLI now includes `tui` subcommand
+- README updated with comprehensive TUI documentation
+- Added TUI to main feature list
+
 ## [1.4.0] - 2026-01-15
 
 ### Added
