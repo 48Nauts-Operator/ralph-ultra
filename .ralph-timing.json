@@ -19,6 +19,22 @@
     "TUI-001": {
       "actual": 5,
       "estimate": 20
+    },
+    "TUI-002": {
+      "actual": 5,
+      "estimate": 20
+    },
+    "TUI-003": {
+      "actual": 5,
+      "estimate": 20
+    },
+    "TUI-005": {
+      "actual": 5,
+      "estimate": 20
+    },
+    "TUI-007": {
+      "actual": 5,
+      "estimate": 20
     }
   },
   "averages": {

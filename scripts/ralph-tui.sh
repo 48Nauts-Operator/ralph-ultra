@@ -117,32 +117,39 @@ create_session() {
     # Create new session in detached mode
     tmux new-session -d -s "$SESSION_NAME" -c "$project_path"
 
-    # Split window: create right pane (60%)
-    tmux split-window -h -t "$SESSION_NAME:0" -p 60 -c "$project_path"
+    # Split top for status bar (1 line)
+    tmux split-window -v -t "$SESSION_NAME:0" -l 1 -c "$project_path"
 
-    # Split bottom for input bar (3 lines from bottom)
-    tmux split-window -v -t "$SESSION_NAME:0.1" -l 3 -c "$project_path"
+    # Split the bottom pane horizontally: create right pane (60%)
+    tmux split-window -h -t "$SESSION_NAME:0.1" -p 60 -c "$project_path"
+
+    # Split the right pane vertically for input bar (3 lines from bottom)
+    tmux split-window -v -t "$SESSION_NAME:0.2" -l 3 -c "$project_path"
 
     # Set pane titles
-    tmux select-pane -t "$SESSION_NAME:0.0" -T "PRD Progress"
-    tmux select-pane -t "$SESSION_NAME:0.1" -T "Live Monitor"
-    tmux select-pane -t "$SESSION_NAME:0.2" -T "Command Input"
+    tmux select-pane -t "$SESSION_NAME:0.0" -T "Status Bar"
+    tmux select-pane -t "$SESSION_NAME:0.1" -T "PRD Progress"
+    tmux select-pane -t "$SESSION_NAME:0.2" -T "Live Monitor"
+    tmux select-pane -t "$SESSION_NAME:0.3" -T "Command Input"
 
     # Set environment variable for project path
     tmux set-environment -t "$SESSION_NAME" RALPH_PROJECT_PATH "$project_path"
 
     # Initialize panes with placeholder content
+    # Top pane: Status bar (auto-refreshing)
+    tmux send-keys -t "$SESSION_NAME:0.0" "'$SCRIPT_DIR/ralph-tui-status-bar.sh' '$project_path'" C-m
+
     # Left pane: PRD progress viewer (with watch mode for auto-refresh)
-    tmux send-keys -t "$SESSION_NAME:0.0" "'$SCRIPT_DIR/ralph-tui-left-panel.sh' --watch '$project_path'" C-m
+    tmux send-keys -t "$SESSION_NAME:0.1" "'$SCRIPT_DIR/ralph-tui-left-panel.sh' --watch '$project_path'" C-m
 
     # Right pane: Live monitor (default view)
-    tmux send-keys -t "$SESSION_NAME:0.1" "'$SCRIPT_DIR/ralph-tui-right-panel.sh' monitor '$project_path'" C-m
+    tmux send-keys -t "$SESSION_NAME:0.2" "'$SCRIPT_DIR/ralph-tui-right-panel.sh' monitor '$project_path'" C-m
 
     # Bottom pane: Interactive input bar
-    tmux send-keys -t "$SESSION_NAME:0.2" "'$SCRIPT_DIR/ralph-tui-input-bar.sh' '$project_path'" C-m
+    tmux send-keys -t "$SESSION_NAME:0.3" "'$SCRIPT_DIR/ralph-tui-input-bar.sh' '$project_path'" C-m
 
     # Focus on input pane
-    tmux select-pane -t "$SESSION_NAME:0.2"
+    tmux select-pane -t "$SESSION_NAME:0.3"
 
     success "TUI session created successfully"
 }

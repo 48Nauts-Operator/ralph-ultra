@@ -154,7 +154,7 @@
         "Updates every 30 seconds",
         "Doesn't flicker during updates"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "TUI-010",

@@ -62,6 +62,30 @@
       "type": "story_complete",
       "message": "Completed: TUI-001 in 5m",
       "story": "TUI-001"
+    },
+    {
+      "timestamp": "2026-01-16T00:44:50+01:00",
+      "type": "story_complete",
+      "message": "Completed: TUI-002 in 5m",
+      "story": "TUI-002"
+    },
+    {
+      "timestamp": "2026-01-16T00:49:51+01:00",
+      "type": "story_complete",
+      "message": "Completed: TUI-003 in 5m",
+      "story": "TUI-003"
+    },
+    {
+      "timestamp": "2026-01-16T00:54:53+01:00",
+      "type": "story_complete",
+      "message": "Completed: TUI-005 in 5m",
+      "story": "TUI-005"
+    },
+    {
+      "timestamp": "2026-01-16T00:59:55+01:00",
+      "type": "story_complete",
+      "message": "Completed: TUI-007 in 5m",
+      "story": "TUI-007"
     }
   ],
   "stories_completed": [
@@ -139,6 +163,84 @@
         "lines_removed": 0,
         "files": [
           "scripts/ralph-tui.sh"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-16T00:44:50+01:00",
+      "story": "TUI-002",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "2c6a356",
+        "end_commit": "4279e77",
+        "files_changed": 10,
+        "lines_added": 815,
+        "lines_removed": 8,
+        "files": [
+          ".ralph-events.json",
+          ".ralph-last-branch",
+          ".ralph-monitor-state.json",
+          ".ralph-monitor.pid",
+          ".ralph-timing.json",
+          "logs/notifications.jsonl",
+          "prd-tui.json",
+          "ralph-report_2026-01-16_00-34-42.html",
+          "scripts/ralph-tui-left-panel.sh",
+          "scripts/ralph-tui.sh"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-16T00:49:51+01:00",
+      "story": "TUI-003",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "4279e77",
+        "end_commit": "a4b7f1c",
+        "files_changed": 3,
+        "lines_added": 501,
+        "lines_removed": 4,
+        "files": [
+          "scripts/ralph-tui-input-bar.sh",
+          "scripts/ralph-tui-right-panel.sh",
+          "scripts/ralph-tui.sh"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-16T00:54:53+01:00",
+      "story": "TUI-005",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "a4b7f1c",
+        "end_commit": "782b8b8",
+        "files_changed": 2,
+        "lines_added": 362,
+        "lines_removed": 1,
+        "files": [
+          "prd.json",
+          "scripts/ralph-tui-right-panel.sh"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-16T00:59:55+01:00",
+      "story": "TUI-007",
+      "duration": 5,
+      "estimate": 20,
+      "git": {
+        "start_commit": "782b8b8",
+        "end_commit": "5f07dd2",
+        "files_changed": 3,
+        "lines_added": 201,
+        "lines_removed": 10,
+        "files": [
+          "prd.json",
+          "scripts/ralph-tui-input-bar.sh",
+          "scripts/ralph-tui-right-panel.sh"
         ]
       }
     }
