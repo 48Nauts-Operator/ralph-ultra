@@ -4,6 +4,10 @@
 
 set -e
 
+# Define SCRIPT_DIR early (needed for flags that exec other scripts)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERSION=$(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo "unknown")
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -17,10 +21,16 @@ success() { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
 show_usage() {
+  echo "Ralph Ultra v$VERSION - Autonomous AI Agent System"
+  echo ""
   echo "Usage: ralph.sh [options] <project_dir> [max_iterations]"
+  echo "       ralph.sh tui [project_dir]"
+  echo ""
+  echo "Commands:"
+  echo "  tui             Launch interactive Terminal UI dashboard"
   echo ""
   echo "Arguments:"
-  echo "  project_dir     Path to project (REQUIRED)"
+  echo "  project_dir     Path to project (REQUIRED, default: current dir for tui)"
   echo "  max_iterations  Maximum iterations (auto-calculated if not provided)"
   echo "                  Auto: remaining_stories * 3, min 10, max 200"
   echo ""
@@ -36,6 +46,7 @@ show_usage() {
   echo "  --hybrid-stats  Show hybrid LLM usage statistics"
   echo "  --status        Show current status"
   echo "  --report        Generate HTML report"
+  echo "  --version, -v   Show version"
   echo "  --help, -h      Show this help"
   echo ""
   echo "Git Behavior:"
@@ -46,6 +57,8 @@ show_usage() {
   echo ""
   echo "Examples:"
   echo "  ralph.sh /path/to/project"
+  echo "  ralph.sh tui                         # TUI for current directory"
+  echo "  ralph.sh tui /path/to/project        # TUI for specific project"
   echo "  ralph.sh --worktree /path/to/project"
   echo "  ralph.sh --branch feature/my-feature /path/to/project"
   echo "  ralph.sh --status /path/to/project"
@@ -61,10 +74,19 @@ AGENT_ONLY=false
 USE_WORKTREE=false
 BRANCH_NAME=""
 
-while [[ "$1" == --* ]]; do
+if [[ "$1" == "tui" ]]; then
+  shift
+  exec "$SCRIPT_DIR/ralph-tui.sh" "$@"
+fi
+
+while [[ "$1" == --* ]] || [[ "$1" == "-v" ]]; do
   case "$1" in
     --help|-h)
       show_usage
+      exit 0
+      ;;
+    --version|-v)
+      echo "Ralph Ultra v$VERSION"
       exit 0
       ;;
     --no-monitor)
@@ -126,7 +148,6 @@ fi
 
 PROJECT_DIR="$1"
 USER_ITERATIONS="$2"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 MONITOR_SCRIPT="$SCRIPT_DIR/ralph-monitor.sh"
 BUDGET_SCRIPT="$SCRIPT_DIR/ralph-budget.sh"
