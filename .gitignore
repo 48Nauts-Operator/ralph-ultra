@@ -1,9 +1,24 @@
 *.log
 .ralph-failures/
-ralph-report.html
+ralph-report*.html
 .last-branch
 progress.txt
 prd.json
+prd-*.json
 archive/
 .opencode/
 .DS_Store
+
+# Runtime/state files
+.ralph-events.json
+.ralph-last-branch
+.ralph-monitor-state.json
+.ralph-monitor.pid
+.ralph-timing.json
+.ralph-tui-history
+
+# Logs
+logs/
+
+# Development notes
+future-features/
