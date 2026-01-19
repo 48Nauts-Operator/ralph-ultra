@@ -34,8 +34,17 @@ show_help() {
     read -r
 }
 
+is_ralph_running() {
+    pgrep -f "ralph.sh.*$PROJECT_DIR" > /dev/null 2>&1 || pgrep -f "claude" > /dev/null 2>&1
+}
+
 switch_view() {
     local view="$1"
+    if is_ralph_running; then
+        echo -e "${YELLOW}Ralph is running - cannot switch views${NC}"
+        echo -e "${DIM}Use /stop first, or wait for Ralph to finish${NC}"
+        return 1
+    fi
     tmux send-keys -t ralph-tui:0.1 C-c
     sleep 0.2
     tmux send-keys -t ralph-tui:0.1 "'$SCRIPT_DIR/ralph-tui-right-panel.sh' $view '$PROJECT_DIR'" C-m
