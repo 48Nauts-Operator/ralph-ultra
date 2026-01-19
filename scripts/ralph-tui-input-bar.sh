@@ -27,6 +27,7 @@ declare -A CMD_DESC=(
     ["/stop"]="Stop Ralph"
     ["/report"]="Generate HTML report"
     ["/quota"]="Show Claude Pro quota status"
+    ["/resources"]="Check CPU, RAM, running sessions"
 )
 
 declare -A CMD_OPTS=(
@@ -64,7 +65,7 @@ show_help() {
     echo -e "${BOLD}${CYAN}Ralph TUI Commands${NC}"
     echo -e "${DIM}─────────────────────────────────────${NC}"
     echo ""
-    for cmd in /help /quit /monitor /status /logs /run /stop /report /quota; do
+    for cmd in /help /quit /monitor /status /logs /run /stop /report /quota /resources; do
         local opts="${CMD_OPTS[$cmd]:-}"
         if [[ -n "$opts" ]]; then
             printf "  ${GREEN}%-12s${NC} ${DIM}%-35s${NC} %s\n" "$cmd" "[$opts]" "${CMD_DESC[$cmd]}"
@@ -138,6 +139,19 @@ cmd_run() {
         return
     fi
     
+    "$SCRIPT_DIR/ralph-resources.sh" --check
+    local resource_status=$?
+    
+    if [[ $resource_status -eq 1 ]]; then
+        echo ""
+        read -p "Start anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${DIM}Aborted${NC}"
+            return
+        fi
+    fi
+    
     mkdir -p "$PROJECT_DIR/logs"
     
     local extra_args="${RALPH_TUI_ARGS:-} $args"
@@ -182,6 +196,10 @@ cmd_quota() {
     "$SCRIPT_DIR/ralph-quota.sh" --status 2>/dev/null || echo -e "${YELLOW}Quota check unavailable${NC}"
 }
 
+cmd_resources() {
+    "$SCRIPT_DIR/ralph-resources.sh" --status
+}
+
 cmd_quit() {
     echo -e "${YELLOW}Exiting TUI...${NC}"
     tmux kill-session -t "$TUI_SESSION" 2>/dev/null
@@ -213,6 +231,7 @@ process_command() {
         /stop)         cmd_stop ;;
         /report)       cmd_report "$cmd_args" ;;
         /quota)        cmd_quota ;;
+        /resources)    cmd_resources ;;
         /*)            show_suggestions "$base_cmd" ;;
         *)             echo -e "${RED}Commands must start with /${NC}" ;;
     esac
