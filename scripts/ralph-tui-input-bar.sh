@@ -64,6 +64,8 @@ cmd_logs() {
 }
 
 cmd_run() {
+    local args="${1:-}"
+    
     if is_ralph_running; then
         echo -e "${YELLOW}Ralph is already running${NC}"
         echo -e "${DIM}Use /stop to stop it, or /monitor to view progress${NC}"
@@ -72,8 +74,9 @@ cmd_run() {
     
     mkdir -p "$PROJECT_DIR/logs"
     
-    local extra_args="${RALPH_TUI_ARGS:-}"
+    local extra_args="${RALPH_TUI_ARGS:-} $args"
     echo -e "${GREEN}Starting Ralph in background...${NC}"
+    [[ -n "$args" ]] && echo -e "${DIM}Args: $args${NC}"
     
     tmux new-session -d -s "$RALPH_SESSION" -c "$PROJECT_DIR" \
         "'$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota $extra_args --agent-only '$PROJECT_DIR' 2>&1 | tee '$LOG_FILE'"
@@ -122,6 +125,8 @@ process_command() {
     fi
     
     local base_cmd="${cmd%% *}"
+    local cmd_args="${cmd#* }"
+    [[ "$cmd_args" == "$cmd" ]] && cmd_args=""
     
     case "$base_cmd" in
         /help|/h)      show_help ;;
@@ -129,7 +134,7 @@ process_command() {
         /monitor)      cmd_monitor ;;
         /status)       cmd_status ;;
         /logs)         cmd_logs ;;
-        /run)          cmd_run ;;
+        /run)          cmd_run "$cmd_args" ;;
         /stop)         cmd_stop ;;
         /report)       cmd_report ;;
         *)             echo -e "${RED}Unknown: $base_cmd${NC}. Type ${GREEN}/help${NC}" ;;
