@@ -101,16 +101,15 @@ install_scripts() {
   
   mkdir -p "$INSTALL_DIR"
   
-  # Copy scripts
-  cp "$SCRIPT_DIR/ralph.sh" "$INSTALL_DIR/"
-  cp "$SCRIPT_DIR/ralph-monitor.sh" "$INSTALL_DIR/"
-  cp "$SCRIPT_DIR/ralph-budget.sh" "$INSTALL_DIR/"
+  # Copy all scripts and prompt.md
+  cp "$SCRIPT_DIR"/*.sh "$INSTALL_DIR/"
   cp "$SCRIPT_DIR/prompt.md" "$INSTALL_DIR/"
   
   # Make executable
   chmod +x "$INSTALL_DIR"/*.sh
   
-  success "Scripts installed to $INSTALL_DIR"
+  local count=$(ls -1 "$INSTALL_DIR"/*.sh 2>/dev/null | wc -l | tr -d ' ')
+  success "Installed $count scripts to $INSTALL_DIR"
 }
 
 generate_config() {

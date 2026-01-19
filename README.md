@@ -1,5 +1,9 @@
 # Ralph Ultra
 
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/48Nauts-Operator/ralph-ultra/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![GitHub](https://img.shields.io/badge/GitHub-48Nauts--Operator%2Fralph--ultra-black?logo=github)](https://github.com/48Nauts-Operator/ralph-ultra)
+
 **Autonomous AI Agent System with Health Monitoring, Budget Planning & Sub-Agent Delegation**
 
 Ralph Ultra is an enhanced version of the Ralph autonomous coding agent. It adds production-grade features for running AI agents unattended on large projects.
