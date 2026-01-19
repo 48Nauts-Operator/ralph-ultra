@@ -180,12 +180,26 @@ render_panel() {
     fi
     echo ""
 
+    # System Stats
+    local cpu_usage="0"
+    local ralph_procs="0"
+    if pgrep -f "claude" >/dev/null 2>&1; then
+        cpu_usage=$(ps -p $(pgrep -f "claude" | head -1) -o %cpu= 2>/dev/null | tr -d ' ' || echo "0")
+        ralph_procs=$(pgrep -f "claude" 2>/dev/null | wc -l | tr -d ' ')
+    fi
+    local ralph_status="${RED}Stopped${NC}"
+    if tmux has-session -t ralph-agent 2>/dev/null; then
+        ralph_status="${GREEN}Running${NC}"
+    fi
+
     # Progress Summary
     echo -e "${BOLD}${CYAN}Progress Summary${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "  Completed:  ${GREEN}${completed_stories}${NC}/${total_stories} (${completion_pct}%)"
     echo -e "  ETA:        ${YELLOW}${eta}${NC}"
     echo -e "  Cost:       ${MAGENTA}${cost}${NC}"
+    echo -e "  Ralph:      ${ralph_status}"
+    echo -e "  CPU:        ${CYAN}${cpu_usage}%${NC}  Procs: ${CYAN}${ralph_procs}${NC}"
     echo ""
 
     # Story List
