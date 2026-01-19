@@ -1329,20 +1329,44 @@ validate_project() {
   return $errors
 }
 
+detect_prd_format() {
+  if jq -e '.userStories' "$PROJECT_DIR/prd.json" &>/dev/null; then
+    echo "ralph"
+  elif jq -e '.features' "$PROJECT_DIR/prd.json" &>/dev/null; then
+    echo "features"
+  elif jq -e '.implementation_phases' "$PROJECT_DIR/prd.json" &>/dev/null; then
+    echo "phases"
+  else
+    echo "unknown"
+  fi
+}
+
 validate_prd_structure() {
   if [ ! -f "$PROJECT_DIR/prd.json" ]; then
     return 1
   fi
   
-  if ! jq -e '.userStories' "$PROJECT_DIR/prd.json" &>/dev/null; then
-    log "ERROR" "prd.json missing 'userStories' array"
-    return 1
-  fi
+  local format=$(detect_prd_format)
+  local total=0
   
-  local total=$(jq '.userStories | length' "$PROJECT_DIR/prd.json" 2>/dev/null)
+  case "$format" in
+    ralph)
+      total=$(jq '.userStories | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo 0)
+      ;;
+    features)
+      total=$(jq '.features | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo 0)
+      ;;
+    phases)
+      total=$(jq '.implementation_phases | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo 0)
+      ;;
+    *)
+      log "WARN" "Unknown PRD format, continuing anyway"
+      return 0
+      ;;
+  esac
+  
   if [ -z "$total" ] || [ "$total" -eq 0 ]; then
-    log "ERROR" "prd.json has no user stories"
-    return 1
+    log "WARN" "PRD has no stories/features, continuing anyway"
   fi
   
   return 0
@@ -1404,36 +1428,64 @@ get_ai_cpu() {
 # =============================================================================
 
 get_story_count() {
-  if [ -f "$PROJECT_DIR/prd.json" ]; then
-    jq '.userStories | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo "0"
-  else
+  if [ ! -f "$PROJECT_DIR/prd.json" ]; then
     echo "0"
+    return
   fi
+  
+  local format=$(detect_prd_format)
+  case "$format" in
+    ralph)   jq '.userStories | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo "0" ;;
+    features) jq '.features | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo "0" ;;
+    phases)  jq '.implementation_phases | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo "0" ;;
+    *)       echo "0" ;;
+  esac
 }
 
 get_completed_count() {
-  if [ -f "$PROJECT_DIR/prd.json" ]; then
-    jq '[.userStories[] | select(.passes == true)] | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo "0"
-  else
+  if [ ! -f "$PROJECT_DIR/prd.json" ]; then
     echo "0"
+    return
   fi
+  
+  local format=$(detect_prd_format)
+  case "$format" in
+    ralph)   jq '[.userStories[] | select(.passes == true)] | length' "$PROJECT_DIR/prd.json" 2>/dev/null || echo "0" ;;
+    features) echo "0" ;;
+    phases)  echo "0" ;;
+    *)       echo "0" ;;
+  esac
 }
 
 get_current_story() {
-  if [ -f "$PROJECT_DIR/prd.json" ]; then
-    jq -r '.userStories | sort_by(.priority) | .[] | select(.passes == false) | .id' "$PROJECT_DIR/prd.json" 2>/dev/null | head -1
-  else
+  if [ ! -f "$PROJECT_DIR/prd.json" ]; then
     echo "unknown"
+    return
   fi
+  
+  local format=$(detect_prd_format)
+  case "$format" in
+    ralph)   jq -r '.userStories | sort_by(.priority) | .[] | select(.passes == false) | .id' "$PROJECT_DIR/prd.json" 2>/dev/null | head -1 ;;
+    features) jq -r '.features[0].id // "feature-1"' "$PROJECT_DIR/prd.json" 2>/dev/null ;;
+    phases)  jq -r '.implementation_phases[0].name // "phase-1"' "$PROJECT_DIR/prd.json" 2>/dev/null ;;
+    *)       echo "unknown" ;;
+  esac
 }
 
 get_current_story_title() {
   local story_id="$1"
-  if [ -f "$PROJECT_DIR/prd.json" ] && [ -n "$story_id" ]; then
-    jq -r --arg id "$story_id" '.userStories[] | select(.id == $id) | .title' "$PROJECT_DIR/prd.json" 2>/dev/null
-  else
+  if [ ! -f "$PROJECT_DIR/prd.json" ] || [ -z "$story_id" ]; then
     echo ""
+    return
   fi
+  
+  local format=$(detect_prd_format)
+  case "$format" in
+    ralph)   jq -r --arg id "$story_id" '.userStories[] | select(.id == $id) | .title' "$PROJECT_DIR/prd.json" 2>/dev/null ;;
+    features) jq -r --arg id "$story_id" '.features[] | select(.id == $id) | .name' "$PROJECT_DIR/prd.json" 2>/dev/null ;;
+    phases)  jq -r --arg name "$story_id" '.implementation_phases[] | select(.name == $name) | .name' "$PROJECT_DIR/prd.json" 2>/dev/null ;;
+    *)       echo "" ;;
+  esac
 }
 
 get_progress_summary() {
