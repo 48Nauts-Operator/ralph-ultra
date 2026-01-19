@@ -193,8 +193,9 @@ render_panel() {
     fi
 
     # Progress Summary
+    local separator=$(printf '%*s' "$((panel_width - 2))" '' | tr ' ' '━')
     echo -e "${BOLD}${CYAN}Progress Summary${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}${separator}${NC}"
     echo -e "  Completed:  ${GREEN}${completed_stories}${NC}/${total_stories} (${completion_pct}%)"
     echo -e "  ETA:        ${YELLOW}${eta}${NC}"
     echo -e "  Cost:       ${MAGENTA}${cost}${NC}"
@@ -204,7 +205,7 @@ render_panel() {
 
     # Story List
     echo -e "${BOLD}${CYAN}User Stories${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}${separator}${NC}"
 
     # Render stories based on PRD format
     case "$prd_format" in
@@ -265,12 +266,14 @@ render_panel() {
 
 # Main execution
 if [[ "$WATCH_MODE" == "true" ]]; then
-    # Watch mode: continuously render when PRD changes
     LAST_MOD=0
+    REFRESH_COUNT=0
     while true; do
+        REFRESH_COUNT=$((REFRESH_COUNT + 1))
         if [[ -f "$PRD_FILE" ]]; then
             CURRENT_MOD=$(stat -f %m "$PRD_FILE" 2>/dev/null || stat -c %Y "$PRD_FILE" 2>/dev/null || echo 0)
-            if [[ "$CURRENT_MOD" != "$LAST_MOD" ]]; then
+            # Refresh if PRD changed OR every 5 cycles (10 seconds) for live stats
+            if [[ "$CURRENT_MOD" != "$LAST_MOD" ]] || [[ $((REFRESH_COUNT % 5)) -eq 0 ]]; then
                 render_panel
                 LAST_MOD=$CURRENT_MOD
             fi
