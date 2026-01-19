@@ -79,8 +79,28 @@ show_help() {
     read -r
 }
 
-RALPH_SESSION="ralph-agent"
-LOG_FILE="$PROJECT_DIR/logs/ralph-agent.log"
+# Get project name for session naming
+get_project_name() {
+    local prd_file="$PROJECT_DIR/prd.json"
+    local name=""
+    
+    # Try to get from prd.json
+    if [[ -f "$prd_file" ]]; then
+        name=$(jq -r '.project // .project.name // empty' "$prd_file" 2>/dev/null | head -1)
+    fi
+    
+    # Fallback to directory basename
+    if [[ -z "$name" ]]; then
+        name=$(basename "$PROJECT_DIR")
+    fi
+    
+    # Sanitize: lowercase, replace spaces/special chars with dashes
+    echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
+}
+
+PROJECT_NAME=$(get_project_name)
+RALPH_SESSION="ralph-${PROJECT_NAME}"
+LOG_FILE="$PROJECT_DIR/logs/ralph-${PROJECT_NAME}.log"
 
 is_ralph_running() {
     tmux has-session -t "$RALPH_SESSION" 2>/dev/null

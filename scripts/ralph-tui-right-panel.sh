@@ -27,8 +27,22 @@ if [[ -d "$PROJECT_DIR" ]]; then
 else
     PROJECT_DIR="$(pwd)"
 fi
+
+get_project_name() {
+    local prd_file="$PROJECT_DIR/prd.json"
+    local name=""
+    if [[ -f "$prd_file" ]]; then
+        name=$(jq -r '.project // .project.name // empty' "$prd_file" 2>/dev/null | head -1)
+    fi
+    if [[ -z "$name" ]]; then
+        name=$(basename "$PROJECT_DIR")
+    fi
+    echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
+}
+
+PROJECT_NAME=$(get_project_name)
 MONITOR_LOG="$PROJECT_DIR/logs/ralph-monitor.log"
-AGENT_LOG="$PROJECT_DIR/logs/ralph-agent.log"
+AGENT_LOG="$PROJECT_DIR/logs/ralph-${PROJECT_NAME}.log"
 
 # Use agent log if it exists and is newer, otherwise monitor log
 if [[ -f "$AGENT_LOG" ]] && [[ -f "$MONITOR_LOG" ]]; then

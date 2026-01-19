@@ -30,6 +30,20 @@ PROJECT_PATH="${1:-${RALPH_PROJECT_PATH:-.}}"
 PRD_FILE="$PROJECT_PATH/prd.json"
 TIMING_FILE="$PROJECT_PATH/.ralph-timing.json"
 
+get_project_name() {
+    local name=""
+    if [[ -f "$PRD_FILE" ]]; then
+        name=$(jq -r '.project // .project.name // empty' "$PRD_FILE" 2>/dev/null | head -1)
+    fi
+    if [[ -z "$name" ]]; then
+        name=$(basename "$PROJECT_PATH")
+    fi
+    echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
+}
+
+PROJECT_NAME=$(get_project_name)
+RALPH_SESSION="ralph-${PROJECT_NAME}"
+
 # Check if prd.json exists
 if [[ ! -f "$PRD_FILE" ]]; then
     echo -e "${RED}ERROR: prd.json not found at: $PRD_FILE${NC}"
@@ -188,7 +202,7 @@ render_panel() {
         ralph_procs=$(pgrep -f "claude" 2>/dev/null | wc -l | tr -d ' ')
     fi
     local ralph_status="${RED}Stopped${NC}"
-    if tmux has-session -t ralph-agent 2>/dev/null; then
+    if tmux has-session -t "$RALPH_SESSION" 2>/dev/null; then
         ralph_status="${GREEN}Running${NC}"
     fi
 
