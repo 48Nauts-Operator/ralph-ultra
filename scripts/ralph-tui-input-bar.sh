@@ -16,19 +16,64 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${1:-$(pwd)}"
 [[ -d "$PROJECT_DIR" ]] && PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 
+# Command definitions with descriptions and options
+declare -A CMD_DESC=(
+    ["/help"]="Show this help"
+    ["/quit"]="Exit TUI"
+    ["/monitor"]="Switch to live log view"
+    ["/status"]="Show system status (quota, hybrid, timing)"
+    ["/logs"]="Browse log files"
+    ["/run"]="Start Ralph"
+    ["/stop"]="Stop Ralph"
+    ["/report"]="Generate HTML report"
+    ["/quota"]="Show Claude Pro quota status"
+)
+
+declare -A CMD_OPTS=(
+    ["/run"]="--hybrid aggressive|balanced|conservative"
+    ["/report"]="--open"
+)
+
+show_suggestions() {
+    local prefix="$1"
+    local matches=()
+    
+    for cmd in "${!CMD_DESC[@]}"; do
+        if [[ "$cmd" == "$prefix"* ]]; then
+            matches+=("$cmd")
+        fi
+    done
+    
+    if [[ ${#matches[@]} -eq 0 ]]; then
+        return
+    fi
+    
+    echo -e "${DIM}Commands:${NC}"
+    for cmd in "${matches[@]}"; do
+        local opts="${CMD_OPTS[$cmd]:-}"
+        if [[ -n "$opts" ]]; then
+            echo -e "  ${GREEN}$cmd${NC} ${DIM}[$opts]${NC} - ${CMD_DESC[$cmd]}"
+        else
+            echo -e "  ${GREEN}$cmd${NC} - ${CMD_DESC[$cmd]}"
+        fi
+    done
+}
+
 show_help() {
     clear
     echo -e "${BOLD}${CYAN}Ralph TUI Commands${NC}"
     echo -e "${DIM}─────────────────────────────────────${NC}"
     echo ""
-    echo -e "  ${GREEN}/help${NC}, ${GREEN}/h${NC}        Show this help"
-    echo -e "  ${GREEN}/quit${NC}, ${GREEN}/q${NC}        Exit TUI"
-    echo -e "  ${GREEN}/monitor${NC}        Switch to live log view"
-    echo -e "  ${GREEN}/status${NC}         Show system status"
-    echo -e "  ${GREEN}/logs${NC}           Browse log files"
-    echo -e "  ${GREEN}/run${NC}            Start Ralph"
-    echo -e "  ${GREEN}/stop${NC}           Stop Ralph"
-    echo -e "  ${GREEN}/report${NC}         Generate HTML report"
+    for cmd in /help /quit /monitor /status /logs /run /stop /report /quota; do
+        local opts="${CMD_OPTS[$cmd]:-}"
+        if [[ -n "$opts" ]]; then
+            printf "  ${GREEN}%-12s${NC} ${DIM}%-35s${NC} %s\n" "$cmd" "[$opts]" "${CMD_DESC[$cmd]}"
+        else
+            printf "  ${GREEN}%-12s${NC} %s\n" "$cmd" "${CMD_DESC[$cmd]}"
+        fi
+    done
+    echo ""
+    echo -e "${DIM}Tip: Type '/' to see all commands, '/run' to see /run options${NC}"
     echo ""
     echo -e "${DIM}Press Enter to continue...${NC}"
     read -r
@@ -102,9 +147,18 @@ cmd_stop() {
 }
 
 cmd_report() {
+    local args="${1:-}"
     echo -e "${BLUE}Generating report...${NC}"
     "$SCRIPT_DIR/ralph.sh" --report "$PROJECT_DIR" 2>/dev/null
+    if [[ "$args" == *"--open"* ]]; then
+        open "$PROJECT_DIR/ralph-report"*.html 2>/dev/null || xdg-open "$PROJECT_DIR/ralph-report"*.html 2>/dev/null
+    fi
     echo -e "${GREEN}Report generated${NC}"
+}
+
+cmd_quota() {
+    echo -e "${BLUE}Checking quota...${NC}"
+    "$SCRIPT_DIR/ralph-quota.sh" --status 2>/dev/null || echo -e "${YELLOW}Quota check unavailable${NC}"
 }
 
 cmd_quit() {
@@ -136,8 +190,10 @@ process_command() {
         /logs)         cmd_logs ;;
         /run)          cmd_run "$cmd_args" ;;
         /stop)         cmd_stop ;;
-        /report)       cmd_report ;;
-        *)             echo -e "${RED}Unknown: $base_cmd${NC}. Type ${GREEN}/help${NC}" ;;
+        /report)       cmd_report "$cmd_args" ;;
+        /quota)        cmd_quota ;;
+        /*)            show_suggestions "$base_cmd" ;;
+        *)             echo -e "${RED}Commands must start with /${NC}" ;;
     esac
 }
 

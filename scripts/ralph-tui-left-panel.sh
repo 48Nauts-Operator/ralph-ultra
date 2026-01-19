@@ -159,10 +159,17 @@ render_panel() {
     # Clear screen
     clear
 
-    # Header
-    echo -e "${BOLD}${BLUE}╔══════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${BLUE}║${NC}  ${BOLD}Ralph Ultra - TUI${NC}                 ${BOLD}${BLUE}║${NC}"
-    echo -e "${BOLD}${BLUE}╚══════════════════════════════════════╝${NC}"
+    # Header - dynamic width
+    local header_width=$((panel_width - 2))
+    [[ $header_width -lt 20 ]] && header_width=20
+    local title="Ralph Ultra - TUI"
+    local padding=$(( (header_width - ${#title} - 2) / 2 ))
+    local pad_left=$(printf '%*s' $padding '')
+    local pad_right=$(printf '%*s' $((header_width - ${#title} - 2 - padding)) '')
+    
+    printf "${BOLD}${BLUE}╔%${header_width}s╗${NC}\n" | tr ' ' '═'
+    echo -e "${BOLD}${BLUE}║${NC}${pad_left}${BOLD}${title}${NC}${pad_right}${BOLD}${BLUE}║${NC}"
+    printf "${BOLD}${BLUE}╚%${header_width}s╝${NC}\n" | tr ' ' '═'
     echo ""
 
     # Project Info
