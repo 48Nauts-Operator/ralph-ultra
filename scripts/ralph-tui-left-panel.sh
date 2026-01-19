@@ -57,20 +57,23 @@ calculate_eta() {
     fi
 
     local remaining_stories=$((total_stories - completed_stories))
-    if [[ $remaining_stories -eq 0 ]]; then
+    if [[ $remaining_stories -le 0 ]]; then
         echo "0m"
         return
     fi
 
-    # Get average time for remaining stories by complexity
     local total_minutes=0
-    local story_ids=$(jq -r '[.userStories[] | select(.passes == false) | .id] | .[]' "$PRD_FILE")
+    local story_ids=$(jq -r '[.userStories[] | select(.passes == false) | .id] | .[] // empty' "$PRD_FILE" 2>/dev/null)
 
-    for story_id in $story_ids; do
-        local complexity=$(jq -r ".userStories[] | select(.id == \"$story_id\") | .complexity // \"medium\"" "$PRD_FILE")
-        local avg_time=$(jq -r ".averages.$complexity // 30" "$TIMING_FILE")
-        total_minutes=$((total_minutes + avg_time))
-    done
+    if [[ -z "$story_ids" ]]; then
+        total_minutes=$((remaining_stories * 30))
+    else
+        for story_id in $story_ids; do
+            local complexity=$(jq -r ".userStories[] | select(.id == \"$story_id\") | .complexity // \"medium\"" "$PRD_FILE" 2>/dev/null)
+            local avg_time=$(jq -r ".averages.${complexity:-medium} // 30" "$TIMING_FILE" 2>/dev/null)
+            total_minutes=$((total_minutes + ${avg_time:-30}))
+        done
+    fi
 
     if [[ $total_minutes -lt 60 ]]; then
         echo "${total_minutes}m"
@@ -86,17 +89,58 @@ calculate_cost() {
     echo "\$$(echo "scale=2; $completed * 0.50" | bc)"
 }
 
+# Detect PRD format and extract stories
+detect_prd_format() {
+    if jq -e '.userStories' "$PRD_FILE" > /dev/null 2>&1; then
+        echo "ralph"
+    elif jq -e '.features' "$PRD_FILE" > /dev/null 2>&1; then
+        echo "features"
+    elif jq -e '.implementation_phases' "$PRD_FILE" > /dev/null 2>&1; then
+        echo "phases"
+    else
+        echo "unknown"
+    fi
+}
+
 # Render panel function
 render_panel() {
-    # Parse PRD data
-    local project_name=$(jq -r '.project // "Unknown"' "$PRD_FILE")
-    local branch_name=$(jq -r '.branchName // "main"' "$PRD_FILE")
-    local description=$(jq -r '.description // ""' "$PRD_FILE")
+    # Parse PRD data - support multiple formats
+    local project_name=$(jq -r '.project.name // .project // "Unknown"' "$PRD_FILE")
+    local branch_name=$(jq -r '.branchName // .project.repository // "main"' "$PRD_FILE")
+    local description=$(jq -r '.description // .overview.problem // .project.description // ""' "$PRD_FILE")
 
-    # Calculate story statistics
-    local total_stories=$(jq '.userStories | length' "$PRD_FILE")
-    local completed_stories=$(jq '[.userStories[] | select(.passes == true)] | length' "$PRD_FILE")
-    local in_progress_story=$(jq -r '[.userStories[] | select(.passes == false)] | .[0].id // "none"' "$PRD_FILE")
+    # Detect format and calculate story statistics
+    local prd_format=$(detect_prd_format)
+    local total_stories=0
+    local completed_stories=0
+    local in_progress_story="none"
+
+    case "$prd_format" in
+        ralph)
+            total_stories=$(jq '.userStories | length // 0' "$PRD_FILE")
+            completed_stories=$(jq '[.userStories[] | select(.passes == true)] | length // 0' "$PRD_FILE")
+            in_progress_story=$(jq -r '[.userStories[] | select(.passes == false)] | .[0].id // "none"' "$PRD_FILE")
+            ;;
+        features)
+            total_stories=$(jq '[.features[].user_stories // [] | .[]] | length // 0' "$PRD_FILE")
+            completed_stories=0
+            in_progress_story=$(jq -r '.features[0].id // "none"' "$PRD_FILE")
+            ;;
+        phases)
+            total_stories=$(jq '[.implementation_phases[].tasks // [] | .[]] | length // 0' "$PRD_FILE")
+            completed_stories=0
+            in_progress_story="phase-1"
+            ;;
+        *)
+            total_stories=0
+            completed_stories=0
+            ;;
+    esac
+
+    # Safety check for division
+    if [[ $total_stories -eq 0 ]]; then
+        total_stories=1
+    fi
 
     # Get panel width (default 40% of 80 cols = 32 cols, but use tput if available)
     local panel_width=${RALPH_TUI_LEFT_WIDTH:-32}
@@ -141,35 +185,58 @@ render_panel() {
     echo -e "${BOLD}${CYAN}User Stories${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-    # Read stories and display with status icons
-    jq -c '.userStories[]' "$PRD_FILE" | while IFS= read -r story; do
-        id=$(echo "$story" | jq -r '.id')
-        title=$(echo "$story" | jq -r '.title')
-        passes=$(echo "$story" | jq -r '.passes')
+    # Render stories based on PRD format
+    case "$prd_format" in
+        ralph)
+            jq -c '.userStories[] // empty' "$PRD_FILE" 2>/dev/null | while IFS= read -r story; do
+                id=$(echo "$story" | jq -r '.id // "?"')
+                title=$(echo "$story" | jq -r '.title // "Untitled"')
+                passes=$(echo "$story" | jq -r '.passes // false')
 
-        # Determine status icon and color
-        icon=""
-        color=""
-        arrow=""
+                if [[ "$passes" == "true" ]]; then
+                    icon="✓"; color="$GREEN"; arrow=""
+                elif [[ "$id" == "$in_progress_story" ]]; then
+                    icon="▸"; color="$YELLOW"; arrow="${YELLOW}→ ${NC}"
+                else
+                    icon=" "; color="$DIM"; arrow=""
+                fi
 
-        if [[ "$passes" == "true" ]]; then
-            icon="✓"
-            color="$GREEN"
-        elif [[ "$id" == "$in_progress_story" ]]; then
-            icon="▸"
-            color="$YELLOW"
-            arrow="${YELLOW}→ ${NC}"
-        else
-            icon=" "
-            color="$DIM"
-        fi
+                display_title=$(truncate_text "$title" "$max_text_width")
+                echo -e "${arrow}${color}[${icon}]${NC} ${color}${id}${NC} ${color}${display_title}${NC}"
+            done
+            ;;
+        features)
+            jq -c '.features[] // empty' "$PRD_FILE" 2>/dev/null | while IFS= read -r feature; do
+                id=$(echo "$feature" | jq -r '.id // "?"')
+                name=$(echo "$feature" | jq -r '.name // "Untitled"')
+                priority=$(echo "$feature" | jq -r '.priority // "medium"')
 
-        # Truncate title to fit panel
-        display_title=$(truncate_text "$title" "$max_text_width")
+                if [[ "$priority" == "critical" ]]; then
+                    icon="!"; color="$RED"
+                elif [[ "$priority" == "high" ]]; then
+                    icon="▸"; color="$YELLOW"
+                else
+                    icon=" "; color="$DIM"
+                fi
 
-        # Print story line
-        echo -e "${arrow}${color}[${icon}]${NC} ${color}${id}${NC} ${color}${display_title}${NC}"
-    done
+                display_name=$(truncate_text "$name" "$max_text_width")
+                echo -e "${color}[${icon}]${NC} ${color}${id}${NC} ${color}${display_name}${NC}"
+            done
+            ;;
+        phases)
+            jq -c '.implementation_phases[] // empty' "$PRD_FILE" 2>/dev/null | while IFS= read -r phase; do
+                phase_num=$(echo "$phase" | jq -r '.phase // "?"')
+                name=$(echo "$phase" | jq -r '.name // "Untitled"')
+                duration=$(echo "$phase" | jq -r '.duration // "?"')
+
+                display_name=$(truncate_text "$name" "$max_text_width")
+                echo -e "${CYAN}[${phase_num}]${NC} ${display_name} ${DIM}(${duration})${NC}"
+            done
+            ;;
+        *)
+            echo -e "${DIM}  No stories found in PRD${NC}"
+            ;;
+    esac
 
     echo ""
     echo -e "${DIM}Press ? for help, /quit to exit${NC}"
