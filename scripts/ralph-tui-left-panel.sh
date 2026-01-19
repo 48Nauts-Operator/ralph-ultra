@@ -228,22 +228,21 @@ render_panel() {
             done
             ;;
         features)
+            # Features format doesn't have progress tracking (no 'passes' field)
+            # Display all items uniformly - cannot show completion status
             jq -c '.features[] // empty' "$PRD_FILE" 2>/dev/null | while IFS= read -r feature; do
                 id=$(echo "$feature" | jq -r '.id // "?"')
                 name=$(echo "$feature" | jq -r '.name // "Untitled"')
-                priority=$(echo "$feature" | jq -r '.priority // "medium"')
 
-                if [[ "$priority" == "critical" ]]; then
-                    icon="!"; color="$RED"
-                elif [[ "$priority" == "high" ]]; then
-                    icon="▸"; color="$YELLOW"
-                else
-                    icon=" "; color="$DIM"
-                fi
+                # All items shown in dim/gray since we can't track progress
+                icon=" "; color="$DIM"
 
                 display_name=$(truncate_text "$name" "$max_text_width")
-                echo -e "${color}[${icon}]${NC} ${color}${id}${NC} ${color}${display_name}${NC}"
+                echo -e "${color}[ ]${NC} ${color}${id}${NC} ${color}${display_name}${NC}"
             done
+            echo -e ""
+            echo -e "${YELLOW}⚠ Note: 'features' format lacks progress tracking${NC}"
+            echo -e "${DIM}  Convert to 'userStories' format for full support${NC}"
             ;;
         phases)
             jq -c '.implementation_phases[] // empty' "$PRD_FILE" 2>/dev/null | while IFS= read -r phase; do
