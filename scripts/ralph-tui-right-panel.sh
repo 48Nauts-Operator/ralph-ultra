@@ -27,7 +27,21 @@ if [[ -d "$PROJECT_DIR" ]]; then
 else
     PROJECT_DIR="$(pwd)"
 fi
-LOG_FILE="$PROJECT_DIR/logs/ralph-monitor.log"
+MONITOR_LOG="$PROJECT_DIR/logs/ralph-monitor.log"
+AGENT_LOG="$PROJECT_DIR/logs/ralph-agent.log"
+
+# Use agent log if it exists and is newer, otherwise monitor log
+if [[ -f "$AGENT_LOG" ]] && [[ -f "$MONITOR_LOG" ]]; then
+    if [[ "$AGENT_LOG" -nt "$MONITOR_LOG" ]]; then
+        LOG_FILE="$AGENT_LOG"
+    else
+        LOG_FILE="$MONITOR_LOG"
+    fi
+elif [[ -f "$AGENT_LOG" ]]; then
+    LOG_FILE="$AGENT_LOG"
+else
+    LOG_FILE="$MONITOR_LOG"
+fi
 
 # Format timestamp for display
 format_timestamp() {

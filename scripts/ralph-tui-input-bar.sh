@@ -34,17 +34,15 @@ show_help() {
     read -r
 }
 
+RALPH_SESSION="ralph-agent"
+LOG_FILE="$PROJECT_DIR/logs/ralph-agent.log"
+
 is_ralph_running() {
-    pgrep -f "ralph.sh.*$PROJECT_DIR" > /dev/null 2>&1 || pgrep -f "claude" > /dev/null 2>&1
+    tmux has-session -t "$RALPH_SESSION" 2>/dev/null
 }
 
 switch_view() {
     local view="$1"
-    if is_ralph_running; then
-        echo -e "${YELLOW}Ralph is running - cannot switch views${NC}"
-        echo -e "${DIM}Use /stop first, or wait for Ralph to finish${NC}"
-        return 1
-    fi
     tmux send-keys -t ralph-tui:0.1 C-c
     sleep 0.2
     tmux send-keys -t ralph-tui:0.1 "'$SCRIPT_DIR/ralph-tui-right-panel.sh' $view '$PROJECT_DIR'" C-m
@@ -66,29 +64,34 @@ cmd_logs() {
 }
 
 cmd_run() {
-    if pgrep -f "ralph.sh.*$PROJECT_DIR" > /dev/null 2>&1; then
+    if is_ralph_running; then
         echo -e "${YELLOW}Ralph is already running${NC}"
+        echo -e "${DIM}Use /stop to stop it, or /monitor to view progress${NC}"
         return
     fi
-    echo -e "${GREEN}Starting Ralph in right panel...${NC}"
     
-    # Kill any existing process in pane 1 and wait for it to exit
-    tmux send-keys -t ralph-tui:0.1 C-c
-    sleep 0.5
-    tmux send-keys -t ralph-tui:0.1 C-c
-    sleep 0.5
+    mkdir -p "$PROJECT_DIR/logs"
     
-    # Clear and run Ralph
-    tmux send-keys -t ralph-tui:0.1 "clear && cd '$PROJECT_DIR' && '$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota --agent-only '$PROJECT_DIR'" C-m
-    echo -e "${GREEN}Ralph started in right panel${NC}"
+    echo -e "${GREEN}Starting Ralph in background...${NC}"
+    
+    tmux new-session -d -s "$RALPH_SESSION" -c "$PROJECT_DIR" \
+        "'$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota --agent-only '$PROJECT_DIR' 2>&1 | tee '$LOG_FILE'"
+    
+    sleep 1
+    
+    if is_ralph_running; then
+        echo -e "${GREEN}Ralph running (session: $RALPH_SESSION)${NC}"
+        echo -e "${DIM}Use /monitor to view live output${NC}"
+        switch_view "monitor"
+    else
+        echo -e "${RED}Failed to start Ralph${NC}"
+    fi
 }
 
 cmd_stop() {
-    local pid
-    pid=$(pgrep -f "ralph.sh.*$PROJECT_DIR" 2>/dev/null | head -1)
-    if [[ -n "$pid" ]]; then
-        kill "$pid" 2>/dev/null
-        echo -e "${GREEN}Ralph stopped (PID: $pid)${NC}"
+    if is_ralph_running; then
+        tmux kill-session -t "$RALPH_SESSION" 2>/dev/null
+        echo -e "${GREEN}Ralph stopped${NC}"
     else
         echo -e "${YELLOW}Ralph is not running${NC}"
     fi
