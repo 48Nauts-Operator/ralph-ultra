@@ -62,10 +62,16 @@ cmd_run() {
         return
     fi
     echo -e "${GREEN}Starting Ralph in right panel...${NC}"
+    
+    # Kill any existing process in pane 1 and wait for it to exit
     tmux send-keys -t ralph-tui:0.1 C-c
-    sleep 0.2
-    tmux send-keys -t ralph-tui:0.1 "cd '$PROJECT_DIR' && '$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota --agent-only '$PROJECT_DIR'" C-m
-    echo -e "${GREEN}Ralph running in right panel${NC}"
+    sleep 0.5
+    tmux send-keys -t ralph-tui:0.1 C-c
+    sleep 0.5
+    
+    # Clear and run Ralph
+    tmux send-keys -t ralph-tui:0.1 "clear && cd '$PROJECT_DIR' && '$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota --agent-only '$PROJECT_DIR'" C-m
+    echo -e "${GREEN}Ralph started in right panel${NC}"
 }
 
 cmd_stop() {
