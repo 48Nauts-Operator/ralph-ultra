@@ -1,6 +1,6 @@
 # Ralph Ultra
 
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/48Nauts-Operator/ralph-ultra/releases)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/48Nauts-Operator/ralph-ultra/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-48Nauts--Operator%2Fralph--ultra-black?logo=github)](https://github.com/48Nauts-Operator/ralph-ultra)
 
@@ -23,9 +23,11 @@ See [Installation](#installation) below.
 
 ---
 
-## Interactive Terminal UI (NEW in v1.5.0)
+## Interactive Terminal UI (v1.6.0)
 
 Ralph Ultra now includes an **interactive Terminal UI (TUI)** for real-time project monitoring and control.
+
+![Ralph TUI Screenshot](assets/ralph-tui-v1.6.png)
 
 ### Quick Start
 
