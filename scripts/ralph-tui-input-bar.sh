@@ -64,7 +64,7 @@ cmd_run() {
     echo -e "${GREEN}Starting Ralph in right panel...${NC}"
     tmux send-keys -t ralph-tui:0.1 C-c
     sleep 0.2
-    tmux send-keys -t ralph-tui:0.1 "cd '$PROJECT_DIR' && '$SCRIPT_DIR/ralph.sh' --skip-budget --agent-only '$PROJECT_DIR'" C-m
+    tmux send-keys -t ralph-tui:0.1 "cd '$PROJECT_DIR' && '$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota --agent-only '$PROJECT_DIR'" C-m
     echo -e "${GREEN}Ralph running in right panel${NC}"
 }
 
