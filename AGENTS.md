@@ -267,3 +267,70 @@ When implementing status commands that aggregate multiple sources:
 - Tag format: `v1.X.0` for features, `v1.X.Y` for fixes
 - Always run syntax checks before committing
 - Update VERSION and CHANGELOG.md for releases
+
+## Release Process (MANDATORY)
+
+When releasing a new version, **ALL steps must be completed**:
+
+### 1. Update Version Badge in README.md
+```markdown
+[![Version](https://img.shields.io/badge/version-1.X.0-blue.svg)]
+```
+
+### 2. Create Annotated Git Tag
+```bash
+git tag -a v1.X.0 -m "v1.X.0 - Feature Name
+
+Features:
+- Feature 1 description
+- Feature 2 description
+
+Fixes:
+- Fix 1 description
+"
+```
+
+### 3. Push Tag to Remote
+```bash
+git push origin v1.X.0
+```
+
+### 4. Tag Naming Convention
+| Version | When to Use |
+|---------|-------------|
+| `v1.X.0` | New features (minor) |
+| `v1.X.Y` | Bug fixes (patch) |
+| `v2.0.0` | Breaking changes (major) |
+
+### 5. Tag Message Format
+```
+vX.Y.Z - Short Feature Name
+
+Features:
+- Bullet point for each new feature
+
+Fixes:
+- Bullet point for each fix
+
+Breaking Changes: (if any)
+- Description of breaking change
+```
+
+### Example
+```bash
+git tag -a v1.6.0 -m "v1.6.0 - Multi-Session Support & Resource Checking
+
+Features:
+- Multiple Ralph sessions per project (ralph-<project-name>)
+- Multiple TUI sessions per project (tui-<project-name>)
+- Resource checker before starting new sessions
+- /resources command to check CPU, RAM, running sessions
+- TUI screenshot in README
+
+Fixes:
+- Features format now shows warning about lack of progress tracking
+"
+git push origin v1.6.0
+```
+
+**NEVER skip tagging when updating the version badge in README.**
