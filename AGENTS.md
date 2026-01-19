@@ -8,6 +8,76 @@ cost optimization, and learning capabilities.
 
 **Repository:** https://github.com/48Nauts-Operator/ralph-ultra
 
+## PRD Format (CRITICAL)
+
+When creating a PRD for Ralph Ultra, **you MUST use this exact format**:
+
+```json
+{
+  "project": "project-name",
+  "description": "Brief project description",
+  "branchName": "ralph/project-name",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Short title for the story",
+      "description": "Detailed description of what needs to be done",
+      "acceptanceCriteria": [
+        "Criterion 1",
+        "Criterion 2"
+      ],
+      "complexity": "simple|medium|complex",
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Another story",
+      "description": "Description",
+      "acceptanceCriteria": ["..."],
+      "complexity": "medium",
+      "passes": false
+    }
+  ]
+}
+```
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `project` | string | Project name |
+| `userStories` | array | List of user stories |
+| `userStories[].id` | string | Unique ID (e.g., "US-001") |
+| `userStories[].title` | string | Short descriptive title |
+| `userStories[].description` | string | What needs to be implemented |
+| `userStories[].acceptanceCriteria` | array | List of acceptance criteria |
+| `userStories[].passes` | boolean | **MUST be `false` initially** - Ralph sets to `true` when done |
+
+### Optional Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `description` | string | - | Project description |
+| `branchName` | string | ralph/{project} | Git branch name |
+| `userStories[].complexity` | string | "medium" | simple/medium/complex (for ETA) |
+| `userStories[].priority` | number | - | Execution order (lower = first) |
+
+### How Ralph Uses PRD
+
+1. Ralph reads `prd.json` from project root
+2. Finds stories where `passes: false`
+3. Works on them one by one
+4. Sets `passes: true` when acceptance criteria are met
+5. TUI shows: gray (pending) → yellow (in progress) → green (done)
+
+### DO NOT USE
+
+- `features` array format
+- `implementation_phases` format
+- Any format without `userStories` and `passes` fields
+
+These formats won't track progress correctly.
+
 ## Repository Structure
 
 ```
