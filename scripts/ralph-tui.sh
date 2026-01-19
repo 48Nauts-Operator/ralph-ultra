@@ -14,8 +14,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Constants
-SESSION_NAME="ralph-tui"
 MIN_TMUX_VERSION="2.1"
+SESSION_NAME=""  # Set dynamically based on project
 
 # Script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,6 +64,19 @@ info() {
 
 success() {
     echo -e "${GREEN}SUCCESS:${NC} $1"
+}
+
+get_project_name() {
+    local project_path="$1"
+    local prd_file="$project_path/prd.json"
+    local name=""
+    if [[ -f "$prd_file" ]]; then
+        name=$(jq -r '.project // .project.name // empty' "$prd_file" 2>/dev/null | head -1)
+    fi
+    if [[ -z "$name" ]]; then
+        name=$(basename "$project_path")
+    fi
+    echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
 }
 
 # Check if tmux is installed
@@ -248,6 +261,9 @@ main() {
     else
         error "Directory does not exist: $project_path"
     fi
+
+    # Set session name based on project
+    SESSION_NAME="tui-$(get_project_name "$project_path")"
 
     # Check dependencies
     check_tmux

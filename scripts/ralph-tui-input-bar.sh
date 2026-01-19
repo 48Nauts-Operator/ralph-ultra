@@ -100,6 +100,7 @@ get_project_name() {
 
 PROJECT_NAME=$(get_project_name)
 RALPH_SESSION="ralph-${PROJECT_NAME}"
+TUI_SESSION="tui-${PROJECT_NAME}"
 LOG_FILE="$PROJECT_DIR/logs/ralph-${PROJECT_NAME}.log"
 
 is_ralph_running() {
@@ -108,9 +109,9 @@ is_ralph_running() {
 
 switch_view() {
     local view="$1"
-    tmux send-keys -t ralph-tui:0.1 C-c
+    tmux send-keys -t "$TUI_SESSION:0.1" C-c
     sleep 0.2
-    tmux send-keys -t ralph-tui:0.1 "'$SCRIPT_DIR/ralph-tui-right-panel.sh' $view '$PROJECT_DIR'" C-m
+    tmux send-keys -t "$TUI_SESSION:0.1" "'$SCRIPT_DIR/ralph-tui-right-panel.sh' $view '$PROJECT_DIR'" C-m
 }
 
 cmd_monitor() {
@@ -183,7 +184,7 @@ cmd_quota() {
 
 cmd_quit() {
     echo -e "${YELLOW}Exiting TUI...${NC}"
-    tmux kill-session -t ralph-tui 2>/dev/null
+    tmux kill-session -t "$TUI_SESSION" 2>/dev/null
     exit 0
 }
 
