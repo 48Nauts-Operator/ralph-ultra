@@ -72,10 +72,11 @@ cmd_run() {
     
     mkdir -p "$PROJECT_DIR/logs"
     
+    local extra_args="${RALPH_TUI_ARGS:-}"
     echo -e "${GREEN}Starting Ralph in background...${NC}"
     
     tmux new-session -d -s "$RALPH_SESSION" -c "$PROJECT_DIR" \
-        "'$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota --agent-only '$PROJECT_DIR' 2>&1 | tee '$LOG_FILE'"
+        "'$SCRIPT_DIR/ralph.sh' --skip-budget --skip-quota $extra_args --agent-only '$PROJECT_DIR' 2>&1 | tee '$LOG_FILE'"
     
     sleep 1
     
@@ -139,6 +140,13 @@ clear
 echo -e "${BOLD}${CYAN}Ralph TUI Input${NC}"
 echo -e "${DIM}Type /help for commands${NC}"
 echo ""
+
+# Check for auto-run from TUI launch args
+if [[ "${RALPH_TUI_AUTO_RUN:-false}" == "true" ]]; then
+    sleep 1
+    echo -e "${DIM}Auto-starting Ralph...${NC}"
+    cmd_run
+fi
 
 while true; do
     echo -n -e "${BOLD}${CYAN}> ${NC}"

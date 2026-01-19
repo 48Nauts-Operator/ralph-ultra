@@ -27,18 +27,22 @@ usage() {
 Ralph TUI - Interactive Terminal Dashboard
 
 Usage:
-    $(basename "$0") [PROJECT_PATH]
+    $(basename "$0") [PROJECT_PATH] [OPTIONS]
 
 Arguments:
     PROJECT_PATH    Path to project directory (default: current directory)
                     Must contain prd.json file
 
 Options:
+    --run           Start Ralph immediately after TUI launches
+    --hybrid MODE   Use hybrid LLM mode (aggressive|balanced|conservative)
     -h, --help      Show this help message
 
 Examples:
-    $(basename "$0")                    # Use current directory
-    $(basename "$0") ~/my-project       # Use specified project
+    $(basename "$0")                           # Use current directory
+    $(basename "$0") ~/my-project              # Use specified project
+    $(basename "$0") ~/my-project --run        # Start and run immediately
+    $(basename "$0") . --run --hybrid balanced # Run with hybrid mode
 
 EOF
     exit 0
@@ -205,13 +209,38 @@ cleanup() {
 
 # Main function
 main() {
+    local project_path="."
+    local auto_run=false
+    local ralph_args=""
+    
     # Parse arguments
-    local project_path="${1:-.}"
-
-    # Handle help flag
-    if [[ "$project_path" == "-h" ]] || [[ "$project_path" == "--help" ]]; then
-        usage
-    fi
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                usage
+                ;;
+            --run)
+                auto_run=true
+                shift
+                ;;
+            --hybrid)
+                ralph_args="$ralph_args --hybrid ${2:-balanced}"
+                shift 2
+                ;;
+            --skip-budget|--skip-quota|--no-monitor)
+                ralph_args="$ralph_args $1"
+                shift
+                ;;
+            -*)
+                warn "Unknown option: $1"
+                shift
+                ;;
+            *)
+                project_path="$1"
+                shift
+                ;;
+        esac
+    done
 
     # Resolve to absolute path
     if [[ -d "$project_path" ]]; then
@@ -228,6 +257,10 @@ main() {
 
     # Setup cleanup trap
     trap cleanup SIGINT SIGTERM
+
+    # Store ralph args for auto-run
+    export RALPH_TUI_ARGS="$ralph_args"
+    export RALPH_TUI_AUTO_RUN="$auto_run"
 
     # Create or attach to session
     attach_or_create "$project_path"
