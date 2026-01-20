@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useStdout, useInput, useApp } from 'ink';
 import { ProjectsRail } from './ProjectsRail';
+import { SessionsPane } from './SessionsPane';
 import { StatusBar } from './StatusBar';
 import { ShortcutsBar } from './ShortcutsBar';
 import type { Project, FocusPane } from '../types';
@@ -19,12 +20,14 @@ export const App: React.FC = () => {
     rows: stdout?.rows || 24,
   });
   const [railCollapsed, setRailCollapsed] = useState(false);
-  const [focusPane, setFocusPane] = useState<FocusPane>('rail');
+  const [focusPane, setFocusPane] = useState<FocusPane>('sessions');
   const [isRunning, setIsRunning] = useState(false);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
+  // For now, use current working directory as the active project
+  const currentPath = process.cwd();
   const [projects] = useState<Project[]>([
-    { id: '1', name: 'ralph-ultra', path: '/path/to/ralph-ultra', color: '#7FFFD4' },
+    { id: '1', name: 'ralph-ultra', path: currentPath, color: '#7FFFD4' },
     { id: '2', name: 'my-app', path: '/path/to/my-app', color: '#CC5500' },
     { id: '3', name: 'backend-api', path: '/path/to/backend', color: '#FFD700' },
   ]);
@@ -153,16 +156,11 @@ export const App: React.FC = () => {
         </Box>
 
         {/* Sessions/Tasks Pane (Middle) */}
-        <Box
-          width={sessionsWidth}
-          flexDirection="column"
-          borderStyle="single"
-          borderColor={focusPane === 'sessions' ? 'cyan' : 'gray'}
-        >
-          <Box padding={1}>
-            <Text dimColor>Sessions</Text>
-          </Box>
-        </Box>
+        <SessionsPane
+          isFocused={focusPane === 'sessions'}
+          height={dimensions.rows - 2} // Subtract StatusBar and ShortcutsBar
+          projectPath={projects.find(p => p.id === activeProjectId)?.path || currentPath}
+        />
 
         {/* Work Pane (Right) */}
         <Box
