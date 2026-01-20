@@ -4,6 +4,7 @@ import { readFileSync, watchFile, unwatchFile, existsSync } from 'fs';
 import { join } from 'path';
 import { useTheme } from '@hooks/useTheme';
 import type { UserStory } from '@types';
+import type { TailscaleStatus } from '../remote/tailscale';
 
 /**
  * View types for the work pane
@@ -27,6 +28,10 @@ interface WorkPaneProps {
   processState?: string;
   /** Process error message if any */
   processError?: string;
+  /** Tailscale status information */
+  tailscaleStatus?: TailscaleStatus | null;
+  /** Generated remote URL with token */
+  remoteURL?: string | null;
 }
 
 /**
@@ -42,6 +47,8 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   logLines = [],
   processState = 'idle',
   processError,
+  tailscaleStatus = null,
+  remoteURL = null,
 }) => {
   const { theme } = useTheme();
   const [currentView, setCurrentView] = useState<WorkView>('monitor');
@@ -162,24 +169,28 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
 
   // Render Status view
   const renderStatus = () => {
-    const statusInfo = {
-      processState: processState,
-      quota: '245k / 1M tokens',
-      model: 'claude-sonnet-4-20250514',
-      hybridConfig: 'oracle + explorer',
-      avgIterationTime: '42s',
-      lastRun: 'Not started',
-      tailscaleStatus: 'Disconnected',
-      tailscaleIP: 'N/A',
-      remoteConnections: 0,
-    };
-
     const stateColor =
-      statusInfo.processState === 'running'
+      processState === 'running'
         ? theme.success
-        : statusInfo.processState === 'stopping'
+        : processState === 'stopping'
           ? theme.warning
           : theme.muted;
+
+    // Determine Tailscale status display
+    const getTailscaleStatusDisplay = () => {
+      if (!tailscaleStatus) {
+        return { text: 'Checking...', color: theme.muted };
+      }
+      if (!tailscaleStatus.isInstalled) {
+        return { text: 'Not Installed', color: theme.error };
+      }
+      if (!tailscaleStatus.isConnected) {
+        return { text: 'Disconnected', color: theme.warning };
+      }
+      return { text: 'Connected', color: theme.success };
+    };
+
+    const tailscaleDisplay = getTailscaleStatusDisplay();
 
     return (
       <Box flexDirection="column" paddingX={1} gap={0}>
@@ -188,7 +199,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
         </Text>
         <Text>
           <Text dimColor>Process State: </Text>
-          <Text color={stateColor}>{statusInfo.processState}</Text>
+          <Text color={stateColor}>{processState}</Text>
         </Text>
         {processError && (
           <Text>
@@ -198,23 +209,23 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
         )}
         <Text>
           <Text dimColor>Model: </Text>
-          <Text color={theme.warning}>{statusInfo.model}</Text>
+          <Text color={theme.warning}>claude-sonnet-4-20250514</Text>
         </Text>
         <Text>
           <Text dimColor>Quota: </Text>
-          <Text color={theme.success}>{statusInfo.quota}</Text>
+          <Text color={theme.success}>245k / 1M tokens</Text>
         </Text>
         <Text>
           <Text dimColor>Hybrid Config: </Text>
-          <Text>{statusInfo.hybridConfig}</Text>
+          <Text>oracle + explorer</Text>
         </Text>
         <Text>
           <Text dimColor>Avg Iteration: </Text>
-          <Text>{statusInfo.avgIterationTime}</Text>
+          <Text>42s</Text>
         </Text>
         <Text>
           <Text dimColor>Last Run: </Text>
-          <Text>{statusInfo.lastRun}</Text>
+          <Text>Not started</Text>
         </Text>
         <Text> </Text>
         <Text bold color={theme.accent}>
@@ -222,16 +233,37 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
         </Text>
         <Text>
           <Text dimColor>Tailscale: </Text>
-          <Text color={theme.muted}>{statusInfo.tailscaleStatus}</Text>
+          <Text color={tailscaleDisplay.color}>{tailscaleDisplay.text}</Text>
         </Text>
-        <Text>
-          <Text dimColor>IP: </Text>
-          <Text>{statusInfo.tailscaleIP}</Text>
-        </Text>
-        <Text>
-          <Text dimColor>Connections: </Text>
-          <Text>{statusInfo.remoteConnections}</Text>
-        </Text>
+        {tailscaleStatus?.isConnected && (
+          <>
+            <Text>
+              <Text dimColor>Tailscale IP: </Text>
+              <Text color={theme.success}>{tailscaleStatus.tailscaleIP}</Text>
+            </Text>
+            <Text>
+              <Text dimColor>MagicDNS: </Text>
+              <Text color={theme.success}>{tailscaleStatus.magicDNS}</Text>
+            </Text>
+            {remoteURL && (
+              <Text>
+                <Text dimColor>Remote URL: </Text>
+                <Text color={theme.accent}>{remoteURL}</Text>
+              </Text>
+            )}
+            <Text dimColor>(Press &apos;c&apos; to copy URL to clipboard)</Text>
+          </>
+        )}
+        {!tailscaleStatus?.isInstalled && (
+          <Text color={theme.muted} wrap="wrap">
+            Install Tailscale for secure remote access
+          </Text>
+        )}
+        {tailscaleStatus?.isInstalled && !tailscaleStatus?.isConnected && (
+          <Text color={theme.muted} wrap="wrap">
+            Run &apos;tailscale up&apos; to connect
+          </Text>
+        )}
       </Box>
     );
   };

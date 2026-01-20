@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '@hooks/useTheme';
+import type { TailscaleStatus } from '../remote/tailscale';
 
 interface StatusBarProps {
   /** Current agent identifier (e.g., 'claude-sonnet-4-20250514') */
@@ -9,6 +10,8 @@ interface StatusBarProps {
   progress?: number;
   /** Number of remote connections */
   remoteConnections?: number;
+  /** Tailscale status information */
+  tailscaleStatus?: TailscaleStatus | null;
   /** Total terminal width for layout calculations */
   width: number;
 }
@@ -21,6 +24,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   agentName,
   progress = 0,
   remoteConnections = 0,
+  tailscaleStatus = null,
   width,
 }) => {
   const { theme } = useTheme();
@@ -64,15 +68,38 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const remoteColor = remoteConnections > 0 ? theme.success : theme.muted;
   const remoteText = `${remoteIcon} ${remoteConnections}`;
 
+  // Tailscale status indicator
+  const getTailscaleIcon = (): string => {
+    if (!tailscaleStatus) return '◌'; // Hollow circle - checking
+    if (!tailscaleStatus.isInstalled) return '○'; // Empty circle - not installed
+    if (!tailscaleStatus.isConnected) return '◐'; // Half-filled circle - disconnected
+    return '●'; // Filled circle - connected
+  };
+
+  const getTailscaleColor = () => {
+    if (!tailscaleStatus || !tailscaleStatus.isInstalled) return theme.muted;
+    if (!tailscaleStatus.isConnected) return theme.warning;
+    return theme.success;
+  };
+
+  const tailscaleIcon = getTailscaleIcon();
+  const tailscaleColor = getTailscaleColor();
+
   // Calculate spacing to distribute elements across the width
-  // Format: [branding] [spacing] [agent] [spacing] [progress] [spacing] [remote] [spacing] [timer]
+  // Format: [branding] [spacing] [agent] [spacing] [progress] [spacing] [tailscale] [spacing] [remote] [spacing] [timer]
   const contentWidth =
-    branding.length + agent.length + progressText.length + remoteText.length + timer.length;
+    branding.length +
+    agent.length +
+    progressText.length +
+    1 + // tailscale icon
+    remoteText.length +
+    timer.length;
   const totalSpacing = Math.max(0, width - contentWidth);
-  const spacing1 = Math.floor(totalSpacing * 0.25);
-  const spacing2 = Math.floor(totalSpacing * 0.25);
-  const spacing3 = Math.floor(totalSpacing * 0.25);
-  const spacing4 = totalSpacing - spacing1 - spacing2 - spacing3;
+  const spacing1 = Math.floor(totalSpacing * 0.2);
+  const spacing2 = Math.floor(totalSpacing * 0.2);
+  const spacing3 = Math.floor(totalSpacing * 0.2);
+  const spacing4 = Math.floor(totalSpacing * 0.2);
+  const spacing5 = totalSpacing - spacing1 - spacing2 - spacing3 - spacing4;
 
   return (
     <Box width={width}>
@@ -84,8 +111,10 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       <Text>{' '.repeat(spacing2)}</Text>
       <Text color={theme.warning}>{progressText}</Text>
       <Text>{' '.repeat(spacing3)}</Text>
-      <Text color={remoteColor}>{remoteText}</Text>
+      <Text color={tailscaleColor}>{tailscaleIcon}</Text>
       <Text>{' '.repeat(spacing4)}</Text>
+      <Text color={remoteColor}>{remoteText}</Text>
+      <Text>{' '.repeat(spacing5)}</Text>
       <Text color={theme.success}>{timer}</Text>
     </Box>
   );

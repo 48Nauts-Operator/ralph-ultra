@@ -13,6 +13,7 @@ import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
 import { RalphService, type ProcessState } from '../utils/ralph-service';
 import { RalphRemoteServer } from '../remote/server';
+import { getTailscaleStatus, generateRemoteURL, copyToClipboard, type TailscaleStatus } from '../remote/tailscale';
 import type { Project, UserStory } from '../types';
 
 /**
@@ -42,6 +43,8 @@ export const App: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [remoteConnections, setRemoteConnections] = useState(0);
+  const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null);
+  const [remoteURL, setRemoteURL] = useState<string | null>(null);
   const ralphServiceRef = useRef<RalphService | null>(null);
   const remoteServerRef = useRef<RalphRemoteServer | null>(null);
 
@@ -146,6 +149,33 @@ export const App: React.FC = () => {
     };
   }, [activeProjectId, projects, currentPath, processState]);
 
+  // Detect Tailscale status and generate remote URL
+  useEffect(() => {
+    const updateTailscaleStatus = async () => {
+      const status = await getTailscaleStatus();
+      setTailscaleStatus(status);
+
+      // Generate remote URL if Tailscale is connected
+      if (status.isConnected && remoteServerRef.current) {
+        const token = remoteServerRef.current.getToken();
+        const url = await generateRemoteURL(token);
+        setRemoteURL(url);
+      } else {
+        setRemoteURL(null);
+      }
+    };
+
+    // Initial check
+    updateTailscaleStatus();
+
+    // Refresh status every 30 seconds
+    const statusCheckInterval = setInterval(updateTailscaleStatus, 30000);
+
+    return () => {
+      clearInterval(statusCheckInterval);
+    };
+  }, []);
+
   // Check for first launch
   useEffect(() => {
     if (isFirstLaunch()) {
@@ -243,6 +273,19 @@ export const App: React.FC = () => {
         priority: KeyPriority.GLOBAL,
       },
       {
+        key: 'c',
+        handler: async () => {
+          if (remoteURL) {
+            const success = await copyToClipboard(remoteURL);
+            // TODO: Show notification toast when implemented (US-018)
+            if (!success) {
+              console.error('Failed to copy URL to clipboard');
+            }
+          }
+        },
+        priority: KeyPriority.GLOBAL,
+      },
+      {
         key: (input: string) => input === 'q' || input === 'Q',
         handler: () => exit(),
         priority: KeyPriority.GLOBAL,
@@ -274,6 +317,7 @@ export const App: React.FC = () => {
     activeProjectId,
     projects,
     currentPath,
+    remoteURL,
   ]);
 
   // Check minimum terminal size
@@ -317,6 +361,7 @@ export const App: React.FC = () => {
         agentName="claude-sonnet-4-20250514"
         progress={67}
         remoteConnections={remoteConnections}
+        tailscaleStatus={tailscaleStatus}
       />
 
       {/* Main three-pane layout */}
@@ -356,6 +401,8 @@ export const App: React.FC = () => {
           logLines={logLines}
           processState={processState}
           processError={processError}
+          tailscaleStatus={tailscaleStatus}
+          remoteURL={remoteURL}
         />
       </Box>
 
