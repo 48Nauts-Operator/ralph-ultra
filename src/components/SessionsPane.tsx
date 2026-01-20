@@ -14,6 +14,10 @@ interface SessionsPaneProps {
   projectPath: string;
   /** Callback when a story is selected */
   onStorySelect?: (story: UserStory | null) => void;
+  /** Initial/restored scroll index for session restoration */
+  initialScrollIndex?: number;
+  /** Initial/restored selected story ID for session restoration */
+  initialSelectedStoryId?: string | null;
 }
 
 /**
@@ -25,11 +29,14 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
   height,
   projectPath,
   onStorySelect,
+  initialScrollIndex = 0,
+  initialSelectedStoryId = null,
 }) => {
   const { theme } = useTheme();
   const [prd, setPrd] = useState<PRD | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(initialScrollIndex);
   const [error, setError] = useState<string | null>(null);
+  const [sessionRestored, setSessionRestored] = useState(false);
 
   // Load PRD file
   const loadPRD = () => {
@@ -62,6 +69,17 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectPath]);
+
+  // Restore session: find story by ID and set selected index
+  useEffect(() => {
+    if (prd && !sessionRestored && initialSelectedStoryId) {
+      const storyIndex = prd.userStories.findIndex(s => s.id === initialSelectedStoryId);
+      if (storyIndex !== -1) {
+        setSelectedIndex(storyIndex);
+      }
+      setSessionRestored(true);
+    }
+  }, [prd, sessionRestored, initialSelectedStoryId]);
 
   // Bounds check when stories change
   useEffect(() => {

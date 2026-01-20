@@ -35,6 +35,10 @@ interface WorkPaneProps {
   remoteURL?: string | null;
   /** Agent execution tree for tracing view */
   agentTree?: AgentNode[];
+  /** Initial/restored work pane view for session restoration */
+  initialView?: WorkView;
+  /** Initial/restored scroll offset for session restoration */
+  initialScrollOffset?: number;
 }
 
 /**
@@ -53,11 +57,13 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   tailscaleStatus = null,
   remoteURL = null,
   agentTree = [],
+  initialView = 'monitor',
+  initialScrollOffset = 0,
 }) => {
   const { theme } = useTheme();
-  const [currentView, setCurrentView] = useState<WorkView>('monitor');
+  const [currentView, setCurrentView] = useState<WorkView>(initialView);
   const [logContent, setLogContent] = useState<string[]>([]);
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(initialScrollOffset);
 
   // Update log content when logLines prop changes
   useEffect(() => {

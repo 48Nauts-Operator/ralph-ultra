@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Text, useStdout, useApp } from 'ink';
+import { Box, Text, useStdout, useApp, useInput } from 'ink';
 import { ProjectsRail } from './ProjectsRail';
 import { SessionsPane } from './SessionsPane';
-import { WorkPane } from './WorkPane';
+import { WorkPane, type WorkView } from './WorkPane';
 import { StatusBar } from './StatusBar';
 import { ShortcutsBar } from './ShortcutsBar';
 import { WelcomeOverlay } from './WelcomeOverlay';
 import { SettingsPanel } from './SettingsPanel';
+import { RestorePrompt } from './RestorePrompt';
 import { useTheme } from '@hooks/useTheme';
 import { useFocus } from '@hooks/useFocus';
 import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
+import { useSession } from '@hooks/useSession';
+import { loadSession, detectCrash, clearSession, type SessionState } from '../utils/session';
 import { RalphService, type ProcessState } from '../utils/ralph-service';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
@@ -43,8 +46,16 @@ export const App: React.FC = () => {
   const [processError, setProcessError] = useState<string | undefined>();
   const [logLines, setLogLines] = useState<string[]>([]);
   const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [sessionsScrollIndex, setSessionsScrollIndex] = useState(0);
+  const [workPaneView, setWorkPaneView] = useState<WorkView>('monitor');
+  const [workScrollOffset, setWorkScrollOffset] = useState(0);
+  const [tracingNodeIndex, setTracingNodeIndex] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+  const [isCrashRecovery, setIsCrashRecovery] = useState(false);
+  const [sessionInitialized, setSessionInitialized] = useState(false);
   const [remoteConnections, setRemoteConnections] = useState(0);
   const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null);
   const [remoteURL, setRemoteURL] = useState<string | null>(null);
@@ -62,6 +73,44 @@ export const App: React.FC = () => {
     { id: '3', name: 'backend-api', path: '/path/to/backend', color: '#FFD700' },
   ]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>('1');
+
+  // Get the current project path
+  const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
+
+  // Build current session state for persistence
+  const currentSession: SessionState = {
+    lastSaved: Date.now(),
+    cleanShutdown: true,
+    activeProjectId,
+    railCollapsed,
+    focusPane,
+    selectedStoryId,
+    sessionsScrollIndex,
+    workPaneView,
+    workScrollOffset,
+    workPaneState: {
+      tracingNodeIndex,
+    },
+  };
+
+  // Use session persistence hook for auto-save
+  useSession(projectPath, currentSession);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    if (sessionInitialized) return;
+
+    const savedSession = loadSession(projectPath);
+    const hasCrash = detectCrash(projectPath);
+
+    // If session exists, prompt user to restore
+    if (savedSession) {
+      setIsCrashRecovery(hasCrash);
+      setShowRestorePrompt(true);
+    } else {
+      setSessionInitialized(true);
+    }
+  }, [projectPath, sessionInitialized]);
 
   // Initialize RalphService
   useEffect(() => {
@@ -210,6 +259,50 @@ export const App: React.FC = () => {
     setShowWelcome(false);
     markFirstLaunchComplete();
   };
+
+  // Handle session restore prompt
+  const handleRestoreSession = (restore: boolean) => {
+    setShowRestorePrompt(false);
+
+    if (restore) {
+      // Restore session state
+      const savedSession = loadSession(projectPath);
+      if (savedSession) {
+        // Restore all UI state
+        setActiveProjectId(savedSession.activeProjectId);
+        setRailCollapsed(savedSession.railCollapsed);
+        // Note: focusPane is managed by FocusProvider, so we can't directly set it here
+        // It will be restored when components mount
+        setSelectedStoryId(savedSession.selectedStoryId);
+        setSessionsScrollIndex(savedSession.sessionsScrollIndex);
+        setWorkPaneView(savedSession.workPaneView as WorkView);
+        setWorkScrollOffset(savedSession.workScrollOffset);
+        setTracingNodeIndex(savedSession.workPaneState.tracingNodeIndex || 0);
+      }
+    } else {
+      // Start fresh - clear the saved session
+      clearSession(projectPath);
+    }
+
+    setSessionInitialized(true);
+  };
+
+  // Handle restore prompt keyboard input (Y/n)
+  useInput(
+    (input, key) => {
+      if (!showRestorePrompt) return;
+
+      // Y or Enter: restore session
+      if (input === 'y' || input === 'Y' || key.return) {
+        handleRestoreSession(true);
+      }
+      // N or Escape: start fresh
+      else if (input === 'n' || input === 'N' || key.escape) {
+        handleRestoreSession(false);
+      }
+    },
+    { isActive: showRestorePrompt },
+  );
 
   // Handle terminal resize
   useEffect(() => {
@@ -410,7 +503,12 @@ export const App: React.FC = () => {
           isFocused={isFocused('sessions')}
           height={dimensions.rows - 2} // Subtract StatusBar and ShortcutsBar
           projectPath={projects.find(p => p.id === activeProjectId)?.path || currentPath}
-          onStorySelect={setSelectedStory}
+          onStorySelect={story => {
+            setSelectedStory(story);
+            setSelectedStoryId(story?.id || null);
+          }}
+          initialScrollIndex={sessionsScrollIndex}
+          initialSelectedStoryId={selectedStoryId}
         />
 
         {/* Work Pane (Right) */}
@@ -426,6 +524,8 @@ export const App: React.FC = () => {
           tailscaleStatus={tailscaleStatus}
           remoteURL={remoteURL}
           agentTree={agentTree}
+          initialView={workPaneView}
+          initialScrollOffset={workScrollOffset}
         />
       </Box>
 
@@ -446,6 +546,15 @@ export const App: React.FC = () => {
           width={dimensions.columns}
           height={dimensions.rows}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* Session Restore Prompt */}
+      {showRestorePrompt && (
+        <RestorePrompt
+          width={dimensions.columns}
+          height={dimensions.rows}
+          isCrashRecovery={isCrashRecovery}
         />
       )}
     </Box>
