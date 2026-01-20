@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useStdout } from 'ink';
 import { ProjectsRail } from './ProjectsRail';
+import { StatusBar } from './StatusBar';
 import type { Project, FocusPane } from '../types';
 
 /**
@@ -76,6 +77,9 @@ export const App: React.FC = () => {
 
   return (
     <Box flexDirection="column" height={dimensions.rows}>
+      {/* Status Bar (Top) */}
+      <StatusBar width={dimensions.columns} agentName="claude-sonnet-4-20250514" progress={67} />
+
       {/* Main three-pane layout */}
       <Box flexGrow={1}>
         {/* Projects Rail (Left) */}

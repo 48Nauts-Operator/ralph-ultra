@@ -23,6 +23,8 @@ export default [
         process: 'readonly',
         console: 'readonly',
         Buffer: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
       },
     },
     plugins: {
