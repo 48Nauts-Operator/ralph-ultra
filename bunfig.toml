@@ -1,0 +1,39 @@
+# Bun runtime configuration for Ralph Ultra
+
+[install]
+# Use production mode for faster installs
+production = false
+
+# Cache directory
+cache = ".bun/cache"
+
+# Install dependencies in parallel
+parallel = true
+
+# Don't save exact versions (allow semver flexibility)
+exact = false
+
+# Global install directory (optional)
+# globalDir = "~/.bun/install/global"
+
+[run]
+# Enable hot reloading for development
+hot = true
+
+# Don't clear screen on reload (preserve logs)
+clearScreen = false
+
+[test]
+# Test runner configuration
+preload = []
+coverage = true
+
+[build]
+# Build optimizations
+minify = true
+sourcemap = "external"
+target = "bun"
+
+[dev]
+# Development server configuration
+port = 3000

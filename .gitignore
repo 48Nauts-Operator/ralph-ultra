@@ -22,3 +22,13 @@ logs/
 
 # Development notes
 future-features/
+
+# Node/Bun dependencies and builds
+node_modules/
+.bun/
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
