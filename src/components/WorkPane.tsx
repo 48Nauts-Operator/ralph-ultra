@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { readFileSync, watchFile, unwatchFile, existsSync } from 'fs';
 import { join } from 'path';
 import { useTheme } from '@hooks/useTheme';
+import { useNotifications } from '@hooks/useNotifications';
 import type { UserStory } from '@types';
 import type { TailscaleStatus } from '../remote/tailscale';
 import { TracingPane, type AgentNode } from './TracingPane';
@@ -61,6 +62,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   initialScrollOffset = 0,
 }) => {
   const { theme } = useTheme();
+  const { history: notificationHistory } = useNotifications();
   const [currentView, setCurrentView] = useState<WorkView>(initialView);
   const [logContent, setLogContent] = useState<string[]>([]);
   const [scrollOffset, setScrollOffset] = useState(initialScrollOffset);
@@ -285,6 +287,45 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
           <Text color={theme.muted} wrap="wrap">
             Run &apos;tailscale up&apos; to connect
           </Text>
+        )}
+        <Text> </Text>
+        <Text bold color={theme.accent}>
+          Notification History
+        </Text>
+        {notificationHistory.length === 0 ? (
+          <Text dimColor>No notifications yet</Text>
+        ) : (
+          <Box flexDirection="column">
+            {notificationHistory.slice(0, 5).map((notification) => {
+              const typeColor =
+                notification.type === 'error'
+                  ? theme.error
+                  : notification.type === 'warning'
+                  ? theme.warning
+                  : notification.type === 'success'
+                  ? theme.success
+                  : '#3B82F6';
+              const typeIcon =
+                notification.type === 'error'
+                  ? '✗'
+                  : notification.type === 'warning'
+                  ? '⚠'
+                  : notification.type === 'success'
+                  ? '✓'
+                  : 'ℹ';
+              const timestamp = notification.timestamp.toLocaleTimeString();
+              return (
+                <Text key={notification.id}>
+                  <Text color={typeColor}>{typeIcon}</Text>
+                  <Text dimColor> {timestamp} </Text>
+                  <Text>{notification.message}</Text>
+                </Text>
+              );
+            })}
+            {notificationHistory.length > 5 && (
+              <Text dimColor>... and {notificationHistory.length - 5} more</Text>
+            )}
+          </Box>
         )}
       </Box>
     );

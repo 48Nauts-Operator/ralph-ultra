@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useTheme } from '@hooks/useTheme.js';
+import { useNotifications } from '@hooks/useNotifications.js';
 import type { ThemeName } from '@themes/types.js';
 import { themes } from '@themes/index.js';
 
@@ -15,6 +16,7 @@ interface SettingsPanelProps {
  */
 export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
   const { theme, themeName, setTheme } = useTheme();
+  const { soundEnabled, toggleSound } = useNotifications();
   const themeNames = Object.keys(themes) as ThemeName[];
 
   // Handle keyboard input
@@ -26,6 +28,8 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
         setTheme('nano-dark');
       } else if (input === '2') {
         setTheme('nano-light');
+      } else if (input === 's') {
+        toggleSound();
       }
     },
     { isActive: true },
@@ -88,6 +92,20 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
                 </Box>
               );
             })}
+          </Box>
+        </Box>
+
+        {/* Notification sound section */}
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={theme.foreground}>Notifications:</Text>
+          <Box marginTop={1} marginLeft={2}>
+            <Text color={soundEnabled ? theme.accent : theme.muted}>
+              {soundEnabled ? '● ' : '○ '}
+              Sound {soundEnabled ? 'ON' : 'OFF'}
+            </Text>
+            <Text color={theme.muted}> (press </Text>
+            <Text color={theme.accent}>s</Text>
+            <Text color={theme.muted}> to toggle)</Text>
           </Box>
         </Box>
 

@@ -22,6 +22,7 @@ const SETTINGS_FILE = path.join(CONFIG_DIR, 'settings.json');
  */
 export interface Settings {
   theme?: string;
+  notificationSound?: boolean;
   [key: string]: unknown;
 }
 

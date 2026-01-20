@@ -99,3 +99,24 @@ export interface TabState {
   /** Tracing pane selected node index */
   tracingNodeIndex: number;
 }
+
+/**
+ * Notification types
+ */
+export type NotificationType = 'info' | 'success' | 'warning' | 'error';
+
+/**
+ * A notification message
+ */
+export interface Notification {
+  /** Unique identifier */
+  id: string;
+  /** Notification type */
+  type: NotificationType;
+  /** Message to display */
+  message: string;
+  /** Timestamp when notification was created */
+  timestamp: Date;
+  /** Duration in ms before auto-dismiss (default 5000) */
+  duration?: number;
+}

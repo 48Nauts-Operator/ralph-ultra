@@ -29,6 +29,7 @@ export default [
         clearTimeout: 'readonly',
         Bun: 'readonly',
         Response: 'readonly',
+        NodeJS: 'readonly',
       },
     },
     plugins: {

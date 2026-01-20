@@ -10,16 +10,20 @@ import { WelcomeOverlay } from './WelcomeOverlay';
 import { SettingsPanel } from './SettingsPanel';
 import { ProjectPicker } from './ProjectPicker';
 import { ConfirmDialog } from './ConfirmDialog';
+import { NotificationToast } from './NotificationToast';
 import { useTheme } from '@hooks/useTheme';
 import { useFocus } from '@hooks/useFocus';
 import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { useTabs } from '@hooks/useTabs';
 import { useMultiTabSession } from '@hooks/useMultiTabSession';
+import { useNotifications } from '@hooks/useNotifications';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
 import { getTailscaleStatus, generateRemoteURL, copyToClipboard, type TailscaleStatus } from '../remote/tailscale';
-import type { Project } from '../types';
+import type { Project, PRD } from '../types';
+import { readFileSync, watchFile, unwatchFile } from 'fs';
+import { join } from 'path';
 
 /**
  * Main application component with multi-tab support
@@ -36,6 +40,7 @@ export const App: React.FC = () => {
   const { registerHandler, unregisterHandler } = useKeyboard({
     globalDebounce: 50,
   });
+  const { notifications, notify } = useNotifications();
 
   const [dimensions, setDimensions] = useState({
     columns: stdout?.columns || 80,
@@ -79,12 +84,93 @@ export const App: React.FC = () => {
   // Session persistence for multi-tab state
   useMultiTabSession(tabs, activeTabId, railCollapsed, focusPane);
 
+  // Track previous process state for notifications
+  const prevProcessStateRef = useRef<typeof activeTab.processState>(activeTab.processState);
+  const prevPassCountRef = useRef<number>(0);
+  const [prd, setPrd] = useState<PRD | null>(null);
+
+  // Load and watch PRD file for story completion notifications
+  useEffect(() => {
+    const loadPRD = () => {
+      try {
+        const prdPath = join(activeTab.project.path, 'prd.json');
+        const content = readFileSync(prdPath, 'utf-8');
+        const data = JSON.parse(content) as PRD;
+        setPrd(data);
+      } catch {
+        setPrd(null);
+      }
+    };
+
+    loadPRD();
+
+    const prdPath = join(activeTab.project.path, 'prd.json');
+    watchFile(prdPath, { interval: 1000 }, loadPRD);
+
+    return () => {
+      unwatchFile(prdPath, loadPRD);
+    };
+  }, [activeTab.project.path]);
+
+  // Trigger notification on story completion
+  useEffect(() => {
+    if (!prd) return;
+
+    const passCount = prd.userStories.filter(s => s.passes).length;
+    const totalCount = prd.userStories.length;
+
+    // Story completed
+    if (passCount > prevPassCountRef.current && prevPassCountRef.current > 0) {
+      const completedStory = prd.userStories.find((s, i) => {
+        return s.passes && i === passCount - 1;
+      });
+      if (completedStory) {
+        notify('success', `Story completed: ${completedStory.id} - ${completedStory.title}`);
+      }
+    }
+
+    // All stories completed
+    if (passCount === totalCount && passCount > 0 && prevPassCountRef.current < totalCount) {
+      notify('success', '🎉 All stories completed! Project complete!', 8000);
+    }
+
+    prevPassCountRef.current = passCount;
+  }, [prd, notify]);
+
   // Check for first launch
   useEffect(() => {
     if (isFirstLaunch()) {
       setShowWelcome(true);
     }
   }, []);
+
+  // Trigger notifications on process state changes
+  useEffect(() => {
+    const prevState = prevProcessStateRef.current;
+    const currentState = activeTab.processState;
+
+    // Process started
+    if (prevState === 'idle' && currentState === 'running') {
+      notify('info', `Ralph started for ${activeTab.project.name}`);
+    }
+
+    // Process completed successfully
+    if (prevState === 'running' && currentState === 'idle' && !activeTab.processError) {
+      notify('success', `Ralph completed for ${activeTab.project.name}`);
+    }
+
+    // Process stopped
+    if (prevState === 'running' && currentState === 'stopping') {
+      notify('warning', `Stopping Ralph for ${activeTab.project.name}...`);
+    }
+
+    // Process error
+    if (currentState === 'idle' && activeTab.processError) {
+      notify('error', `Ralph error: ${activeTab.processError}`);
+    }
+
+    prevProcessStateRef.current = currentState;
+  }, [activeTab.processState, activeTab.processError, activeTab.project.name, notify]);
 
   // Handle terminal resize
   useEffect(() => {
@@ -488,6 +574,12 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Notification Toast (Top-right) */}
+      <NotificationToast
+        notifications={notifications}
+        terminalWidth={dimensions.columns}
+      />
     </Box>
   );
 };
