@@ -15,6 +15,8 @@ import { RalphService, type ProcessState } from '../utils/ralph-service';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
 import { getTailscaleStatus, generateRemoteURL, copyToClipboard, type TailscaleStatus } from '../remote/tailscale';
+import { parseAgentTree } from '../utils/log-parser';
+import type { AgentNode } from './TracingPane';
 import type { Project, UserStory } from '../types';
 
 /**
@@ -46,6 +48,7 @@ export const App: React.FC = () => {
   const [remoteConnections, setRemoteConnections] = useState(0);
   const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null);
   const [remoteURL, setRemoteURL] = useState<string | null>(null);
+  const [agentTree, setAgentTree] = useState<AgentNode[]>([]);
   const ralphServiceRef = useRef<RalphService | null>(null);
   const remoteServerRef = useRef<RalphRemoteServer | null>(null);
   const httpServerRef = useRef<RalphHttpServer | null>(null);
@@ -86,7 +89,12 @@ export const App: React.FC = () => {
 
     ralphServiceRef.current.onOutput((line, type) => {
       const formattedLine = `${type === 'stderr' ? '[ERR] ' : ''}${line}`;
-      setLogLines(prev => [...prev, formattedLine]);
+      setLogLines(prev => {
+        const newLines = [...prev, formattedLine];
+        // Parse agent tree from updated log lines
+        setAgentTree(parseAgentTree(newLines));
+        return newLines;
+      });
 
       // Broadcast log to remote clients
       if (remoteServerRef.current) {
@@ -417,6 +425,7 @@ export const App: React.FC = () => {
           processError={processError}
           tailscaleStatus={tailscaleStatus}
           remoteURL={remoteURL}
+          agentTree={agentTree}
         />
       </Box>
 

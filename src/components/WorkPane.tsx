@@ -5,11 +5,12 @@ import { join } from 'path';
 import { useTheme } from '@hooks/useTheme';
 import type { UserStory } from '@types';
 import type { TailscaleStatus } from '../remote/tailscale';
+import { TracingPane, type AgentNode } from './TracingPane';
 
 /**
  * View types for the work pane
  */
-export type WorkView = 'monitor' | 'status' | 'details' | 'help';
+export type WorkView = 'monitor' | 'status' | 'details' | 'help' | 'tracing';
 
 interface WorkPaneProps {
   /** Whether this pane is currently focused */
@@ -32,11 +33,13 @@ interface WorkPaneProps {
   tailscaleStatus?: TailscaleStatus | null;
   /** Generated remote URL with token */
   remoteURL?: string | null;
+  /** Agent execution tree for tracing view */
+  agentTree?: AgentNode[];
 }
 
 /**
  * Work pane - displays different content based on current view mode
- * Views: Monitor (logs), Status (system info), Details (story details), Help (commands)
+ * Views: Monitor (logs), Status (system info), Details (story details), Help (commands), Tracing (agent tree)
  */
 export const WorkPane: React.FC<WorkPaneProps> = ({
   isFocused,
@@ -49,6 +52,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   processError,
   tailscaleStatus = null,
   remoteURL = null,
+  agentTree = [],
 }) => {
   const { theme } = useTheme();
   const [currentView, setCurrentView] = useState<WorkView>('monitor');
@@ -118,6 +122,10 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
       }
       if (input === '4') {
         setCurrentView('help');
+        return;
+      }
+      if (input === '5') {
+        setCurrentView('tracing');
         return;
       }
 
@@ -344,15 +352,20 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
           { key: '2', desc: 'Status (system info)' },
           { key: '3', desc: 'Details (story)' },
           { key: '4', desc: 'Help (this view)' },
+          { key: '5', desc: 'Tracing (agent tree)' },
         ],
       },
       {
-        title: 'Future Features',
+        title: 'Remote',
         items: [
-          { key: '?', desc: 'Welcome overlay (US-008)' },
-          { key: 't', desc: 'Theme settings (US-009)' },
-          { key: 'c', desc: 'Copy remote URL (US-013)' },
-          { key: '5', desc: 'Tracing view (US-015)' },
+          { key: 'c', desc: 'Copy remote URL' },
+        ],
+      },
+      {
+        title: 'Interface',
+        items: [
+          { key: '?', desc: 'Welcome overlay' },
+          { key: 't', desc: 'Theme settings' },
         ],
       },
     ];
@@ -395,8 +408,22 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
         return renderDetails();
       case 'help':
         return renderHelp();
+      case 'tracing':
+        return null; // TracingPane renders itself as a full component
     }
   };
+
+  // For tracing view, render TracingPane directly (it has its own border)
+  if (currentView === 'tracing') {
+    return (
+      <TracingPane
+        isFocused={isFocused}
+        height={height}
+        width={width}
+        agentTree={agentTree}
+      />
+    );
+  }
 
   return (
     <Box
@@ -411,7 +438,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
         <Text bold color={theme.accent}>
           Work: {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
         </Text>
-        <Text dimColor> [1-4 to switch]</Text>
+        <Text dimColor> [1-5 to switch]</Text>
       </Box>
 
       {/* View content */}
