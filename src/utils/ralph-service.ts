@@ -111,7 +111,7 @@ export class RalphService {
 
         this.outputCallback?.(
           `\n─── Process exited with code ${code ?? 'unknown'} (${(duration / 1000).toFixed(1)}s) ───\n`,
-          'stdout'
+          'stdout',
         );
       });
 

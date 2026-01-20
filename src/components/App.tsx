@@ -12,6 +12,7 @@ import { useFocus } from '@hooks/useFocus';
 import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
 import { RalphService, type ProcessState } from '../utils/ralph-service';
+import { RalphRemoteServer } from '../remote/server';
 import type { Project, UserStory } from '../types';
 
 /**
@@ -40,7 +41,9 @@ export const App: React.FC = () => {
   const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [remoteConnections, setRemoteConnections] = useState(0);
   const ralphServiceRef = useRef<RalphService | null>(null);
+  const remoteServerRef = useRef<RalphRemoteServer | null>(null);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
   // For now, use current working directory as the active project
@@ -64,10 +67,26 @@ export const App: React.FC = () => {
     ralphServiceRef.current.onStatusChange(status => {
       setProcessState(status.state);
       setProcessError(status.error);
+
+      // Broadcast state to remote clients
+      if (remoteServerRef.current) {
+        remoteServerRef.current.broadcastState({
+          processState: status.state,
+          selectedStory: selectedStory?.id,
+          progress: 67, // TODO: calculate from actual progress
+          elapsedSeconds: 0, // TODO: use actual elapsed time
+        });
+      }
     });
 
     ralphServiceRef.current.onOutput((line, type) => {
-      setLogLines(prev => [...prev, `${type === 'stderr' ? '[ERR] ' : ''}${line}`]);
+      const formattedLine = `${type === 'stderr' ? '[ERR] ' : ''}${line}`;
+      setLogLines(prev => [...prev, formattedLine]);
+
+      // Broadcast log to remote clients
+      if (remoteServerRef.current) {
+        remoteServerRef.current.broadcastLog(formattedLine);
+      }
     });
 
     return () => {
@@ -76,7 +95,56 @@ export const App: React.FC = () => {
         ralphServiceRef.current.stop();
       }
     };
-  }, [activeProjectId, projects, currentPath]);
+  }, [activeProjectId, projects, currentPath, selectedStory]);
+
+  // Initialize RemoteServer
+  useEffect(() => {
+    remoteServerRef.current = new RalphRemoteServer(7890);
+
+    // Register command handler
+    remoteServerRef.current.onCommand(command => {
+      switch (command.action) {
+        case 'run':
+          if (processState === 'idle') {
+            const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
+            ralphServiceRef.current?.run(projectPath).catch(() => {
+              // Error is already handled by RalphService callbacks
+            });
+          }
+          break;
+        case 'stop':
+          if (processState === 'running') {
+            ralphServiceRef.current?.stop();
+          }
+          break;
+        // TODO: Implement focus and navigate commands
+        case 'focus':
+        case 'navigate':
+          break;
+      }
+    });
+
+    // Start server
+    try {
+      remoteServerRef.current.start();
+    } catch (error) {
+      console.error('Failed to start remote server:', error);
+    }
+
+    // Update connection count periodically
+    const connectionCheckInterval = setInterval(() => {
+      if (remoteServerRef.current) {
+        setRemoteConnections(remoteServerRef.current.getConnectionCount());
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(connectionCheckInterval);
+      if (remoteServerRef.current) {
+        remoteServerRef.current.stop();
+      }
+    };
+  }, [activeProjectId, projects, currentPath, processState]);
 
   // Check for first launch
   useEffect(() => {
@@ -244,7 +312,12 @@ export const App: React.FC = () => {
   return (
     <Box flexDirection="column" height={dimensions.rows}>
       {/* Status Bar (Top) */}
-      <StatusBar width={dimensions.columns} agentName="claude-sonnet-4-20250514" progress={67} />
+      <StatusBar
+        width={dimensions.columns}
+        agentName="claude-sonnet-4-20250514"
+        progress={67}
+        remoteConnections={remoteConnections}
+      />
 
       {/* Main three-pane layout */}
       <Box flexGrow={1}>
