@@ -27,7 +27,7 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = ({ width, focusPane = '
     { key: '[', description: 'Rail' },
     { key: 'r', description: 'Run' },
     { key: 's', description: 'Stop' },
-    { key: 'c', description: 'Copy URL' },
+    { key: ':', description: 'Cmd' },
     { key: '?', description: 'Help' },
     { key: 'q', description: 'Quit' },
   ];

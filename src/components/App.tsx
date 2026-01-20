@@ -11,6 +11,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { ProjectPicker } from './ProjectPicker';
 import { ConfirmDialog } from './ConfirmDialog';
 import { NotificationToast } from './NotificationToast';
+import { CommandPalette } from './CommandPalette';
 import { useTheme } from '@hooks/useTheme';
 import { useFocus } from '@hooks/useFocus';
 import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
@@ -51,6 +52,8 @@ export const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [recentCommands, setRecentCommands] = useState<string[]>([]);
   const [tabToClose, setTabToClose] = useState<string | null>(null);
   const [remoteConnections, setRemoteConnections] = useState(0);
   const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null);
@@ -262,6 +265,178 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Track command execution for recent commands
+  const trackCommandExecution = (commandId: string) => {
+    setRecentCommands(prev => {
+      const filtered = prev.filter(id => id !== commandId);
+      return [commandId, ...filtered].slice(0, 5); // Keep last 5
+    });
+  };
+
+  // Define available commands for command palette
+  const commands = [
+    // Actions
+    {
+      id: 'run',
+      label: 'Run Ralph',
+      description: 'Start Ralph on current project',
+      shortcut: 'r',
+      category: 'Actions',
+      action: async () => {
+        if (activeTab.processState === 'idle') {
+          try {
+            await getRalphService(activeTabId).run(activeTab.project.path);
+          } catch {
+            // Error handled by service callbacks
+          }
+        }
+      },
+    },
+    {
+      id: 'stop',
+      label: 'Stop Ralph',
+      description: 'Stop running Ralph process',
+      shortcut: 's',
+      category: 'Actions',
+      action: () => {
+        if (activeTab.processState === 'running') {
+          getRalphService(activeTabId).stop();
+        }
+      },
+    },
+    {
+      id: 'quit',
+      label: 'Quit',
+      description: 'Exit Ralph Ultra',
+      shortcut: 'q',
+      category: 'Actions',
+      action: () => exit(),
+    },
+    // Views
+    {
+      id: 'view-monitor',
+      label: 'View: Monitor',
+      description: 'Show process logs',
+      shortcut: '1',
+      category: 'Views',
+      action: () => {
+        updateTab(activeTabId, { workPaneView: 'monitor' });
+      },
+    },
+    {
+      id: 'view-status',
+      label: 'View: Status',
+      description: 'Show system status',
+      shortcut: '2',
+      category: 'Views',
+      action: () => {
+        updateTab(activeTabId, { workPaneView: 'status' });
+      },
+    },
+    {
+      id: 'view-details',
+      label: 'View: Details',
+      description: 'Show story details',
+      shortcut: '3',
+      category: 'Views',
+      action: () => {
+        updateTab(activeTabId, { workPaneView: 'details' });
+      },
+    },
+    {
+      id: 'view-help',
+      label: 'View: Help',
+      description: 'Show help',
+      shortcut: '4',
+      category: 'Views',
+      action: () => {
+        updateTab(activeTabId, { workPaneView: 'help' });
+      },
+    },
+    {
+      id: 'view-tracing',
+      label: 'View: Tracing',
+      description: 'Show subagent tracing',
+      shortcut: '5',
+      category: 'Views',
+      action: () => {
+        updateTab(activeTabId, { workPaneView: 'tracing' });
+      },
+    },
+    // Interface
+    {
+      id: 'toggle-rail',
+      label: 'Toggle Projects Rail',
+      description: 'Collapse/expand projects rail',
+      shortcut: '[',
+      category: 'Interface',
+      action: () => setRailCollapsed(prev => !prev),
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      description: 'Show welcome/help overlay',
+      shortcut: '?',
+      category: 'Interface',
+      action: () => setShowWelcome(prev => !prev),
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      description: 'Open settings panel',
+      shortcut: 't',
+      category: 'Interface',
+      action: () => setShowSettings(prev => !prev),
+    },
+    // Tabs
+    {
+      id: 'new-tab',
+      label: 'New Tab',
+      description: 'Open project in new tab',
+      shortcut: 'Ctrl+Shift+T',
+      category: 'Tabs',
+      action: () => setShowProjectPicker(true),
+    },
+    {
+      id: 'close-tab',
+      label: 'Close Tab',
+      description: 'Close current tab',
+      shortcut: 'Ctrl+Shift+W',
+      category: 'Tabs',
+      action: () => {
+        if (tabs.length > 1) {
+          if (activeTab.processState === 'running') {
+            setTabToClose(activeTabId);
+            setShowCloseConfirm(true);
+          } else {
+            closeTab(activeTabId);
+          }
+        }
+      },
+    },
+    {
+      id: 'next-tab',
+      label: 'Next Tab',
+      description: 'Switch to next tab',
+      shortcut: 'Ctrl+Tab',
+      category: 'Tabs',
+      action: () => nextTab(),
+    },
+    // Remote
+    {
+      id: 'copy-url',
+      label: 'Copy Remote URL',
+      description: 'Copy Tailscale remote URL',
+      shortcut: 'c',
+      category: 'Remote',
+      action: async () => {
+        if (remoteURL) {
+          await copyToClipboard(remoteURL);
+        }
+      },
+    },
+  ];
+
   // Register global keyboard shortcuts
   useEffect(() => {
     const handlers = [
@@ -279,10 +454,13 @@ export const App: React.FC = () => {
           } else if (showCloseConfirm) {
             setShowCloseConfirm(false);
             setTabToClose(null);
+          } else if (showCommandPalette) {
+            setShowCommandPalette(false);
           }
         },
         priority: KeyPriority.CRITICAL,
-        isActive: showWelcome || showSettings || showProjectPicker || showCloseConfirm,
+        isActive:
+          showWelcome || showSettings || showProjectPicker || showCloseConfirm || showCommandPalette,
       },
       // Global shortcuts
       {
@@ -319,6 +497,17 @@ export const App: React.FC = () => {
       {
         key: 't',
         handler: () => setShowSettings(prev => !prev),
+        priority: KeyPriority.GLOBAL,
+      },
+      {
+        key: ':',
+        handler: () => setShowCommandPalette(prev => !prev),
+        priority: KeyPriority.GLOBAL,
+      },
+      {
+        key: (_input: string, key: { ctrl?: boolean; name?: string }) =>
+          Boolean(key.ctrl && key.name === 'p'),
+        handler: () => setShowCommandPalette(prev => !prev),
         priority: KeyPriority.GLOBAL,
       },
       {
@@ -376,7 +565,12 @@ export const App: React.FC = () => {
         key: KeyMatchers.tab,
         handler: cycleFocus,
         priority: KeyPriority.GLOBAL,
-        isActive: !showWelcome && !showSettings && !showProjectPicker && !showCloseConfirm,
+        isActive:
+          !showWelcome &&
+          !showSettings &&
+          !showProjectPicker &&
+          !showCloseConfirm &&
+          !showCommandPalette,
       },
     ];
 
@@ -389,6 +583,7 @@ export const App: React.FC = () => {
     showSettings,
     showProjectPicker,
     showCloseConfirm,
+    showCommandPalette,
     activeTab,
     activeTabId,
     tabs,
@@ -400,6 +595,7 @@ export const App: React.FC = () => {
     closeTab,
     nextTab,
     switchToTabNumber,
+    updateTab,
     remoteURL,
   ]);
 
@@ -580,6 +776,19 @@ export const App: React.FC = () => {
         notifications={notifications}
         terminalWidth={dimensions.columns}
       />
+
+      {/* Command Palette (Ctrl+P or ':') */}
+      {showCommandPalette && (
+        <CommandPalette
+          visible={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+          width={dimensions.columns}
+          height={dimensions.rows}
+          commands={commands}
+          recentCommands={recentCommands}
+          onCommandExecuted={trackCommandExecution}
+        />
+      )}
     </Box>
   );
 };
