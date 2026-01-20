@@ -13,6 +13,7 @@ import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
 import { RalphService, type ProcessState } from '../utils/ralph-service';
 import { RalphRemoteServer } from '../remote/server';
+import { RalphHttpServer } from '../remote/http-server';
 import { getTailscaleStatus, generateRemoteURL, copyToClipboard, type TailscaleStatus } from '../remote/tailscale';
 import type { Project, UserStory } from '../types';
 
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
   const [remoteURL, setRemoteURL] = useState<string | null>(null);
   const ralphServiceRef = useRef<RalphService | null>(null);
   const remoteServerRef = useRef<RalphRemoteServer | null>(null);
+  const httpServerRef = useRef<RalphHttpServer | null>(null);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
   // For now, use current working directory as the active project
@@ -100,8 +102,9 @@ export const App: React.FC = () => {
     };
   }, [activeProjectId, projects, currentPath, selectedStory]);
 
-  // Initialize RemoteServer
+  // Initialize RemoteServer and HttpServer
   useEffect(() => {
+    // Start WebSocket server
     remoteServerRef.current = new RalphRemoteServer(7890);
 
     // Register command handler
@@ -127,11 +130,19 @@ export const App: React.FC = () => {
       }
     });
 
-    // Start server
+    // Start WebSocket server
     try {
       remoteServerRef.current.start();
     } catch (error) {
       console.error('Failed to start remote server:', error);
+    }
+
+    // Start HTTP server for remote client
+    httpServerRef.current = new RalphHttpServer(7891);
+    try {
+      httpServerRef.current.start();
+    } catch (error) {
+      console.error('Failed to start HTTP server:', error);
     }
 
     // Update connection count periodically
@@ -145,6 +156,9 @@ export const App: React.FC = () => {
       clearInterval(connectionCheckInterval);
       if (remoteServerRef.current) {
         remoteServerRef.current.stop();
+      }
+      if (httpServerRef.current) {
+        httpServerRef.current.stop();
       }
     };
   }, [activeProjectId, projects, currentPath, processState]);

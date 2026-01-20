@@ -232,6 +232,14 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
           Remote Access
         </Text>
         <Text>
+          <Text dimColor>Local Client: </Text>
+          <Text color={theme.success}>http://127.0.0.1:7891/remote</Text>
+        </Text>
+        <Text dimColor wrap="wrap">
+          (Open in browser on this machine)
+        </Text>
+        <Text> </Text>
+        <Text>
           <Text dimColor>Tailscale: </Text>
           <Text color={tailscaleDisplay.color}>{tailscaleDisplay.text}</Text>
         </Text>
