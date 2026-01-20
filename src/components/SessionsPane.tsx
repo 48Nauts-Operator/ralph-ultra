@@ -93,7 +93,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
         setSelectedIndex(prev => Math.max(prev - 1, 0));
       }
     },
-    { isActive: isFocused }
+    { isActive: isFocused },
   );
 
   if (error) {
@@ -141,18 +141,10 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
   // Calculate visible range for scrolling
   const maxVisible = height - 4; // Account for header and footer
   const scrollOffset = Math.max(0, selectedIndex - Math.floor(maxVisible / 2));
-  const visibleStories = prd.userStories.slice(
-    scrollOffset,
-    scrollOffset + maxVisible
-  );
+  const visibleStories = prd.userStories.slice(scrollOffset, scrollOffset + maxVisible);
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={borderColor}
-      height={height}
-    >
+    <Box flexDirection="column" borderStyle="single" borderColor={borderColor} height={height}>
       {/* Header */}
       <Box paddingX={1} borderStyle="single" borderColor={borderColor}>
         <Text bold color="cyan">
@@ -186,9 +178,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
               >
                 {story.title}
               </Text>
-              <Text color={getComplexityColor(story.complexity)}>
-                [{story.complexity}]
-              </Text>
+              <Text color={getComplexityColor(story.complexity)}>[{story.complexity}]</Text>
             </Box>
           );
         })}

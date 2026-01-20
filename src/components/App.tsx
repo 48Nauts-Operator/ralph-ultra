@@ -5,6 +5,8 @@ import { SessionsPane } from './SessionsPane';
 import { WorkPane } from './WorkPane';
 import { StatusBar } from './StatusBar';
 import { ShortcutsBar } from './ShortcutsBar';
+import { WelcomeOverlay } from './WelcomeOverlay';
+import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
 import type { Project, FocusPane, UserStory } from '../types';
 
 /**
@@ -24,6 +26,7 @@ export const App: React.FC = () => {
   const [focusPane, setFocusPane] = useState<FocusPane>('sessions');
   const [isRunning, setIsRunning] = useState(false);
   const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
   // For now, use current working directory as the active project
@@ -34,6 +37,19 @@ export const App: React.FC = () => {
     { id: '3', name: 'backend-api', path: '/path/to/backend', color: '#FFD700' },
   ]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>('1');
+
+  // Check for first launch
+  useEffect(() => {
+    if (isFirstLaunch()) {
+      setShowWelcome(true);
+    }
+  }, []);
+
+  // Handle welcome overlay dismissal
+  const handleWelcomeDismiss = () => {
+    setShowWelcome(false);
+    markFirstLaunchComplete();
+  };
 
   // Handle terminal resize
   useEffect(() => {
@@ -75,8 +91,8 @@ export const App: React.FC = () => {
     }
 
     if (input === '?') {
-      // Toggle help overlay (will be fully implemented in US-008)
-      // Placeholder: just acknowledge the keypress for now
+      // Toggle help overlay
+      setShowWelcome(prev => !prev);
       return;
     }
 
@@ -177,6 +193,14 @@ export const App: React.FC = () => {
 
       {/* Shortcuts Bar (Bottom) */}
       <ShortcutsBar width={dimensions.columns} focusPane={focusPane} />
+
+      {/* Welcome/Help Overlay */}
+      <WelcomeOverlay
+        visible={showWelcome}
+        onDismiss={handleWelcomeDismiss}
+        width={dimensions.columns}
+        height={dimensions.rows}
+      />
     </Box>
   );
 };

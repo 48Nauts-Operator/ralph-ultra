@@ -101,7 +101,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
         setScrollOffset(prev => Math.max(0, prev - 1));
       }
     },
-    { isActive: isFocused }
+    { isActive: isFocused },
   );
 
   // Get max scroll value for current view
@@ -119,10 +119,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
 
   // Render Monitor view
   const renderMonitor = () => {
-    const visibleLines = logContent.slice(
-      scrollOffset,
-      scrollOffset + (height - 3)
-    );
+    const visibleLines = logContent.slice(scrollOffset, scrollOffset + (height - 3));
 
     return (
       <Box flexDirection="column" paddingX={1}>
@@ -231,10 +228,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
       )),
     ];
 
-    const scrolledContent = visibleContent.slice(
-      scrollOffset,
-      scrollOffset + (height - 3)
-    );
+    const scrolledContent = visibleContent.slice(scrollOffset, scrollOffset + (height - 3));
 
     return (
       <Box flexDirection="column" paddingX={1}>
@@ -246,28 +240,40 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   // Render Help view
   const renderHelp = () => {
     const helpSections = [
-      { title: 'Navigation', items: [
-        { key: 'Tab', desc: 'Cycle focus between panes' },
-        { key: 'j/k or ↑↓', desc: 'Navigate within pane' },
-        { key: '[', desc: 'Toggle projects rail' },
-      ]},
-      { title: 'Actions', items: [
-        { key: 'r', desc: 'Run Ralph on current project' },
-        { key: 's', desc: 'Stop running Ralph' },
-        { key: 'q', desc: 'Quit application' },
-      ]},
-      { title: 'Views', items: [
-        { key: '1', desc: 'Monitor (logs)' },
-        { key: '2', desc: 'Status (system info)' },
-        { key: '3', desc: 'Details (story)' },
-        { key: '4', desc: 'Help (this view)' },
-      ]},
-      { title: 'Future Features', items: [
-        { key: '?', desc: 'Welcome overlay (US-008)' },
-        { key: 't', desc: 'Theme settings (US-009)' },
-        { key: 'c', desc: 'Copy remote URL (US-013)' },
-        { key: '5', desc: 'Tracing view (US-015)' },
-      ]},
+      {
+        title: 'Navigation',
+        items: [
+          { key: 'Tab', desc: 'Cycle focus between panes' },
+          { key: 'j/k or ↑↓', desc: 'Navigate within pane' },
+          { key: '[', desc: 'Toggle projects rail' },
+        ],
+      },
+      {
+        title: 'Actions',
+        items: [
+          { key: 'r', desc: 'Run Ralph on current project' },
+          { key: 's', desc: 'Stop running Ralph' },
+          { key: 'q', desc: 'Quit application' },
+        ],
+      },
+      {
+        title: 'Views',
+        items: [
+          { key: '1', desc: 'Monitor (logs)' },
+          { key: '2', desc: 'Status (system info)' },
+          { key: '3', desc: 'Details (story)' },
+          { key: '4', desc: 'Help (this view)' },
+        ],
+      },
+      {
+        title: 'Future Features',
+        items: [
+          { key: '?', desc: 'Welcome overlay (US-008)' },
+          { key: 't', desc: 'Theme settings (US-009)' },
+          { key: 'c', desc: 'Copy remote URL (US-013)' },
+          { key: '5', desc: 'Tracing view (US-015)' },
+        ],
+      },
     ];
 
     const allLines: React.ReactNode[] = [];
@@ -275,23 +281,20 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
       allLines.push(
         <Text key={`section-${sectionIdx}`} bold color="cyan">
           {section.title}
-        </Text>
+        </Text>,
       );
       section.items.forEach((item, itemIdx) => {
         allLines.push(
           <Text key={`${sectionIdx}-${itemIdx}`}>
             <Text color="yellow">{item.key.padEnd(12)}</Text>
             <Text dimColor>{item.desc}</Text>
-          </Text>
+          </Text>,
         );
       });
       allLines.push(<Text key={`space-${sectionIdx}`}> </Text>);
     });
 
-    const visibleLines = allLines.slice(
-      scrollOffset,
-      scrollOffset + (height - 3)
-    );
+    const visibleLines = allLines.slice(scrollOffset, scrollOffset + (height - 3));
 
     return (
       <Box flexDirection="column" paddingX={1}>
