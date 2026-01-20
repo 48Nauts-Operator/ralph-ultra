@@ -11,6 +11,8 @@ interface SessionsPaneProps {
   height: number;
   /** Project directory path */
   projectPath: string;
+  /** Callback when a story is selected */
+  onStorySelect?: (story: UserStory | null) => void;
 }
 
 /**
@@ -21,6 +23,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
   isFocused,
   height,
   projectPath,
+  onStorySelect,
 }) => {
   const [prd, setPrd] = useState<PRD | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -66,6 +69,14 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
       }
     }
   }, [prd, selectedIndex]);
+
+  // Notify parent when selected story changes
+  useEffect(() => {
+    if (prd && prd.userStories.length > 0 && onStorySelect) {
+      const story = prd.userStories[selectedIndex];
+      onStorySelect(story || null);
+    }
+  }, [selectedIndex, prd, onStorySelect]);
 
   // Handle keyboard navigation (j/k and arrow keys)
   useInput(

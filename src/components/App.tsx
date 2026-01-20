@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useStdout, useInput, useApp } from 'ink';
 import { ProjectsRail } from './ProjectsRail';
 import { SessionsPane } from './SessionsPane';
+import { WorkPane } from './WorkPane';
 import { StatusBar } from './StatusBar';
 import { ShortcutsBar } from './ShortcutsBar';
-import type { Project, FocusPane } from '../types';
+import type { Project, FocusPane, UserStory } from '../types';
 
 /**
  * Main application component with three-pane layout
@@ -22,6 +23,7 @@ export const App: React.FC = () => {
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [focusPane, setFocusPane] = useState<FocusPane>('sessions');
   const [isRunning, setIsRunning] = useState(false);
+  const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
   // For now, use current working directory as the active project
@@ -160,19 +162,17 @@ export const App: React.FC = () => {
           isFocused={focusPane === 'sessions'}
           height={dimensions.rows - 2} // Subtract StatusBar and ShortcutsBar
           projectPath={projects.find(p => p.id === activeProjectId)?.path || currentPath}
+          onStorySelect={setSelectedStory}
         />
 
         {/* Work Pane (Right) */}
-        <Box
+        <WorkPane
+          isFocused={focusPane === 'work'}
+          height={dimensions.rows - 2}
           width={workWidth}
-          flexDirection="column"
-          borderStyle="single"
-          borderColor={focusPane === 'work' ? 'cyan' : 'gray'}
-        >
-          <Box padding={1}>
-            <Text dimColor>Work</Text>
-          </Box>
-        </Box>
+          projectPath={projects.find(p => p.id === activeProjectId)?.path || currentPath}
+          selectedStory={selectedStory}
+        />
       </Box>
 
       {/* Shortcuts Bar (Bottom) */}
