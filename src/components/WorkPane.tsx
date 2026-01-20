@@ -296,23 +296,23 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
           <Text dimColor>No notifications yet</Text>
         ) : (
           <Box flexDirection="column">
-            {notificationHistory.slice(0, 5).map((notification) => {
+            {notificationHistory.slice(0, 5).map(notification => {
               const typeColor =
                 notification.type === 'error'
                   ? theme.error
                   : notification.type === 'warning'
-                  ? theme.warning
-                  : notification.type === 'success'
-                  ? theme.success
-                  : '#3B82F6';
+                    ? theme.warning
+                    : notification.type === 'success'
+                      ? theme.success
+                      : '#3B82F6';
               const typeIcon =
                 notification.type === 'error'
                   ? '✗'
                   : notification.type === 'warning'
-                  ? '⚠'
-                  : notification.type === 'success'
-                  ? '✓'
-                  : 'ℹ';
+                    ? '⚠'
+                    : notification.type === 'success'
+                      ? '✓'
+                      : 'ℹ';
               const timestamp = notification.timestamp.toLocaleTimeString();
               return (
                 <Text key={notification.id}>
@@ -404,9 +404,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
       },
       {
         title: 'Remote',
-        items: [
-          { key: 'c', desc: 'Copy remote URL' },
-        ],
+        items: [{ key: 'c', desc: 'Copy remote URL' }],
       },
       {
         title: 'Interface',
@@ -463,12 +461,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   // For tracing view, render TracingPane directly (it has its own border)
   if (currentView === 'tracing') {
     return (
-      <TracingPane
-        isFocused={isFocused}
-        height={height}
-        width={width}
-        agentTree={agentTree}
-      />
+      <TracingPane isFocused={isFocused} height={height} width={width} agentTree={agentTree} />
     );
   }
 

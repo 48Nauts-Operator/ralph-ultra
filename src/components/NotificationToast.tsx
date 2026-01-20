@@ -16,7 +16,10 @@ interface NotificationToastProps {
 /**
  * Get the color for a notification type
  */
-function getNotificationColor(type: Notification['type'], themeColors: ReturnType<typeof useTheme>['theme']): string {
+function getNotificationColor(
+  type: Notification['type'],
+  themeColors: ReturnType<typeof useTheme>['theme'],
+): string {
   switch (type) {
     case 'info':
       return '#3B82F6'; // Blue
@@ -76,15 +79,16 @@ export function NotificationToast({ notifications, terminalWidth }: Notification
       flexDirection="column"
       gap={1}
     >
-      {visibleNotifications.map((notification) => {
+      {visibleNotifications.map(notification => {
         const color = getNotificationColor(notification.type, theme);
         const icon = getNotificationIcon(notification.type);
 
         // Truncate message to fit in toast
         const maxMessageLength = toastWidth - 6; // Account for padding and icon
-        const displayMessage = notification.message.length > maxMessageLength
-          ? notification.message.substring(0, maxMessageLength - 3) + '...'
-          : notification.message;
+        const displayMessage =
+          notification.message.length > maxMessageLength
+            ? notification.message.substring(0, maxMessageLength - 3) + '...'
+            : notification.message;
 
         return (
           <Box

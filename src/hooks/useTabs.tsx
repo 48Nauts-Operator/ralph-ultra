@@ -33,9 +33,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
     throw new Error('At least one project is required');
   }
 
-  const [tabs, setTabs] = useState<TabState[]>([
-    createNewTab(firstProject),
-  ]);
+  const [tabs, setTabs] = useState<TabState[]>([createNewTab(firstProject)]);
   const [activeTabId, setActiveTabId] = useState<string>(initialActiveId || tabs[0]!.id);
   const [ralphServices, setRalphServices] = useState<Map<string, RalphService>>(new Map());
   const [agentTrees, setAgentTrees] = useState<Map<string, AgentNode[]>>(new Map());
@@ -69,45 +67,51 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   /**
    * Close a tab
    */
-  const closeTab = useCallback((tabId: string) => {
-    setTabs(prev => {
-      const tab = prev.find(t => t.id === tabId);
-      if (!tab) return prev;
+  const closeTab = useCallback(
+    (tabId: string) => {
+      setTabs(prev => {
+        const tab = prev.find(t => t.id === tabId);
+        if (!tab) return prev;
 
-      // Stop the Ralph service for this tab
-      const service = ralphServices.get(tabId);
-      if (service) {
-        service.stop();
-        ralphServices.delete(tabId);
-        setRalphServices(new Map(ralphServices));
-      }
-
-      // Remove the tab
-      const newTabs = prev.filter(t => t.id !== tabId);
-
-      // If we closed the active tab, switch to the previous one
-      if (tabId === activeTabId && newTabs.length > 0) {
-        const closedIndex = prev.findIndex(t => t.id === tabId);
-        const newActiveIndex = Math.max(0, closedIndex - 1);
-        const newActiveTab = newTabs[newActiveIndex];
-        if (newActiveTab) {
-          setActiveTabId(newActiveTab.id);
+        // Stop the Ralph service for this tab
+        const service = ralphServices.get(tabId);
+        if (service) {
+          service.stop();
+          ralphServices.delete(tabId);
+          setRalphServices(new Map(ralphServices));
         }
-      }
 
-      return newTabs;
-    });
-  }, [activeTabId, ralphServices]);
+        // Remove the tab
+        const newTabs = prev.filter(t => t.id !== tabId);
+
+        // If we closed the active tab, switch to the previous one
+        if (tabId === activeTabId && newTabs.length > 0) {
+          const closedIndex = prev.findIndex(t => t.id === tabId);
+          const newActiveIndex = Math.max(0, closedIndex - 1);
+          const newActiveTab = newTabs[newActiveIndex];
+          if (newActiveTab) {
+            setActiveTabId(newActiveTab.id);
+          }
+        }
+
+        return newTabs;
+      });
+    },
+    [activeTabId, ralphServices],
+  );
 
   /**
    * Switch to a specific tab
    */
-  const switchTab = useCallback((tabId: string) => {
-    const tab = tabs.find(t => t.id === tabId);
-    if (tab) {
-      setActiveTabId(tabId);
-    }
-  }, [tabs]);
+  const switchTab = useCallback(
+    (tabId: string) => {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab) {
+        setActiveTabId(tabId);
+      }
+    },
+    [tabs],
+  );
 
   /**
    * Switch to next tab (Ctrl+Tab)
@@ -124,73 +128,79 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   /**
    * Switch to tab by number (Ctrl+1/2/3...)
    */
-  const switchToTabNumber = useCallback((number: number) => {
-    if (number >= 1 && number <= tabs.length) {
-      const tab = tabs[number - 1];
-      if (tab) {
-        setActiveTabId(tab.id);
+  const switchToTabNumber = useCallback(
+    (number: number) => {
+      if (number >= 1 && number <= tabs.length) {
+        const tab = tabs[number - 1];
+        if (tab) {
+          setActiveTabId(tab.id);
+        }
       }
-    }
-  }, [tabs]);
+    },
+    [tabs],
+  );
 
   /**
    * Update tab state
    */
   const updateTab = useCallback((tabId: string, updates: Partial<TabState>) => {
-    setTabs(prev => prev.map(tab =>
-      tab.id === tabId ? { ...tab, ...updates } : tab
-    ));
+    setTabs(prev => prev.map(tab => (tab.id === tabId ? { ...tab, ...updates } : tab)));
   }, []);
 
   /**
    * Get or create RalphService for a tab
    */
-  const getRalphService = useCallback((tabId: string): RalphService => {
-    let service = ralphServices.get(tabId);
-    if (!service) {
-      const tab = tabs.find(t => t.id === tabId);
-      if (!tab) {
-        throw new Error(`Tab not found: ${tabId}`);
+  const getRalphService = useCallback(
+    (tabId: string): RalphService => {
+      let service = ralphServices.get(tabId);
+      if (!service) {
+        const tab = tabs.find(t => t.id === tabId);
+        if (!tab) {
+          throw new Error(`Tab not found: ${tabId}`);
+        }
+
+        service = new RalphService(tab.project.path);
+
+        // Register callbacks
+        service.onStatusChange(status => {
+          updateTab(tabId, {
+            processState: status.state,
+            processError: status.error,
+          });
+        });
+
+        service.onOutput((line, type) => {
+          setTabs(prev =>
+            prev.map(t => {
+              if (t.id !== tabId) return t;
+
+              const formattedLine = `${type === 'stderr' ? '[ERR] ' : ''}${line}`;
+              const newLogLines = [...t.logLines, formattedLine];
+
+              // Parse agent tree from updated log lines
+              const tree = parseAgentTree(newLogLines);
+              setAgentTrees(prev => {
+                const newMap = new Map(prev);
+                newMap.set(tabId, tree);
+                return newMap;
+              });
+
+              return {
+                ...t,
+                logLines: newLogLines,
+              };
+            }),
+          );
+        });
+
+        ralphServices.set(tabId, service);
+        setRalphServices(new Map(ralphServices));
       }
 
-      service = new RalphService(tab.project.path);
-
-      // Register callbacks
-      service.onStatusChange(status => {
-        updateTab(tabId, {
-          processState: status.state,
-          processError: status.error,
-        });
-      });
-
-      service.onOutput((line, type) => {
-        setTabs(prev => prev.map(t => {
-          if (t.id !== tabId) return t;
-
-          const formattedLine = `${type === 'stderr' ? '[ERR] ' : ''}${line}`;
-          const newLogLines = [...t.logLines, formattedLine];
-
-          // Parse agent tree from updated log lines
-          const tree = parseAgentTree(newLogLines);
-          setAgentTrees(prev => {
-            const newMap = new Map(prev);
-            newMap.set(tabId, tree);
-            return newMap;
-          });
-
-          return {
-            ...t,
-            logLines: newLogLines,
-          };
-        }));
-      });
-
-      ralphServices.set(tabId, service);
-      setRalphServices(new Map(ralphServices));
-    }
-
-    return service;
-  }, [tabs, ralphServices, updateTab]);
+      return service;
+    },
+    [tabs, ralphServices, updateTab],
+  );
 
   /**
    * Cleanup on unmount

@@ -21,7 +21,12 @@ import { useNotifications } from '@hooks/useNotifications';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
-import { getTailscaleStatus, generateRemoteURL, copyToClipboard, type TailscaleStatus } from '../remote/tailscale';
+import {
+  getTailscaleStatus,
+  generateRemoteURL,
+  copyToClipboard,
+  type TailscaleStatus,
+} from '../remote/tailscale';
 import type { Project, PRD } from '../types';
 import { readFileSync, watchFile, unwatchFile } from 'fs';
 import { join } from 'path';
@@ -198,7 +203,9 @@ export const App: React.FC = () => {
       switch (command.action) {
         case 'run':
           if (activeTab.processState === 'idle') {
-            getRalphService(activeTabId).run(activeTab.project.path).catch(() => {});
+            getRalphService(activeTabId)
+              .run(activeTab.project.path)
+              .catch(() => {});
           }
           break;
         case 'stop':
@@ -460,7 +467,11 @@ export const App: React.FC = () => {
         },
         priority: KeyPriority.CRITICAL,
         isActive:
-          showWelcome || showSettings || showProjectPicker || showCloseConfirm || showCommandPalette,
+          showWelcome ||
+          showSettings ||
+          showProjectPicker ||
+          showCloseConfirm ||
+          showCommandPalette,
       },
       // Global shortcuts
       {
@@ -772,10 +783,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Notification Toast (Top-right) */}
-      <NotificationToast
-        notifications={notifications}
-        terminalWidth={dimensions.columns}
-      />
+      <NotificationToast notifications={notifications} terminalWidth={dimensions.columns} />
 
       {/* Command Palette (Ctrl+P or ':') */}
       {showCommandPalette && (

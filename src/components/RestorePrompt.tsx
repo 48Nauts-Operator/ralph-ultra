@@ -44,9 +44,7 @@ export const RestorePrompt: React.FC<RestorePromptProps> = ({ width, height, isC
               ⚠ Crash Detected
             </Text>
             <Text color={theme.foreground}> </Text>
-            <Text color={theme.foreground}>
-              The previous session ended unexpectedly.
-            </Text>
+            <Text color={theme.foreground}>The previous session ended unexpectedly.</Text>
           </>
         ) : (
           <>
@@ -54,9 +52,7 @@ export const RestorePrompt: React.FC<RestorePromptProps> = ({ width, height, isC
               Session Found
             </Text>
             <Text color={theme.foreground}> </Text>
-            <Text color={theme.foreground}>
-              A previous session was found for this project.
-            </Text>
+            <Text color={theme.foreground}>A previous session was found for this project.</Text>
           </>
         )}
         <Text color={theme.foreground}> </Text>

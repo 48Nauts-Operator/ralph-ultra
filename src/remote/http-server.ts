@@ -52,7 +52,10 @@ export class RalphHttpServer {
    */
   private handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     // Only serve GET requests to /remote or /
-    if (req.method !== 'GET' || (req.url !== '/remote' && req.url !== '/' && !req.url?.startsWith('/remote?'))) {
+    if (
+      req.method !== 'GET' ||
+      (req.url !== '/remote' && req.url !== '/' && !req.url?.startsWith('/remote?'))
+    ) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not Found');
       return;
@@ -72,8 +75,8 @@ export class RalphHttpServer {
       res.writeHead(200, {
         'Content-Type': 'text/html',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        Pragma: 'no-cache',
+        Expires: '0',
       });
 
       res.end(content);

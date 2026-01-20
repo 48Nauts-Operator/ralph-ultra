@@ -152,8 +152,7 @@ export const TracingPane: React.FC<TracingPaneProps> = ({
   const renderNode = (node: AgentNode, index: number): React.ReactNode => {
     const isSelected = index === selectedIndex;
     const indent = '  '.repeat(node.depth);
-    const expandSymbol =
-      node.children.length > 0 ? (node.expanded ? '▼' : '▶') : ' ';
+    const expandSymbol = node.children.length > 0 ? (node.expanded ? '▼' : '▶') : ' ';
     const statusSymbol = getStatusSymbol(node.status);
     const statusColor = getStatusColor(node.status);
     const duration = formatDuration(node.duration);
@@ -167,9 +166,7 @@ export const TracingPane: React.FC<TracingPaneProps> = ({
           <Text bold color={theme.accent}>
             {node.name}
           </Text>
-          {node.task && (
-            <Text dimColor> - {node.task}</Text>
-          )}
+          {node.task && <Text dimColor> - {node.task}</Text>}
           <Text color={theme.muted}> ({duration})</Text>
         </Text>
       </Box>
@@ -208,9 +205,7 @@ export const TracingPane: React.FC<TracingPaneProps> = ({
             <Text color={theme.warning}>⟳ Running agents (yellow)</Text>
             <Text color={theme.error}>✗ Failed agents (red)</Text>
             <Text> </Text>
-            <Text dimColor>
-              This view shows the hierarchical structure of nested agent calls.
-            </Text>
+            <Text dimColor>This view shows the hierarchical structure of nested agent calls.</Text>
           </Box>
         )}
       </Box>

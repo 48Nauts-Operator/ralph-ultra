@@ -45,7 +45,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
   // Toggle notification sound
   const toggleSound = useCallback(() => {
-    setSoundEnabled((prev) => {
+    setSoundEnabled(prev => {
       const newValue = !prev;
       const settings = loadSettings();
       saveSettings({ ...settings, notificationSound: newValue });
@@ -62,7 +62,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
   // Clear a specific notification
   const clearNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifications(prev => prev.filter(n => n.id !== id));
 
     // Clear timeout if exists
     const timeout = timeoutsRef.current.get(id);
@@ -73,36 +73,39 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
   }, []);
 
   // Add a new notification
-  const notify = useCallback((type: NotificationType, message: string, duration = 5000) => {
-    const notification: Notification = {
-      id: `${Date.now()}-${Math.random()}`,
-      type,
-      message,
-      timestamp: new Date(),
-      duration,
-    };
+  const notify = useCallback(
+    (type: NotificationType, message: string, duration = 5000) => {
+      const notification: Notification = {
+        id: `${Date.now()}-${Math.random()}`,
+        type,
+        message,
+        timestamp: new Date(),
+        duration,
+      };
 
-    // Add to active notifications
-    setNotifications((prev) => [notification, ...prev]);
+      // Add to active notifications
+      setNotifications(prev => [notification, ...prev]);
 
-    // Add to history
-    setHistory((prev) => [notification, ...prev]);
+      // Add to history
+      setHistory(prev => [notification, ...prev]);
 
-    // Play sound
-    playSound();
+      // Play sound
+      playSound();
 
-    // Set auto-dismiss timeout
-    const timeout = setTimeout(() => {
-      clearNotification(notification.id);
-    }, duration);
+      // Set auto-dismiss timeout
+      const timeout = setTimeout(() => {
+        clearNotification(notification.id);
+      }, duration);
 
-    timeoutsRef.current.set(notification.id, timeout);
-  }, [clearNotification, playSound]);
+      timeoutsRef.current.set(notification.id, timeout);
+    },
+    [clearNotification, playSound],
+  );
 
   // Clear all active notifications
   const clearAll = useCallback(() => {
     // Clear all timeouts
-    timeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+    timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
     timeoutsRef.current.clear();
 
     // Clear notifications
@@ -114,7 +117,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     const timeouts = timeoutsRef.current;
     return () => {
       // Clear all timeouts
-      timeouts.forEach((timeout) => clearTimeout(timeout));
+      timeouts.forEach(timeout => clearTimeout(timeout));
       timeouts.clear();
     };
   }, []);
@@ -129,11 +132,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     toggleSound,
   };
 
-  return (
-    <NotificationContext.Provider value={value}>
-      {children}
-    </NotificationContext.Provider>
-  );
+  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }
 
 /**

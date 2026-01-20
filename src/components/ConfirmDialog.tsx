@@ -85,7 +85,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
         {/* Footer */}
         <Box borderStyle="single" borderColor={theme.border} paddingX={1}>
-          <Text color={theme.muted}>Y/Enter Confirm  N/Esc Cancel</Text>
+          <Text color={theme.muted}>Y/Enter Confirm N/Esc Cancel</Text>
         </Box>
       </Box>
     </Box>

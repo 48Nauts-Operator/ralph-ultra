@@ -17,7 +17,12 @@ import { loadSession, detectCrash, clearSession, type SessionState } from '../ut
 import { RalphService, type ProcessState } from '../utils/ralph-service';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
-import { getTailscaleStatus, generateRemoteURL, copyToClipboard, type TailscaleStatus } from '../remote/tailscale';
+import {
+  getTailscaleStatus,
+  generateRemoteURL,
+  copyToClipboard,
+  type TailscaleStatus,
+} from '../remote/tailscale';
 import { parseAgentTree } from '../utils/log-parser';
 import type { AgentNode } from './TracingPane';
 import type { Project, UserStory } from '../types';

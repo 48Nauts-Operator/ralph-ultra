@@ -31,7 +31,10 @@ export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabId }) => {
   const minTabWidth = 12; // Minimum width per tab
   const availableWidth = width - 2; // Account for border padding
   const tabCount = Math.min(tabs.length, 5); // Maximum 5 tabs shown
-  const tabWidth = Math.max(minTabWidth, Math.min(maxTabWidth, Math.floor(availableWidth / tabCount)));
+  const tabWidth = Math.max(
+    minTabWidth,
+    Math.min(maxTabWidth, Math.floor(availableWidth / tabCount)),
+  );
 
   return (
     <Box

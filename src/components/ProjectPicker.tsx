@@ -104,10 +104,7 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
               const isSelected = index === selectedIndex;
               return (
                 <Box key={project.id} marginBottom={0}>
-                  <Text
-                    bold={isSelected}
-                    color={isSelected ? theme.accent : theme.foreground}
-                  >
+                  <Text bold={isSelected} color={isSelected ? theme.accent : theme.foreground}>
                     {isSelected ? '▶ ' : '  '}
                     {project.name}
                   </Text>
@@ -121,9 +118,7 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
         {/* Footer */}
         <Box borderStyle="single" borderColor={theme.border} paddingX={1} marginTop={1}>
           <Text color={theme.muted}>
-            {availableProjects.length > 0
-              ? '↑↓ Navigate  ⏎ Select  Esc Cancel'
-              : 'Esc Close'}
+            {availableProjects.length > 0 ? '↑↓ Navigate  ⏎ Select  Esc Cancel' : 'Esc Close'}
           </Text>
         </Box>
       </Box>

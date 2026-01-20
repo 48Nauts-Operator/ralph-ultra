@@ -103,7 +103,10 @@ export async function getTailscaleStatus(): Promise<TailscaleStatus> {
  * @param port - WebSocket server port (default: 7890)
  * @returns Full URL with token parameter, or null if Tailscale not available
  */
-export async function generateRemoteURL(token: string, port: number = 7890): Promise<string | null> {
+export async function generateRemoteURL(
+  token: string,
+  port: number = 7890,
+): Promise<string | null> {
   const status = await getTailscaleStatus();
 
   if (!status.isConnected || !status.magicDNS) {
