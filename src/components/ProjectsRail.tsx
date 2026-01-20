@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { useTheme } from '@hooks/useTheme';
 import type { Project } from '../types';
 
 interface ProjectsRailProps {
@@ -33,6 +34,7 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
   onSelectProject,
   hasFocus,
 }) => {
+  const { theme } = useTheme();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Handle keyboard input when focused
@@ -98,11 +100,11 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
         <Box key={project.id} flexDirection="column">
           <Box
             borderStyle={isActive ? 'bold' : 'single'}
-            borderColor={isActive ? color : isSelected ? 'cyan' : 'gray'}
+            borderColor={isActive ? color : isSelected ? theme.accent : theme.border}
             width={3}
             justifyContent="center"
           >
-            <Text bold={isActive} color={isActive ? color : isSelected ? 'cyan' : undefined}>
+            <Text bold={isActive} color={isActive ? color : isSelected ? theme.accent : undefined}>
               {icon}
             </Text>
           </Box>
@@ -123,7 +125,7 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
         >
           <Text
             bold={isActive || isSelected}
-            color={isActive ? color : isSelected ? 'cyan' : undefined}
+            color={isActive ? color : isSelected ? theme.accent : undefined}
           >
             {icon}
           </Text>
@@ -137,7 +139,7 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
     <Box flexDirection="column" paddingTop={1}>
       {/* Header */}
       <Box marginBottom={1} paddingX={1}>
-        <Text bold dimColor={!hasFocus} color={hasFocus ? 'cyan' : undefined}>
+        <Text bold dimColor={!hasFocus} color={hasFocus ? theme.accent : undefined}>
           {collapsed ? '▶' : 'Projects'}
         </Text>
       </Box>

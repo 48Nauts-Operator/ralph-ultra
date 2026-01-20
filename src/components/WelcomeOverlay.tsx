@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
+import { useTheme } from '@hooks/useTheme';
 
 interface WelcomeOverlayProps {
   /** Whether the overlay is currently visible */
@@ -22,6 +23,8 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
   width,
   height,
 }) => {
+  const { theme } = useTheme();
+
   // Handle any key press to dismiss
   useInput(
     (input, key) => {
@@ -107,14 +110,14 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
         flexDirection="column"
         width={overlayWidth}
         borderStyle="double"
-        borderColor="cyan"
+        borderColor={theme.accent}
         paddingX={2}
         paddingY={1}
       >
         {/* ASCII Banner */}
         <Box flexDirection="column" marginBottom={1}>
           {banner.map((line, i) => (
-            <Text key={i} color="cyan" bold>
+            <Text key={i} color={theme.accent} bold>
               {line}
             </Text>
           ))}
@@ -124,12 +127,12 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
         <Box flexDirection="column" gap={1}>
           {Object.entries(commands).map(([category, cmds]) => (
             <Box key={category} flexDirection="column">
-              <Text bold color="yellow">
+              <Text bold color={theme.accentSecondary}>
                 {category}:
               </Text>
               {cmds.map((cmd, i) => (
                 <Box key={i} marginLeft={2}>
-                  <Text color="cyan" bold>
+                  <Text color={theme.accent} bold>
                     {cmd.key.padEnd(15)}
                   </Text>
                   <Text dimColor>{cmd.desc}</Text>

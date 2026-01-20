@@ -6,6 +6,8 @@ import { WorkPane } from './WorkPane';
 import { StatusBar } from './StatusBar';
 import { ShortcutsBar } from './ShortcutsBar';
 import { WelcomeOverlay } from './WelcomeOverlay';
+import { SettingsPanel } from './SettingsPanel';
+import { useTheme } from '@hooks/useTheme';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
 import type { Project, FocusPane, UserStory } from '../types';
 
@@ -16,6 +18,7 @@ import type { Project, FocusPane, UserStory } from '../types';
  * - Work pane (right): flexible width, min 40 chars
  */
 export const App: React.FC = () => {
+  const { theme } = useTheme();
   const { stdout } = useStdout();
   const { exit } = useApp();
   const [dimensions, setDimensions] = useState({
@@ -27,6 +30,7 @@ export const App: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
   // For now, use current working directory as the active project
@@ -96,6 +100,12 @@ export const App: React.FC = () => {
       return;
     }
 
+    if (input === 't') {
+      // Toggle settings panel
+      setShowSettings(prev => !prev);
+      return;
+    }
+
     if (input === 'q' || input === 'Q') {
       // Quit application
       exit();
@@ -129,16 +139,16 @@ export const App: React.FC = () => {
         justifyContent="center"
         height={dimensions.rows}
       >
-        <Text bold color="red">
+        <Text bold color={theme.error}>
           Terminal Too Small
         </Text>
-        <Text>
+        <Text color={theme.foreground}>
           Current: {dimensions.columns}x{dimensions.rows}
         </Text>
-        <Text>
+        <Text color={theme.foreground}>
           Minimum: {minColumns}x{minRows}
         </Text>
-        <Text dimColor>Please resize your terminal window</Text>
+        <Text color={theme.muted}>Please resize your terminal window</Text>
       </Box>
     );
   }
@@ -161,7 +171,7 @@ export const App: React.FC = () => {
           width={railWidth}
           flexDirection="column"
           borderStyle="single"
-          borderColor={focusPane === 'rail' ? 'cyan' : 'gray'}
+          borderColor={focusPane === 'rail' ? theme.borderFocused : theme.border}
         >
           <ProjectsRail
             collapsed={railCollapsed}
@@ -201,6 +211,15 @@ export const App: React.FC = () => {
         width={dimensions.columns}
         height={dimensions.rows}
       />
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <SettingsPanel
+          width={dimensions.columns}
+          height={dimensions.rows}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </Box>
   );
 };

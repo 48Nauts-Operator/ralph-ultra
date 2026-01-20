@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { useTheme } from '@hooks/useTheme';
 import type { FocusPane } from '../types';
 
 interface ShortcutItem {
@@ -19,6 +20,8 @@ interface ShortcutsBarProps {
  * Single-line bar at the bottom of the screen showing available commands
  */
 export const ShortcutsBar: React.FC<ShortcutsBarProps> = ({ width, focusPane = 'rail' }) => {
+  const { theme } = useTheme();
+
   // Base shortcuts that are always available (global)
   const globalShortcuts: ShortcutItem[] = [
     { key: '[', description: 'Rail' },
@@ -53,11 +56,11 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = ({ width, focusPane = '
     const separator = index < allShortcuts.length - 1 ? ' | ' : '';
     return (
       <Text key={`${shortcut.key}-${index}`}>
-        <Text bold color="cyan">
+        <Text bold color={theme.accent}>
           {shortcut.key}
         </Text>
-        <Text dimColor> {shortcut.description}</Text>
-        <Text dimColor>{separator}</Text>
+        <Text color={theme.muted}> {shortcut.description}</Text>
+        <Text color={theme.muted}>{separator}</Text>
       </Text>
     );
   };

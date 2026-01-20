@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { readFileSync, watchFile, unwatchFile } from 'fs';
 import { join } from 'path';
+import { useTheme } from '@hooks/useTheme';
 import type { PRD, UserStory, Complexity } from '@types';
 
 interface SessionsPaneProps {
@@ -25,6 +26,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
   projectPath,
   onStorySelect,
 }) => {
+  const { theme } = useTheme();
   const [prd, setPrd] = useState<PRD | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
   if (error) {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color="red">Error loading PRD</Text>
+        <Text color={theme.error}>Error loading PRD</Text>
         <Text dimColor>{error}</Text>
       </Box>
     );
@@ -113,7 +115,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
     );
   }
 
-  const borderColor = isFocused ? 'cyan' : 'gray';
+  const borderColor = isFocused ? theme.borderFocused : theme.border;
 
   // Calculate completion stats
   const completed = prd.userStories.filter(s => s.passes).length;
@@ -147,7 +149,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
     <Box flexDirection="column" borderStyle="single" borderColor={borderColor} height={height}>
       {/* Header */}
       <Box paddingX={1} borderStyle="single" borderColor={borderColor}>
-        <Text bold color="cyan">
+        <Text bold color={theme.accent}>
           {prd.project}
         </Text>
         <Text dimColor> ({prd.branchName})</Text>
@@ -187,7 +189,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
       {/* Footer with completion count */}
       <Box paddingX={1} borderStyle="single" borderColor={borderColor}>
         <Text>
-          <Text color="green">{completed}</Text>
+          <Text color={theme.success}>{completed}</Text>
           <Text dimColor>/</Text>
           <Text>{total}</Text>
           <Text dimColor> stories complete</Text>

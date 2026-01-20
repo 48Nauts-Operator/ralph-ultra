@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { useTheme } from '@hooks/useTheme';
 
 interface StatusBarProps {
   /** Current agent identifier (e.g., 'claude-sonnet-4-20250514') */
@@ -15,6 +16,7 @@ interface StatusBarProps {
  * Exactly 1 line height, spans full terminal width
  */
 export const StatusBar: React.FC<StatusBarProps> = ({ agentName, progress = 0, width }) => {
+  const { theme } = useTheme();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Update timer every second
@@ -60,15 +62,15 @@ export const StatusBar: React.FC<StatusBarProps> = ({ agentName, progress = 0, w
 
   return (
     <Box width={width}>
-      <Text bold color="cyan">
+      <Text bold color={theme.accent}>
         {branding}
       </Text>
       <Text>{' '.repeat(spacing1)}</Text>
-      <Text dimColor>{agent}</Text>
+      <Text color={theme.muted}>{agent}</Text>
       <Text>{' '.repeat(spacing2)}</Text>
-      <Text color="yellow">{progressText}</Text>
+      <Text color={theme.warning}>{progressText}</Text>
       <Text>{' '.repeat(spacing3)}</Text>
-      <Text color="green">{timer}</Text>
+      <Text color={theme.success}>{timer}</Text>
     </Box>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { readFileSync, watchFile, unwatchFile, existsSync } from 'fs';
 import { join } from 'path';
+import { useTheme } from '@hooks/useTheme';
 import type { UserStory } from '@types';
 
 /**
@@ -33,6 +34,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   projectPath,
   selectedStory,
 }) => {
+  const { theme } = useTheme();
   const [currentView, setCurrentView] = useState<WorkView>('monitor');
   const [logContent, setLogContent] = useState<string[]>([]);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -115,7 +117,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
     return 0;
   };
 
-  const borderColor = isFocused ? 'cyan' : 'gray';
+  const borderColor = isFocused ? theme.borderFocused : theme.border;
 
   // Render Monitor view
   const renderMonitor = () => {
@@ -152,16 +154,16 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
 
     return (
       <Box flexDirection="column" paddingX={1} gap={0}>
-        <Text bold color="cyan">
+        <Text bold color={theme.accent}>
           System Status
         </Text>
         <Text>
           <Text dimColor>Model: </Text>
-          <Text color="yellow">{statusInfo.model}</Text>
+          <Text color={theme.warning}>{statusInfo.model}</Text>
         </Text>
         <Text>
           <Text dimColor>Quota: </Text>
-          <Text color="green">{statusInfo.quota}</Text>
+          <Text color={theme.success}>{statusInfo.quota}</Text>
         </Text>
         <Text>
           <Text dimColor>Hybrid Config: </Text>
@@ -176,12 +178,12 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
           <Text>{statusInfo.lastRun}</Text>
         </Text>
         <Text> </Text>
-        <Text bold color="cyan">
+        <Text bold color={theme.accent}>
           Remote Access
         </Text>
         <Text>
           <Text dimColor>Tailscale: </Text>
-          <Text color="gray">{statusInfo.tailscaleStatus}</Text>
+          <Text color={theme.muted}>{statusInfo.tailscaleStatus}</Text>
         </Text>
         <Text>
           <Text dimColor>IP: </Text>
@@ -206,7 +208,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
     }
 
     const visibleContent: React.ReactNode[] = [
-      <Text key="title" bold color="cyan">
+      <Text key="title" bold color={theme.accent}>
         {selectedStory.id}: {selectedStory.title}
       </Text>,
       <Text key="space1"> </Text>,
@@ -222,7 +224,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
       </Text>,
       ...selectedStory.acceptanceCriteria.map((criteria, idx) => (
         <Text key={`ac-${idx}`}>
-          <Text color="green">✓ </Text>
+          <Text color={theme.success}>✓ </Text>
           <Text>{criteria}</Text>
         </Text>
       )),
@@ -279,14 +281,14 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
     const allLines: React.ReactNode[] = [];
     helpSections.forEach((section, sectionIdx) => {
       allLines.push(
-        <Text key={`section-${sectionIdx}`} bold color="cyan">
+        <Text key={`section-${sectionIdx}`} bold color={theme.accent}>
           {section.title}
         </Text>,
       );
       section.items.forEach((item, itemIdx) => {
         allLines.push(
           <Text key={`${sectionIdx}-${itemIdx}`}>
-            <Text color="yellow">{item.key.padEnd(12)}</Text>
+            <Text color={theme.warning}>{item.key.padEnd(12)}</Text>
             <Text dimColor>{item.desc}</Text>
           </Text>,
         );
@@ -327,7 +329,7 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
     >
       {/* Header showing current view */}
       <Box paddingX={1} borderStyle="single" borderColor={borderColor}>
-        <Text bold color="cyan">
+        <Text bold color={theme.accent}>
           Work: {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
         </Text>
         <Text dimColor> [1-4 to switch]</Text>

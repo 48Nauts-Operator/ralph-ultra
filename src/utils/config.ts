@@ -13,6 +13,19 @@ const CONFIG_DIR = path.join(os.homedir(), '.config', 'ralph-ultra');
 const FIRST_LAUNCH_FLAG = path.join(CONFIG_DIR, '.first-launch');
 
 /**
+ * Settings file path
+ */
+const SETTINGS_FILE = path.join(CONFIG_DIR, 'settings.json');
+
+/**
+ * Settings structure
+ */
+export interface Settings {
+  theme?: string;
+  [key: string]: unknown;
+}
+
+/**
  * Ensure the config directory exists
  */
 export function ensureConfigDir(): void {
@@ -48,4 +61,34 @@ export function markFirstLaunchComplete(): void {
  */
 export function getConfigDir(): string {
   return CONFIG_DIR;
+}
+
+/**
+ * Load settings from file
+ * @returns Settings object, or empty object if file doesn't exist
+ */
+export function loadSettings(): Settings {
+  ensureConfigDir();
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const content = fs.readFileSync(SETTINGS_FILE, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (error) {
+    console.error('Failed to load settings:', error);
+  }
+  return {};
+}
+
+/**
+ * Save settings to file
+ * @param settings Settings object to save
+ */
+export function saveSettings(settings: Settings): void {
+  ensureConfigDir();
+  try {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+  }
 }
