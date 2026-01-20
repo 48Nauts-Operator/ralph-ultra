@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useStdout, useApp } from 'ink';
 import { ProjectsRail } from './ProjectsRail';
 import { SessionsPane } from './SessionsPane';
@@ -11,6 +11,7 @@ import { useTheme } from '@hooks/useTheme';
 import { useFocus } from '@hooks/useFocus';
 import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
+import { RalphService, type ProcessState } from '../utils/ralph-service';
 import type { Project, UserStory } from '../types';
 
 /**
@@ -33,10 +34,13 @@ export const App: React.FC = () => {
     rows: stdout?.rows || 24,
   });
   const [railCollapsed, setRailCollapsed] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
+  const [processState, setProcessState] = useState<ProcessState>('idle');
+  const [processError, setProcessError] = useState<string | undefined>();
+  const [logLines, setLogLines] = useState<string[]>([]);
   const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const ralphServiceRef = useRef<RalphService | null>(null);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
   // For now, use current working directory as the active project
@@ -47,6 +51,32 @@ export const App: React.FC = () => {
     { id: '3', name: 'backend-api', path: '/path/to/backend', color: '#FFD700' },
   ]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>('1');
+
+  // Initialize RalphService
+  useEffect(() => {
+    const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
+    ralphServiceRef.current = new RalphService(projectPath);
+
+    // Clear logs when switching projects
+    setLogLines([]);
+
+    // Register callbacks
+    ralphServiceRef.current.onStatusChange(status => {
+      setProcessState(status.state);
+      setProcessError(status.error);
+    });
+
+    ralphServiceRef.current.onOutput((line, type) => {
+      setLogLines(prev => [...prev, `${type === 'stderr' ? '[ERR] ' : ''}${line}`]);
+    });
+
+    return () => {
+      // Cleanup: stop process if running
+      if (ralphServiceRef.current) {
+        ralphServiceRef.current.stop();
+      }
+    };
+  }, [activeProjectId, projects, currentPath]);
 
   // Check for first launch
   useEffect(() => {
@@ -112,19 +142,24 @@ export const App: React.FC = () => {
       },
       {
         key: 'r',
-        handler: () => {
-          // Run Ralph (will be implemented in US-011)
-          setIsRunning(true);
-          setTimeout(() => setIsRunning(false), 2000);
+        handler: async () => {
+          if (processState !== 'idle') {
+            return; // Already running or stopping
+          }
+          const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
+          try {
+            await ralphServiceRef.current?.run(projectPath);
+          } catch {
+            // Error is already handled by RalphService callbacks
+          }
         },
         priority: KeyPriority.GLOBAL,
       },
       {
         key: 's',
         handler: () => {
-          // Stop Ralph (will be implemented in US-011)
-          if (isRunning) {
-            setIsRunning(false);
+          if (processState === 'running') {
+            ralphServiceRef.current?.stop();
           }
         },
         priority: KeyPriority.GLOBAL,
@@ -160,7 +195,18 @@ export const App: React.FC = () => {
     return () => {
       handlers.forEach(handler => unregisterHandler(handler));
     };
-  }, [showWelcome, showSettings, isRunning, cycleFocus, exit, registerHandler, unregisterHandler]);
+  }, [
+    showWelcome,
+    showSettings,
+    processState,
+    cycleFocus,
+    exit,
+    registerHandler,
+    unregisterHandler,
+    activeProjectId,
+    projects,
+    currentPath,
+  ]);
 
   // Check minimum terminal size
   const minColumns = 80;
@@ -234,6 +280,9 @@ export const App: React.FC = () => {
           width={workWidth}
           projectPath={projects.find(p => p.id === activeProjectId)?.path || currentPath}
           selectedStory={selectedStory}
+          logLines={logLines}
+          processState={processState}
+          processError={processError}
         />
       </Box>
 

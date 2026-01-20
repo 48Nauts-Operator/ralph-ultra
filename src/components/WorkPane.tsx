@@ -21,6 +21,12 @@ interface WorkPaneProps {
   projectPath: string;
   /** Currently selected user story (for Details view) */
   selectedStory: UserStory | null;
+  /** Real-time log lines from Ralph process */
+  logLines?: string[];
+  /** Process state for status view */
+  processState?: string;
+  /** Process error message if any */
+  processError?: string;
 }
 
 /**
@@ -33,13 +39,29 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
   width,
   projectPath,
   selectedStory,
+  logLines = [],
+  processState = 'idle',
+  processError,
 }) => {
   const { theme } = useTheme();
   const [currentView, setCurrentView] = useState<WorkView>('monitor');
   const [logContent, setLogContent] = useState<string[]>([]);
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Load log file for Monitor view
+  // Update log content when logLines prop changes
+  useEffect(() => {
+    if (logLines.length > 0) {
+      setLogContent(logLines);
+      // Auto-scroll to bottom on new content
+      const contentHeight = logLines.length;
+      const visibleHeight = height - 3; // Subtract header and borders
+      if (contentHeight > visibleHeight) {
+        setScrollOffset(Math.max(0, contentHeight - visibleHeight));
+      }
+    }
+  }, [logLines, height]);
+
+  // Load log file for Monitor view (fallback to file if no live stream)
   const loadLog = () => {
     try {
       const logPath = join(projectPath, 'ralph-monitor.log');
@@ -140,8 +162,8 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
 
   // Render Status view
   const renderStatus = () => {
-    // TODO: These will be real values in later stories (US-011, US-012, US-013)
     const statusInfo = {
+      processState: processState,
       quota: '245k / 1M tokens',
       model: 'claude-sonnet-4-20250514',
       hybridConfig: 'oracle + explorer',
@@ -152,11 +174,28 @@ export const WorkPane: React.FC<WorkPaneProps> = ({
       remoteConnections: 0,
     };
 
+    const stateColor =
+      statusInfo.processState === 'running'
+        ? theme.success
+        : statusInfo.processState === 'stopping'
+          ? theme.warning
+          : theme.muted;
+
     return (
       <Box flexDirection="column" paddingX={1} gap={0}>
         <Text bold color={theme.accent}>
           System Status
         </Text>
+        <Text>
+          <Text dimColor>Process State: </Text>
+          <Text color={stateColor}>{statusInfo.processState}</Text>
+        </Text>
+        {processError && (
+          <Text>
+            <Text dimColor>Error: </Text>
+            <Text color={theme.error}>{processError}</Text>
+          </Text>
+        )}
         <Text>
           <Text dimColor>Model: </Text>
           <Text color={theme.warning}>{statusInfo.model}</Text>
