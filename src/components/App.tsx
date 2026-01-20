@@ -1,32 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Text, useStdout, useApp, useInput } from 'ink';
+import { Box, Text, useStdout, useApp } from 'ink';
 import { ProjectsRail } from './ProjectsRail';
 import { SessionsPane } from './SessionsPane';
-import { WorkPane, type WorkView } from './WorkPane';
+import { WorkPane } from './WorkPane';
 import { StatusBar } from './StatusBar';
 import { ShortcutsBar } from './ShortcutsBar';
+import { TabBar } from './TabBar';
 import { WelcomeOverlay } from './WelcomeOverlay';
 import { SettingsPanel } from './SettingsPanel';
-import { RestorePrompt } from './RestorePrompt';
+import { ProjectPicker } from './ProjectPicker';
+import { ConfirmDialog } from './ConfirmDialog';
 import { useTheme } from '@hooks/useTheme';
 import { useFocus } from '@hooks/useFocus';
 import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
+import { useTabs } from '@hooks/useTabs';
+import { useMultiTabSession } from '@hooks/useMultiTabSession';
 import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
-import { useSession } from '@hooks/useSession';
-import { loadSession, detectCrash, clearSession, type SessionState } from '../utils/session';
-import { RalphService, type ProcessState } from '../utils/ralph-service';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
 import { getTailscaleStatus, generateRemoteURL, copyToClipboard, type TailscaleStatus } from '../remote/tailscale';
-import { parseAgentTree } from '../utils/log-parser';
-import type { AgentNode } from './TracingPane';
-import type { Project, UserStory } from '../types';
+import type { Project } from '../types';
 
 /**
- * Main application component with three-pane layout
+ * Main application component with multi-tab support
  * - Projects rail (left): 12 chars expanded, 3 chars collapsed
  * - Sessions pane (middle): flexible width, min 30 chars
  * - Work pane (right): flexible width, min 40 chars
+ * - Tab bar (below status bar when multiple projects open)
  */
 export const App: React.FC = () => {
   const { theme } = useTheme();
@@ -34,7 +34,7 @@ export const App: React.FC = () => {
   const { exit } = useApp();
   const { focusPane, cycleFocus, isFocused } = useFocus();
   const { registerHandler, unregisterHandler } = useKeyboard({
-    globalDebounce: 50, // 50ms debounce for all keys
+    globalDebounce: 50,
   });
 
   const [dimensions, setDimensions] = useState({
@@ -42,210 +42,42 @@ export const App: React.FC = () => {
     rows: stdout?.rows || 24,
   });
   const [railCollapsed, setRailCollapsed] = useState(false);
-  const [processState, setProcessState] = useState<ProcessState>('idle');
-  const [processError, setProcessError] = useState<string | undefined>();
-  const [logLines, setLogLines] = useState<string[]>([]);
-  const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
-  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
-  const [sessionsScrollIndex, setSessionsScrollIndex] = useState(0);
-  const [workPaneView, setWorkPaneView] = useState<WorkView>('monitor');
-  const [workScrollOffset, setWorkScrollOffset] = useState(0);
-  const [tracingNodeIndex, setTracingNodeIndex] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
-  const [isCrashRecovery, setIsCrashRecovery] = useState(false);
-  const [sessionInitialized, setSessionInitialized] = useState(false);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [tabToClose, setTabToClose] = useState<string | null>(null);
   const [remoteConnections, setRemoteConnections] = useState(0);
   const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null);
   const [remoteURL, setRemoteURL] = useState<string | null>(null);
-  const [agentTree, setAgentTree] = useState<AgentNode[]>([]);
-  const ralphServiceRef = useRef<RalphService | null>(null);
   const remoteServerRef = useRef<RalphRemoteServer | null>(null);
   const httpServerRef = useRef<RalphHttpServer | null>(null);
 
-  // Mock projects for demonstration (will be loaded from filesystem in later stories)
-  // For now, use current working directory as the active project
+  // Mock projects for demonstration
   const currentPath = process.cwd();
   const [projects] = useState<Project[]>([
     { id: '1', name: 'ralph-ultra', path: currentPath, color: '#7FFFD4' },
     { id: '2', name: 'my-app', path: '/path/to/my-app', color: '#CC5500' },
     { id: '3', name: 'backend-api', path: '/path/to/backend', color: '#FFD700' },
   ]);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>('1');
 
-  // Get the current project path
-  const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
+  // Multi-tab state management
+  const {
+    tabs,
+    activeTabId,
+    activeTab,
+    openTab,
+    closeTab,
+    switchTab,
+    nextTab,
+    switchToTabNumber,
+    updateTab,
+    getRalphService,
+    getAgentTree,
+  } = useTabs(projects);
 
-  // Build current session state for persistence
-  const currentSession: SessionState = {
-    lastSaved: Date.now(),
-    cleanShutdown: true,
-    activeProjectId,
-    railCollapsed,
-    focusPane,
-    selectedStoryId,
-    sessionsScrollIndex,
-    workPaneView,
-    workScrollOffset,
-    workPaneState: {
-      tracingNodeIndex,
-    },
-  };
-
-  // Use session persistence hook for auto-save
-  useSession(projectPath, currentSession);
-
-  // Check for existing session on mount
-  useEffect(() => {
-    if (sessionInitialized) return;
-
-    const savedSession = loadSession(projectPath);
-    const hasCrash = detectCrash(projectPath);
-
-    // If session exists, prompt user to restore
-    if (savedSession) {
-      setIsCrashRecovery(hasCrash);
-      setShowRestorePrompt(true);
-    } else {
-      setSessionInitialized(true);
-    }
-  }, [projectPath, sessionInitialized]);
-
-  // Initialize RalphService
-  useEffect(() => {
-    const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
-    ralphServiceRef.current = new RalphService(projectPath);
-
-    // Clear logs when switching projects
-    setLogLines([]);
-
-    // Register callbacks
-    ralphServiceRef.current.onStatusChange(status => {
-      setProcessState(status.state);
-      setProcessError(status.error);
-
-      // Broadcast state to remote clients
-      if (remoteServerRef.current) {
-        remoteServerRef.current.broadcastState({
-          processState: status.state,
-          selectedStory: selectedStory?.id,
-          progress: 67, // TODO: calculate from actual progress
-          elapsedSeconds: 0, // TODO: use actual elapsed time
-        });
-      }
-    });
-
-    ralphServiceRef.current.onOutput((line, type) => {
-      const formattedLine = `${type === 'stderr' ? '[ERR] ' : ''}${line}`;
-      setLogLines(prev => {
-        const newLines = [...prev, formattedLine];
-        // Parse agent tree from updated log lines
-        setAgentTree(parseAgentTree(newLines));
-        return newLines;
-      });
-
-      // Broadcast log to remote clients
-      if (remoteServerRef.current) {
-        remoteServerRef.current.broadcastLog(formattedLine);
-      }
-    });
-
-    return () => {
-      // Cleanup: stop process if running
-      if (ralphServiceRef.current) {
-        ralphServiceRef.current.stop();
-      }
-    };
-  }, [activeProjectId, projects, currentPath, selectedStory]);
-
-  // Initialize RemoteServer and HttpServer
-  useEffect(() => {
-    // Start WebSocket server
-    remoteServerRef.current = new RalphRemoteServer(7890);
-
-    // Register command handler
-    remoteServerRef.current.onCommand(command => {
-      switch (command.action) {
-        case 'run':
-          if (processState === 'idle') {
-            const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
-            ralphServiceRef.current?.run(projectPath).catch(() => {
-              // Error is already handled by RalphService callbacks
-            });
-          }
-          break;
-        case 'stop':
-          if (processState === 'running') {
-            ralphServiceRef.current?.stop();
-          }
-          break;
-        // TODO: Implement focus and navigate commands
-        case 'focus':
-        case 'navigate':
-          break;
-      }
-    });
-
-    // Start WebSocket server
-    try {
-      remoteServerRef.current.start();
-    } catch (error) {
-      console.error('Failed to start remote server:', error);
-    }
-
-    // Start HTTP server for remote client
-    httpServerRef.current = new RalphHttpServer(7891);
-    try {
-      httpServerRef.current.start();
-    } catch (error) {
-      console.error('Failed to start HTTP server:', error);
-    }
-
-    // Update connection count periodically
-    const connectionCheckInterval = setInterval(() => {
-      if (remoteServerRef.current) {
-        setRemoteConnections(remoteServerRef.current.getConnectionCount());
-      }
-    }, 1000);
-
-    return () => {
-      clearInterval(connectionCheckInterval);
-      if (remoteServerRef.current) {
-        remoteServerRef.current.stop();
-      }
-      if (httpServerRef.current) {
-        httpServerRef.current.stop();
-      }
-    };
-  }, [activeProjectId, projects, currentPath, processState]);
-
-  // Detect Tailscale status and generate remote URL
-  useEffect(() => {
-    const updateTailscaleStatus = async () => {
-      const status = await getTailscaleStatus();
-      setTailscaleStatus(status);
-
-      // Generate remote URL if Tailscale is connected
-      if (status.isConnected && remoteServerRef.current) {
-        const token = remoteServerRef.current.getToken();
-        const url = await generateRemoteURL(token);
-        setRemoteURL(url);
-      } else {
-        setRemoteURL(null);
-      }
-    };
-
-    // Initial check
-    updateTailscaleStatus();
-
-    // Refresh status every 30 seconds
-    const statusCheckInterval = setInterval(updateTailscaleStatus, 30000);
-
-    return () => {
-      clearInterval(statusCheckInterval);
-    };
-  }, []);
+  // Session persistence for multi-tab state
+  useMultiTabSession(tabs, activeTabId, railCollapsed, focusPane);
 
   // Check for first launch
   useEffect(() => {
@@ -253,56 +85,6 @@ export const App: React.FC = () => {
       setShowWelcome(true);
     }
   }, []);
-
-  // Handle welcome overlay dismissal
-  const handleWelcomeDismiss = () => {
-    setShowWelcome(false);
-    markFirstLaunchComplete();
-  };
-
-  // Handle session restore prompt
-  const handleRestoreSession = (restore: boolean) => {
-    setShowRestorePrompt(false);
-
-    if (restore) {
-      // Restore session state
-      const savedSession = loadSession(projectPath);
-      if (savedSession) {
-        // Restore all UI state
-        setActiveProjectId(savedSession.activeProjectId);
-        setRailCollapsed(savedSession.railCollapsed);
-        // Note: focusPane is managed by FocusProvider, so we can't directly set it here
-        // It will be restored when components mount
-        setSelectedStoryId(savedSession.selectedStoryId);
-        setSessionsScrollIndex(savedSession.sessionsScrollIndex);
-        setWorkPaneView(savedSession.workPaneView as WorkView);
-        setWorkScrollOffset(savedSession.workScrollOffset);
-        setTracingNodeIndex(savedSession.workPaneState.tracingNodeIndex || 0);
-      }
-    } else {
-      // Start fresh - clear the saved session
-      clearSession(projectPath);
-    }
-
-    setSessionInitialized(true);
-  };
-
-  // Handle restore prompt keyboard input (Y/n)
-  useInput(
-    (input, key) => {
-      if (!showRestorePrompt) return;
-
-      // Y or Enter: restore session
-      if (input === 'y' || input === 'Y' || key.return) {
-        handleRestoreSession(true);
-      }
-      // N or Escape: start fresh
-      else if (input === 'n' || input === 'N' || key.escape) {
-        handleRestoreSession(false);
-      }
-    },
-    { isActive: showRestorePrompt },
-  );
 
   // Handle terminal resize
   useEffect(() => {
@@ -319,10 +101,85 @@ export const App: React.FC = () => {
     };
   }, [stdout]);
 
+  // Initialize RemoteServer and HttpServer
+  useEffect(() => {
+    remoteServerRef.current = new RalphRemoteServer(7890);
+
+    remoteServerRef.current.onCommand(command => {
+      switch (command.action) {
+        case 'run':
+          if (activeTab.processState === 'idle') {
+            getRalphService(activeTabId).run(activeTab.project.path).catch(() => {});
+          }
+          break;
+        case 'stop':
+          if (activeTab.processState === 'running') {
+            getRalphService(activeTabId).stop();
+          }
+          break;
+        case 'focus':
+        case 'navigate':
+          break;
+      }
+    });
+
+    try {
+      remoteServerRef.current.start();
+    } catch (error) {
+      console.error('Failed to start remote server:', error);
+    }
+
+    httpServerRef.current = new RalphHttpServer(7891);
+    try {
+      httpServerRef.current.start();
+    } catch (error) {
+      console.error('Failed to start HTTP server:', error);
+    }
+
+    const connectionCheckInterval = setInterval(() => {
+      if (remoteServerRef.current) {
+        setRemoteConnections(remoteServerRef.current.getConnectionCount());
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(connectionCheckInterval);
+      if (remoteServerRef.current) {
+        remoteServerRef.current.stop();
+      }
+      if (httpServerRef.current) {
+        httpServerRef.current.stop();
+      }
+    };
+  }, [activeTab, activeTabId, getRalphService]);
+
+  // Detect Tailscale status
+  useEffect(() => {
+    const updateTailscaleStatus = async () => {
+      const status = await getTailscaleStatus();
+      setTailscaleStatus(status);
+
+      if (status.isConnected && remoteServerRef.current) {
+        const token = remoteServerRef.current.getToken();
+        const url = await generateRemoteURL(token);
+        setRemoteURL(url);
+      } else {
+        setRemoteURL(null);
+      }
+    };
+
+    updateTailscaleStatus();
+    const statusCheckInterval = setInterval(updateTailscaleStatus, 30000);
+
+    return () => {
+      clearInterval(statusCheckInterval);
+    };
+  }, []);
+
   // Register global keyboard shortcuts
   useEffect(() => {
     const handlers = [
-      // Overlays (highest priority - they consume keys when active)
+      // Overlays (highest priority)
       {
         key: KeyMatchers.escape,
         handler: () => {
@@ -331,23 +188,17 @@ export const App: React.FC = () => {
             markFirstLaunchComplete();
           } else if (showSettings) {
             setShowSettings(false);
+          } else if (showProjectPicker) {
+            setShowProjectPicker(false);
+          } else if (showCloseConfirm) {
+            setShowCloseConfirm(false);
+            setTabToClose(null);
           }
         },
         priority: KeyPriority.CRITICAL,
-        isActive: showWelcome || showSettings,
+        isActive: showWelcome || showSettings || showProjectPicker || showCloseConfirm,
       },
-      {
-        key: (input: string) => input !== '' && !input.match(/^[a-zA-Z0-9]$/),
-        handler: () => {
-          if (showWelcome) {
-            setShowWelcome(false);
-            markFirstLaunchComplete();
-          }
-        },
-        priority: KeyPriority.CRITICAL,
-        isActive: showWelcome,
-      },
-      // Global shortcuts (work anywhere)
+      // Global shortcuts
       {
         key: '[',
         handler: () => setRailCollapsed(prev => !prev),
@@ -356,14 +207,11 @@ export const App: React.FC = () => {
       {
         key: 'r',
         handler: async () => {
-          if (processState !== 'idle') {
-            return; // Already running or stopping
-          }
-          const projectPath = projects.find(p => p.id === activeProjectId)?.path || currentPath;
+          if (activeTab.processState !== 'idle') return;
           try {
-            await ralphServiceRef.current?.run(projectPath);
+            await getRalphService(activeTabId).run(activeTab.project.path);
           } catch {
-            // Error is already handled by RalphService callbacks
+            // Error handled by service callbacks
           }
         },
         priority: KeyPriority.GLOBAL,
@@ -371,8 +219,8 @@ export const App: React.FC = () => {
       {
         key: 's',
         handler: () => {
-          if (processState === 'running') {
-            ralphServiceRef.current?.stop();
+          if (activeTab.processState === 'running') {
+            getRalphService(activeTabId).stop();
           }
         },
         priority: KeyPriority.GLOBAL,
@@ -391,11 +239,7 @@ export const App: React.FC = () => {
         key: 'c',
         handler: async () => {
           if (remoteURL) {
-            const success = await copyToClipboard(remoteURL);
-            // TODO: Show notification toast when implemented (US-018)
-            if (!success) {
-              console.error('Failed to copy URL to clipboard');
-            }
+            await copyToClipboard(remoteURL);
           }
         },
         priority: KeyPriority.GLOBAL,
@@ -405,33 +249,71 @@ export const App: React.FC = () => {
         handler: () => exit(),
         priority: KeyPriority.GLOBAL,
       },
-      // Tab: cycle focus between panes
+      // Tab switching (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1/2/3...)
+      {
+        key: (_input: string, key: { ctrl?: boolean; shift?: boolean; name?: string }) =>
+          Boolean(key.ctrl && key.shift && key.name === 't'),
+        handler: () => setShowProjectPicker(true),
+        priority: KeyPriority.GLOBAL,
+      },
+      {
+        key: (_input: string, key: { ctrl?: boolean; shift?: boolean; name?: string }) =>
+          Boolean(key.ctrl && key.shift && key.name === 'w'),
+        handler: () => {
+          if (tabs.length > 1) {
+            // Check if Ralph is running
+            if (activeTab.processState === 'running') {
+              setTabToClose(activeTabId);
+              setShowCloseConfirm(true);
+            } else {
+              closeTab(activeTabId);
+            }
+          }
+        },
+        priority: KeyPriority.GLOBAL,
+      },
+      {
+        key: (_input: string, key: { ctrl?: boolean; tab?: boolean }) =>
+          Boolean(key.ctrl && key.tab),
+        handler: () => nextTab(),
+        priority: KeyPriority.GLOBAL,
+      },
+      // Ctrl+1/2/3/4/5 for direct tab switching
+      ...[1, 2, 3, 4, 5].map(num => ({
+        key: (_input: string, key: { ctrl?: boolean; name?: string }) =>
+          Boolean(key.ctrl && key.name === String(num)),
+        handler: () => switchToTabNumber(num),
+        priority: KeyPriority.GLOBAL,
+      })),
+      // Tab: cycle focus
       {
         key: KeyMatchers.tab,
         handler: cycleFocus,
         priority: KeyPriority.GLOBAL,
-        isActive: !showWelcome && !showSettings, // Don't cycle focus when overlay is open
+        isActive: !showWelcome && !showSettings && !showProjectPicker && !showCloseConfirm,
       },
     ];
 
-    // Register all handlers
     handlers.forEach(handler => registerHandler(handler));
-
-    // Cleanup on unmount
     return () => {
       handlers.forEach(handler => unregisterHandler(handler));
     };
   }, [
     showWelcome,
     showSettings,
-    processState,
+    showProjectPicker,
+    showCloseConfirm,
+    activeTab,
+    activeTabId,
+    tabs,
     cycleFocus,
     exit,
     registerHandler,
     unregisterHandler,
-    activeProjectId,
-    projects,
-    currentPath,
+    getRalphService,
+    closeTab,
+    nextTab,
+    switchToTabNumber,
     remoteURL,
   ]);
 
@@ -468,6 +350,10 @@ export const App: React.FC = () => {
   const sessionsWidth = Math.max(30, Math.floor(remainingWidth * 0.4));
   const workWidth = Math.max(40, remainingWidth - sessionsWidth);
 
+  // Calculate height accounting for StatusBar, TabBar (if shown), and ShortcutsBar
+  const tabBarHeight = tabs.length > 1 ? 1 : 0;
+  const contentHeight = dimensions.rows - 2 - tabBarHeight; // StatusBar + ShortcutsBar + optional TabBar
+
   return (
     <Box flexDirection="column" height={dimensions.rows}>
       {/* Status Bar (Top) */}
@@ -478,6 +364,16 @@ export const App: React.FC = () => {
         remoteConnections={remoteConnections}
         tailscaleStatus={tailscaleStatus}
       />
+
+      {/* Tab Bar (below status bar when multiple tabs open) */}
+      {tabs.length > 1 && (
+        <TabBar
+          width={dimensions.columns}
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onSelectTab={switchTab}
+        />
+      )}
 
       {/* Main three-pane layout */}
       <Box flexGrow={1}>
@@ -492,8 +388,13 @@ export const App: React.FC = () => {
             collapsed={railCollapsed}
             onToggleCollapse={() => setRailCollapsed(!railCollapsed)}
             projects={projects}
-            activeProjectId={activeProjectId}
-            onSelectProject={setActiveProjectId}
+            activeProjectId={activeTab.project.id}
+            onSelectProject={projectId => {
+              const project = projects.find(p => p.id === projectId);
+              if (project) {
+                openTab(project);
+              }
+            }}
             hasFocus={isFocused('rail')}
           />
         </Box>
@@ -501,31 +402,33 @@ export const App: React.FC = () => {
         {/* Sessions/Tasks Pane (Middle) */}
         <SessionsPane
           isFocused={isFocused('sessions')}
-          height={dimensions.rows - 2} // Subtract StatusBar and ShortcutsBar
-          projectPath={projects.find(p => p.id === activeProjectId)?.path || currentPath}
+          height={contentHeight}
+          projectPath={activeTab.project.path}
           onStorySelect={story => {
-            setSelectedStory(story);
-            setSelectedStoryId(story?.id || null);
+            updateTab(activeTabId, {
+              selectedStory: story,
+              selectedStoryId: story?.id || null,
+            });
           }}
-          initialScrollIndex={sessionsScrollIndex}
-          initialSelectedStoryId={selectedStoryId}
+          initialScrollIndex={activeTab.sessionsScrollIndex}
+          initialSelectedStoryId={activeTab.selectedStoryId}
         />
 
         {/* Work Pane (Right) */}
         <WorkPane
           isFocused={isFocused('work')}
-          height={dimensions.rows - 2}
+          height={contentHeight}
           width={workWidth}
-          projectPath={projects.find(p => p.id === activeProjectId)?.path || currentPath}
-          selectedStory={selectedStory}
-          logLines={logLines}
-          processState={processState}
-          processError={processError}
+          projectPath={activeTab.project.path}
+          selectedStory={activeTab.selectedStory}
+          logLines={activeTab.logLines}
+          processState={activeTab.processState}
+          processError={activeTab.processError}
           tailscaleStatus={tailscaleStatus}
           remoteURL={remoteURL}
-          agentTree={agentTree}
-          initialView={workPaneView}
-          initialScrollOffset={workScrollOffset}
+          agentTree={getAgentTree(activeTabId)}
+          initialView={activeTab.workPaneView}
+          initialScrollOffset={activeTab.workScrollOffset}
         />
       </Box>
 
@@ -535,7 +438,10 @@ export const App: React.FC = () => {
       {/* Welcome/Help Overlay */}
       <WelcomeOverlay
         visible={showWelcome}
-        onDismiss={handleWelcomeDismiss}
+        onDismiss={() => {
+          setShowWelcome(false);
+          markFirstLaunchComplete();
+        }}
         width={dimensions.columns}
         height={dimensions.rows}
       />
@@ -549,12 +455,37 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Session Restore Prompt */}
-      {showRestorePrompt && (
-        <RestorePrompt
+      {/* Project Picker (Ctrl+T) */}
+      {showProjectPicker && (
+        <ProjectPicker
           width={dimensions.columns}
           height={dimensions.rows}
-          isCrashRecovery={isCrashRecovery}
+          projects={projects}
+          openProjectIds={tabs.map(t => t.project.id)}
+          onSelect={project => {
+            openTab(project);
+            setShowProjectPicker(false);
+          }}
+          onCancel={() => setShowProjectPicker(false)}
+        />
+      )}
+
+      {/* Close Confirmation Dialog (Ctrl+W with running process) */}
+      {showCloseConfirm && tabToClose && (
+        <ConfirmDialog
+          width={dimensions.columns}
+          height={dimensions.rows}
+          title="Close Running Tab?"
+          message={`Ralph is currently running in "${activeTab.project.name}". Close anyway?`}
+          onConfirm={() => {
+            closeTab(tabToClose);
+            setShowCloseConfirm(false);
+            setTabToClose(null);
+          }}
+          onCancel={() => {
+            setShowCloseConfirm(false);
+            setTabToClose(null);
+          }}
         />
       )}
     </Box>

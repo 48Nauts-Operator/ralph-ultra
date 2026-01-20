@@ -61,3 +61,41 @@ export interface PRD {
   /** List of user stories */
   userStories: UserStory[];
 }
+
+/**
+ * Process state for a Ralph instance
+ */
+export type ProcessState = 'idle' | 'running' | 'stopping';
+
+/**
+ * Work pane view types
+ */
+export type WorkView = 'monitor' | 'status' | 'details' | 'help' | 'tracing';
+
+/**
+ * Complete state for a single tab/project
+ */
+export interface TabState {
+  /** Unique identifier for this tab */
+  id: string;
+  /** Project being monitored */
+  project: Project;
+  /** Process state */
+  processState: ProcessState;
+  /** Process error message (if any) */
+  processError?: string;
+  /** Log lines from process output */
+  logLines: string[];
+  /** Currently selected story */
+  selectedStory: UserStory | null;
+  /** Selected story ID for persistence */
+  selectedStoryId: string | null;
+  /** Sessions pane scroll index */
+  sessionsScrollIndex: number;
+  /** Current work pane view */
+  workPaneView: WorkView;
+  /** Work pane scroll offset */
+  workScrollOffset: number;
+  /** Tracing pane selected node index */
+  tracingNodeIndex: number;
+}

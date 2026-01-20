@@ -5,7 +5,7 @@ import { getConfigDir, ensureConfigDir } from './config';
 import type { FocusPane } from '../types';
 
 /**
- * Session state structure
+ * Session state structure (single-tab, legacy)
  * Contains all UI state needed to restore the user's session
  */
 export interface SessionState {
@@ -32,6 +32,33 @@ export interface SessionState {
     /** Selected tracing node index */
     tracingNodeIndex?: number;
   };
+}
+
+/**
+ * Multi-tab session state structure
+ * Contains state for all open tabs and UI state
+ */
+export interface MultiTabSessionState {
+  /** Timestamp when session was last saved */
+  lastSaved: number;
+  /** Whether the session was cleanly closed */
+  cleanShutdown: boolean;
+  /** Whether the projects rail is collapsed */
+  railCollapsed: boolean;
+  /** Currently focused pane */
+  focusPane: FocusPane;
+  /** Currently active tab ID */
+  activeTabId: string;
+  /** All open tabs (limited to 5) */
+  tabs: Array<{
+    id: string;
+    projectId: string;
+    selectedStoryId: string | null;
+    sessionsScrollIndex: number;
+    workPaneView: string;
+    workScrollOffset: number;
+    tracingNodeIndex: number;
+  }>;
 }
 
 /**
@@ -133,29 +160,49 @@ export function saveSession(projectPath: string, state: SessionState): void {
 
 /**
  * Mark session as cleanly shutdown
- * @param projectPath Path to the project directory
+ * @param projectPath Path to the project directory or 'multi-tab' for multi-tab session
  */
 export function markCleanShutdown(projectPath: string): void {
-  const session = loadSession(projectPath);
-  if (session) {
-    saveSession(projectPath, {
-      ...session,
-      cleanShutdown: true,
-    });
+  if (projectPath === 'multi-tab') {
+    const session = loadMultiTabSession();
+    if (session) {
+      saveMultiTabSession({
+        ...session,
+        cleanShutdown: true,
+      });
+    }
+  } else {
+    const session = loadSession(projectPath);
+    if (session) {
+      saveSession(projectPath, {
+        ...session,
+        cleanShutdown: true,
+      });
+    }
   }
 }
 
 /**
  * Mark session as active (not cleanly shutdown)
  * Called when app starts to detect crashes later
- * @param projectPath Path to the project directory
+ * @param projectPath Path to the project directory or 'multi-tab' for multi-tab session
  */
 export function markSessionActive(projectPath: string): void {
-  const session = loadSession(projectPath) || DEFAULT_SESSION;
-  saveSession(projectPath, {
-    ...session,
-    cleanShutdown: false,
-  });
+  if (projectPath === 'multi-tab') {
+    const session = loadMultiTabSession();
+    if (session) {
+      saveMultiTabSession({
+        ...session,
+        cleanShutdown: false,
+      });
+    }
+  } else {
+    const session = loadSession(projectPath) || DEFAULT_SESSION;
+    saveSession(projectPath, {
+      ...session,
+      cleanShutdown: false,
+    });
+  }
 }
 
 /**
@@ -216,4 +263,67 @@ export function cleanupOldSessions(): void {
  */
 export function getDefaultSession(): SessionState {
   return { ...DEFAULT_SESSION, lastSaved: Date.now() };
+}
+
+/**
+ * Load multi-tab session state from disk
+ * @returns Multi-tab session state, or null if no session exists
+ */
+export function loadMultiTabSession(): MultiTabSessionState | null {
+  ensureSessionsDir();
+  const sessionFile = path.join(SESSIONS_DIR, 'multi-tab.json');
+
+  try {
+    if (fs.existsSync(sessionFile)) {
+      const content = fs.readFileSync(sessionFile, 'utf-8');
+      const session = JSON.parse(content) as MultiTabSessionState;
+      return session;
+    }
+  } catch (error) {
+    console.error('Failed to load multi-tab session:', error);
+  }
+
+  return null;
+}
+
+/**
+ * Save multi-tab session state to disk
+ * @param state Multi-tab session state to save
+ */
+export function saveMultiTabSession(state: MultiTabSessionState): void {
+  ensureSessionsDir();
+  const sessionFile = path.join(SESSIONS_DIR, 'multi-tab.json');
+
+  try {
+    const sessionData = {
+      ...state,
+      lastSaved: Date.now(),
+    };
+    fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Failed to save multi-tab session:', error);
+  }
+}
+
+/**
+ * Clear multi-tab session data
+ */
+export function clearMultiTabSession(): void {
+  const sessionFile = path.join(SESSIONS_DIR, 'multi-tab.json');
+  try {
+    if (fs.existsSync(sessionFile)) {
+      fs.unlinkSync(sessionFile);
+    }
+  } catch (error) {
+    console.error('Failed to clear multi-tab session:', error);
+  }
+}
+
+/**
+ * Detect if the last multi-tab session ended in a crash
+ * @returns true if crash detected, false otherwise
+ */
+export function detectMultiTabCrash(): boolean {
+  const session = loadMultiTabSession();
+  return session !== null && session.cleanShutdown === false;
 }
