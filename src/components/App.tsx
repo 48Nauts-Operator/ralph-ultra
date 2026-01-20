@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useStdout } from 'ink';
+import { ProjectsRail } from './ProjectsRail';
+import type { Project, FocusPane } from '../types';
 
 /**
  * Main application component with three-pane layout
@@ -13,7 +15,16 @@ export const App: React.FC = () => {
     columns: stdout?.columns || 80,
     rows: stdout?.rows || 24,
   });
-  const [railCollapsed] = useState(false); // Will be controlled via keyboard in US-003
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [focusPane] = useState<FocusPane>('rail'); // Will be managed by keyboard handler in US-010
+
+  // Mock projects for demonstration (will be loaded from filesystem in later stories)
+  const [projects] = useState<Project[]>([
+    { id: '1', name: 'ralph-ultra', path: '/path/to/ralph-ultra', color: '#7FFFD4' },
+    { id: '2', name: 'my-app', path: '/path/to/my-app', color: '#CC5500' },
+    { id: '3', name: 'backend-api', path: '/path/to/backend', color: '#FFD700' },
+  ]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>('1');
 
   // Handle terminal resize
   useEffect(() => {
@@ -72,32 +83,27 @@ export const App: React.FC = () => {
           width={railWidth}
           flexDirection="column"
           borderStyle="single"
-          borderColor="gray"
+          borderColor={focusPane === 'rail' ? 'cyan' : 'gray'}
         >
-          <Box padding={1}>
-            <Text dimColor>{railCollapsed ? '▶' : 'Projects'}</Text>
-          </Box>
+          <ProjectsRail
+            collapsed={railCollapsed}
+            onToggleCollapse={() => setRailCollapsed(!railCollapsed)}
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelectProject={setActiveProjectId}
+            hasFocus={focusPane === 'rail'}
+          />
         </Box>
 
         {/* Sessions/Tasks Pane (Middle) */}
-        <Box
-          width={sessionsWidth}
-          flexDirection="column"
-          borderStyle="single"
-          borderColor="gray"
-        >
+        <Box width={sessionsWidth} flexDirection="column" borderStyle="single" borderColor="gray">
           <Box padding={1}>
             <Text dimColor>Sessions</Text>
           </Box>
         </Box>
 
         {/* Work Pane (Right) */}
-        <Box
-          width={workWidth}
-          flexDirection="column"
-          borderStyle="single"
-          borderColor="gray"
-        >
+        <Box width={workWidth} flexDirection="column" borderStyle="single" borderColor="gray">
           <Box padding={1}>
             <Text dimColor>Work</Text>
           </Box>
