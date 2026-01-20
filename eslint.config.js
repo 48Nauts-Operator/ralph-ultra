@@ -25,6 +25,7 @@ export default [
         Buffer: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
+        setTimeout: 'readonly',
       },
     },
     plugins: {

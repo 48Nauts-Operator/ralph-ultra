@@ -20,7 +20,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ agentName, progress = 0, w
   // Update timer every second
   useEffect(() => {
     const interval = setInterval(() => {
-      setElapsedSeconds((s) => s + 1);
+      setElapsedSeconds(s => s + 1);
     }, 1000);
 
     return () => clearInterval(interval);

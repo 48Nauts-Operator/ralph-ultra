@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useStdout } from 'ink';
+import { Box, Text, useStdout, useInput, useApp } from 'ink';
 import { ProjectsRail } from './ProjectsRail';
 import { StatusBar } from './StatusBar';
+import { ShortcutsBar } from './ShortcutsBar';
 import type { Project, FocusPane } from '../types';
 
 /**
@@ -12,12 +13,14 @@ import type { Project, FocusPane } from '../types';
  */
 export const App: React.FC = () => {
   const { stdout } = useStdout();
+  const { exit } = useApp();
   const [dimensions, setDimensions] = useState({
     columns: stdout?.columns || 80,
     rows: stdout?.rows || 24,
   });
   const [railCollapsed, setRailCollapsed] = useState(false);
-  const [focusPane] = useState<FocusPane>('rail'); // Will be managed by keyboard handler in US-010
+  const [focusPane, setFocusPane] = useState<FocusPane>('rail');
+  const [isRunning, setIsRunning] = useState(false);
 
   // Mock projects for demonstration (will be loaded from filesystem in later stories)
   const [projects] = useState<Project[]>([
@@ -41,6 +44,56 @@ export const App: React.FC = () => {
       stdout?.off('resize', handleResize);
     };
   }, [stdout]);
+
+  // Handle keyboard shortcuts
+  useInput((input, key) => {
+    // Global shortcuts (work regardless of focus)
+    if (input === '[') {
+      setRailCollapsed(prev => !prev);
+      return;
+    }
+
+    if (input === 'r') {
+      // Run Ralph (will be implemented in US-011)
+      setIsRunning(true);
+      // Placeholder: actual execution comes later
+      setTimeout(() => setIsRunning(false), 2000);
+      return;
+    }
+
+    if (input === 's') {
+      // Stop Ralph (will be implemented in US-011)
+      if (isRunning) {
+        setIsRunning(false);
+      }
+      return;
+    }
+
+    if (input === '?') {
+      // Toggle help overlay (will be fully implemented in US-008)
+      // Placeholder: just acknowledge the keypress for now
+      return;
+    }
+
+    if (input === 'q' || input === 'Q') {
+      // Quit application
+      exit();
+      return;
+    }
+
+    // Tab: cycle focus between panes
+    if (key.tab) {
+      setFocusPane(prev => {
+        if (prev === 'rail') return 'sessions';
+        if (prev === 'sessions') return 'work';
+        return 'rail';
+      });
+      return;
+    }
+
+    // Context-specific shortcuts based on focus
+    // (Detailed navigation will be handled by individual pane components)
+  });
 
   // Check minimum terminal size
   const minColumns = 80;
@@ -100,19 +153,32 @@ export const App: React.FC = () => {
         </Box>
 
         {/* Sessions/Tasks Pane (Middle) */}
-        <Box width={sessionsWidth} flexDirection="column" borderStyle="single" borderColor="gray">
+        <Box
+          width={sessionsWidth}
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={focusPane === 'sessions' ? 'cyan' : 'gray'}
+        >
           <Box padding={1}>
             <Text dimColor>Sessions</Text>
           </Box>
         </Box>
 
         {/* Work Pane (Right) */}
-        <Box width={workWidth} flexDirection="column" borderStyle="single" borderColor="gray">
+        <Box
+          width={workWidth}
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={focusPane === 'work' ? 'cyan' : 'gray'}
+        >
           <Box padding={1}>
             <Text dimColor>Work</Text>
           </Box>
         </Box>
       </Box>
+
+      {/* Shortcuts Bar (Bottom) */}
+      <ShortcutsBar width={dimensions.columns} focusPane={focusPane} />
     </Box>
   );
 };
