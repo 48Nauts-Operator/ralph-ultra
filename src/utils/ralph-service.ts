@@ -1,5 +1,5 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, copyFileSync, mkdirSync } from 'fs';
 import { join, basename } from 'path';
 import type { PRD, UserStory } from '../types';
 import { isTestableAC } from '../types';
@@ -101,6 +101,133 @@ export class RalphService {
       return JSON.parse(content);
     } catch {
       return null;
+    }
+  }
+
+  private backupPRD(): string | null {
+    const prdPath = join(this.projectPath, 'prd.json');
+    if (!existsSync(prdPath)) return null;
+
+    try {
+      const backupDir = join(this.projectPath, '.ralph-backups');
+      if (!existsSync(backupDir)) {
+        mkdirSync(backupDir, { recursive: true });
+      }
+
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+      const backupPath = join(backupDir, `prd_${timestamp}.json`);
+
+      copyFileSync(prdPath, backupPath);
+
+      const latestPath = join(backupDir, 'prd_latest.json');
+      copyFileSync(prdPath, latestPath);
+
+      this.cleanupOldBackups(backupDir, 20);
+
+      return backupPath;
+    } catch (err) {
+      this.outputCallback?.(`[WARN] Failed to backup PRD: ${err}\n`, 'stderr');
+      return null;
+    }
+  }
+
+  private cleanupOldBackups(backupDir: string, keepCount: number): void {
+    try {
+      const { readdirSync, statSync, unlinkSync } = require('fs');
+      const files = readdirSync(backupDir)
+        .filter(
+          (f: string) => f.startsWith('prd_') && f.endsWith('.json') && f !== 'prd_latest.json',
+        )
+        .map((f: string) => ({
+          name: f,
+          path: join(backupDir, f),
+          mtime: statSync(join(backupDir, f)).mtime.getTime(),
+        }))
+        .sort((a: { mtime: number }, b: { mtime: number }) => b.mtime - a.mtime);
+
+      for (let i = keepCount; i < files.length; i++) {
+        unlinkSync(files[i].path);
+      }
+    } catch (_) {
+      void _;
+    }
+  }
+
+  public restorePRDFromBackup(): boolean {
+    const latestBackup = join(this.projectPath, '.ralph-backups', 'prd_latest.json');
+    const prdPath = join(this.projectPath, 'prd.json');
+
+    if (!existsSync(latestBackup)) {
+      this.outputCallback?.('[ERROR] No backup found to restore from\n', 'stderr');
+      return false;
+    }
+
+    try {
+      copyFileSync(latestBackup, prdPath);
+      this.outputCallback?.('[INFO] PRD restored from latest backup\n', 'stdout');
+      return true;
+    } catch (err) {
+      this.outputCallback?.(`[ERROR] Failed to restore PRD: ${err}\n`, 'stderr');
+      return false;
+    }
+  }
+
+  /**
+   * List available PRD backups.
+   */
+  public listBackups(): { path: string; timestamp: string; completedStories: number }[] {
+    const backupDir = join(this.projectPath, '.ralph-backups');
+    if (!existsSync(backupDir)) return [];
+
+    try {
+      const { readdirSync } = require('fs');
+      return readdirSync(backupDir)
+        .filter(
+          (f: string) => f.startsWith('prd_') && f.endsWith('.json') && f !== 'prd_latest.json',
+        )
+        .map((f: string) => {
+          const fullPath = join(backupDir, f);
+          try {
+            const content = readFileSync(fullPath, 'utf-8');
+            const prd: PRD = JSON.parse(content);
+            const completedStories = prd.userStories.filter(s => s.passes).length;
+            return {
+              path: fullPath,
+              timestamp: f.replace('prd_', '').replace('.json', ''),
+              completedStories,
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean)
+        .sort((a: { timestamp: string }, b: { timestamp: string }) =>
+          b.timestamp.localeCompare(a.timestamp),
+        );
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Restore PRD from a specific backup file.
+   */
+  public restoreFromBackup(backupPath: string): boolean {
+    const prdPath = join(this.projectPath, 'prd.json');
+
+    if (!existsSync(backupPath)) {
+      this.outputCallback?.(`[ERROR] Backup file not found: ${backupPath}\n`, 'stderr');
+      return false;
+    }
+
+    try {
+      copyFileSync(backupPath, prdPath);
+      this.outputCallback?.(`[INFO] PRD restored from: ${backupPath}\n`, 'stdout');
+      return true;
+    } catch (err) {
+      this.outputCallback?.(`[ERROR] Failed to restore PRD: ${err}\n`, 'stderr');
+      return false;
     }
   }
 
@@ -216,6 +343,11 @@ Start implementing now.`;
       const error = 'No prd.json found in project directory';
       this.emitStatus({ state: 'idle', error });
       throw new Error(error);
+    }
+
+    const backupPath = this.backupPRD();
+    if (backupPath) {
+      this.outputCallback?.(`PRD backed up to: ${backupPath}\n`, 'stdout');
     }
 
     const story = this.getNextStory(prd);
