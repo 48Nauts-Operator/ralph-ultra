@@ -1,0 +1,375 @@
+{
+  "project": "ralph-ultra",
+  "description": "Ralph Ultra 2.0 - The Most Secure Coding Agent. A TypeScript-based TUI with remote control via Tailscale, real-time subagent tracing, and premium developer experience.",
+  "branchName": "feat/ultra-2.0",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Initialize TypeScript project with Bun and OpenTUI",
+      "description": "Set up the project structure with Bun as runtime, TypeScript for type safety, and OpenTUI (Ink) for reactive terminal UI. Include proper linting, formatting, and build configuration.",
+      "acceptanceCriteria": [
+        "package.json created with bun as package manager",
+        "tsconfig.json with strict mode enabled",
+        "bunfig.toml configured for optimal performance",
+        ".eslintrc.json and .prettierrc configured",
+        "src/ directory structure: components/, hooks/, themes/, remote/, utils/",
+        "'bun run dev' starts the application",
+        "'bun run build' creates production bundle",
+        "'bun run lint' and 'bun run format' work correctly"
+      ],
+      "complexity": "medium",
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Create main App component with three-pane layout",
+      "description": "Build the main application shell with three-pane layout: collapsible projects rail (left), sessions/tasks pane (middle), and work pane (right). Use Ink's Box and Text components with flexbox layout.",
+      "acceptanceCriteria": [
+        "App.tsx renders full-screen terminal UI",
+        "Projects rail on left (12 chars wide when expanded, 3 chars collapsed)",
+        "Sessions pane in middle (flexible width, min 30 chars)",
+        "Work pane on right (flexible width, min 40 chars)",
+        "Panes have visible borders with proper corner characters",
+        "Layout adapts to terminal resize events",
+        "Minimum terminal size check (80x24) with graceful message if too small"
+      ],
+      "complexity": "medium",
+      "priority": 2,
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Implement Projects Rail with collapsible behavior",
+      "description": "Create the leftmost panel showing project icons/letters. Supports collapsing with '[' key to maximize workspace. Shows active project indicator.",
+      "acceptanceCriteria": [
+        "ProjectsRail.tsx component with project list",
+        "Each project shows first letter or icon in a colored box",
+        "Active project highlighted with accent color border",
+        "Hover state shows full project name as tooltip",
+        "'[' key toggles collapse/expand with smooth transition",
+        "Collapsed state shows only icons (3 chars wide)",
+        "Expanded state shows icons + truncated names (12 chars)",
+        "Up/Down arrow navigation when rail is focused",
+        "Enter key switches to selected project"
+      ],
+      "complexity": "medium",
+      "priority": 3,
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Implement top StatusBar component",
+      "description": "Create a single-line status bar at the top showing: Ralph Ultra branding, current agent, model, progress percentage, and elapsed timer.",
+      "acceptanceCriteria": [
+        "StatusBar.tsx component, exactly 1 line height",
+        "Left: 'Ralph Ultra' with version number",
+        "Center: Current agent name (e.g., 'claude-sonnet-4-20250514') or 'Idle'",
+        "Center-right: Progress bar with percentage (e.g., '████░░ 67%')",
+        "Right: Elapsed timer in HH:MM:SS format",
+        "Colors: branding in accent color, progress uses gradient",
+        "Updates every second for timer, on events for other data"
+      ],
+      "complexity": "simple",
+      "priority": 4,
+      "passes": true
+    },
+    {
+      "id": "US-005",
+      "title": "Implement bottom ShortcutsBar component",
+      "description": "Create a single-line shortcuts bar at the bottom showing available keyboard commands. Context-aware based on current focus.",
+      "acceptanceCriteria": [
+        "ShortcutsBar.tsx component, exactly 1 line height",
+        "Shows key shortcuts with descriptions: '[' Rail, 'r' Run, 's' Stop, '?' Help, 'q' Quit",
+        "Shortcuts separated by ' | ' with consistent spacing",
+        "Keys highlighted in accent color, descriptions in muted color",
+        "Context-aware: shows different shortcuts based on focused pane",
+        "Shortcuts actually work when pressed (integrated with keyboard handler)"
+      ],
+      "complexity": "simple",
+      "priority": 5,
+      "passes": true
+    },
+    {
+      "id": "US-006",
+      "title": "Implement Sessions/Tasks pane",
+      "description": "Create the middle pane showing user stories from prd.json with status indicators. Supports navigation and shows current story details.",
+      "acceptanceCriteria": [
+        "SessionsPane.tsx reads from prd.json in project directory",
+        "Shows project name and branch as header",
+        "Lists all user stories with status icons: [ ] pending, [>] in progress, [x] complete",
+        "Current/selected story highlighted with accent color",
+        "Shows complexity badge (simple/medium/complex) with color coding",
+        "j/k or Up/Down navigation between stories",
+        "Shows X/Y completion count at bottom",
+        "Auto-scrolls to keep selected item visible",
+        "Watches prd.json for changes and updates automatically"
+      ],
+      "complexity": "medium",
+      "priority": 6,
+      "passes": true
+    },
+    {
+      "id": "US-007",
+      "title": "Implement Work pane with multiple views",
+      "description": "Create the right pane that shows different content based on context: Monitor (logs), Status (system info), Story Details, or Help.",
+      "acceptanceCriteria": [
+        "WorkPane.tsx with view switching capability",
+        "Monitor view: streams ralph-monitor.log with auto-scroll",
+        "Status view: shows quota, hybrid config, timing stats",
+        "Details view: shows full story description and acceptance criteria",
+        "Help view: shows all commands and shortcuts",
+        "Tab key cycles through views",
+        "1/2/3/4 keys jump to specific views",
+        "Current view indicated in pane header",
+        "Proper scrolling with j/k within each view"
+      ],
+      "complexity": "complex",
+      "priority": 7,
+      "passes": true
+    },
+    {
+      "id": "US-008",
+      "title": "Implement Welcome/Help overlay",
+      "description": "Create a centered modal overlay that appears on first launch or when pressing '?'. Shows all available commands organized by category.",
+      "acceptanceCriteria": [
+        "WelcomeOverlay.tsx component with modal behavior",
+        "Centered on screen with semi-transparent backdrop effect (dim background)",
+        "Shows 'Ralph Ultra' ASCII art banner at top",
+        "Commands organized in sections: Navigation, Actions, Views, Remote",
+        "Each command shows key + description in two columns",
+        "Press any key or 'q' to dismiss",
+        "Appears automatically on first launch (stores flag in ~/.config/ralph-ultra/)",
+        "'?' key toggles overlay from anywhere"
+      ],
+      "complexity": "medium",
+      "priority": 8,
+      "passes": true
+    },
+    {
+      "id": "US-009",
+      "title": "Implement Theme system with settings",
+      "description": "Create a theme engine supporting multiple color schemes. Include settings panel accessible via 't' key. Default theme: 'Nano Dark' with mint and dirty orange accents.",
+      "acceptanceCriteria": [
+        "themes/ directory with theme definitions as TypeScript objects",
+        "Theme interface: background, foreground, accent, muted, error, warning, success, border",
+        "Default 'Nano Dark' theme: dark bg, mint (#7FFFD4) primary accent, dirty orange (#CC5500) secondary",
+        "'Nano Light' theme as alternative",
+        "ThemeContext provider wrapping entire app",
+        "useTheme() hook for components to access current theme",
+        "SettingsPanel.tsx overlay with theme selector",
+        "'t' key opens settings panel",
+        "Theme preference persisted to ~/.config/ralph-ultra/settings.json",
+        "All components use theme colors (no hardcoded colors)"
+      ],
+      "complexity": "medium",
+      "priority": 9,
+      "passes": true
+    },
+    {
+      "id": "US-010",
+      "title": "Implement keyboard navigation system",
+      "description": "Create a centralized keyboard handler managing focus, navigation, and command execution across all panes and overlays.",
+      "acceptanceCriteria": [
+        "useKeyboard() hook managing all key events",
+        "Focus system tracking which pane is active (rail, sessions, work)",
+        "Tab cycles focus between panes (visible focus indicator)",
+        "Arrow keys navigate within focused pane",
+        "Global shortcuts work regardless of focus: '[', 'r', 's', '?', 'q', 't'",
+        "Escape cancels current action or closes overlay",
+        "Enter confirms/activates selected item",
+        "Keys properly debounced to prevent rapid repeats",
+        "No key conflicts between overlays and main UI"
+      ],
+      "complexity": "medium",
+      "priority": 10,
+      "passes": true
+    },
+    {
+      "id": "US-011",
+      "title": "Integrate with Ralph Nano backend",
+      "description": "Connect the TUI to Ralph Nano's bash scripts for actual execution. TUI becomes the 'cockpit' controlling the 'engine'.",
+      "acceptanceCriteria": [
+        "RalphService class wrapping calls to ralph-nano scripts",
+        "'r' key runs 'ralph.sh' on current project via child_process",
+        "'s' key sends SIGTERM to running ralph process",
+        "Process state tracked: idle, running, stopping",
+        "stdout/stderr piped to Monitor view in real-time",
+        "Exit code and duration shown when process completes",
+        "RALPH_NANO_PATH environment variable or auto-detect",
+        "Error handling if ralph-nano not installed (helpful message)"
+      ],
+      "complexity": "complex",
+      "priority": 11,
+      "passes": true
+    },
+    {
+      "id": "US-012",
+      "title": "Implement WebSocket server for remote control",
+      "description": "Create a secure WebSocket server that allows remote clients to view and control Ralph Ultra. Foundation for Tailscale integration.",
+      "acceptanceCriteria": [
+        "remote/server.ts with WebSocket server on configurable port (default 7890)",
+        "Token-based authentication (generated on first run, stored securely)",
+        "Connection handshake requires valid token within 5 seconds",
+        "Server broadcasts: state changes, log lines, progress updates",
+        "Server accepts: run, stop, focus, navigate commands",
+        "Maximum 3 concurrent connections",
+        "Automatic reconnection handling",
+        "Server only binds to localhost by default (Tailscale handles exposure)",
+        "Connection status shown in StatusBar"
+      ],
+      "complexity": "complex",
+      "priority": 12,
+      "passes": true
+    },
+    {
+      "id": "US-013",
+      "title": "Implement Tailscale integration",
+      "description": "Integrate with Tailscale for secure remote access. Auto-detect Tailscale status, display MagicDNS address, handle authentication.",
+      "acceptanceCriteria": [
+        "remote/tailscale.ts module for Tailscale CLI interaction",
+        "Detect if Tailscale is installed and connected ('tailscale status')",
+        "Display machine's Tailscale IP and MagicDNS name in Status view",
+        "Generate shareable URL: tailscale-hostname:7890 with token",
+        "StatusBar shows Tailscale icon when connected (green) or disconnected (gray)",
+        "'c' key copies remote URL to clipboard",
+        "Warning if Tailscale not detected (falls back to localhost-only)",
+        "Documentation for setting up Tailscale ACLs for Ralph"
+      ],
+      "complexity": "medium",
+      "priority": 13,
+      "passes": true
+    },
+    {
+      "id": "US-014",
+      "title": "Create remote viewer client",
+      "description": "Build a lightweight client that can connect to Ralph Ultra remotely. Web-based for maximum accessibility (phone, tablet, any browser).",
+      "acceptanceCriteria": [
+        "remote/client/ directory with standalone web app",
+        "Single HTML file with embedded CSS/JS (no build step needed)",
+        "Connects to WebSocket server with token from URL parameter",
+        "Renders same three-pane layout in browser (responsive)",
+        "Read-only by default, 'Allow Control' toggle for remote commands",
+        "Mobile-friendly: touch navigation, appropriate font sizes",
+        "Shows connection status and latency",
+        "Graceful handling of disconnection/reconnection",
+        "Served by Ralph Ultra on /remote endpoint (port 7891)"
+      ],
+      "complexity": "complex",
+      "priority": 14,
+      "passes": true
+    },
+    {
+      "id": "US-015",
+      "title": "Implement subagent tracing view",
+      "description": "Create a tree view showing real-time hierarchy of nested agent calls. Key differentiator from other coding agents.",
+      "acceptanceCriteria": [
+        "TracingPane.tsx component (alternative Work pane view)",
+        "Tree structure showing parent -> child agent relationships",
+        "Each node shows: agent name, status (running/done), duration",
+        "Expandable/collapsible branches with +/- indicators",
+        "Color coding: running=yellow, success=green, error=red",
+        "Auto-expand currently running branch",
+        "Click/Enter on node shows that agent's output in details",
+        "Parse agent hierarchy from log patterns or OpenCode hooks",
+        "'5' key switches to tracing view"
+      ],
+      "complexity": "complex",
+      "priority": 15,
+      "passes": true
+    },
+    {
+      "id": "US-016",
+      "title": "Implement session persistence",
+      "description": "Save and restore TUI state so users can close and reopen without losing context. Survive crashes gracefully.",
+      "acceptanceCriteria": [
+        "Session state saved to ~/.config/ralph-ultra/sessions/<project-hash>.json",
+        "State includes: scroll positions, selected items, view modes, collapsed state",
+        "Auto-save every 30 seconds and on state changes",
+        "On launch, detect existing session and offer to restore",
+        "'Resume where you left off? [Y/n]' prompt",
+        "Crash recovery: detect unclean shutdown, restore from last save",
+        "'/clear-session' command to start fresh",
+        "Session files cleaned up after 7 days of inactivity"
+      ],
+      "complexity": "medium",
+      "priority": 16,
+      "passes": true
+    },
+    {
+      "id": "US-017",
+      "title": "Multi-project support with tabs",
+      "description": "Allow monitoring multiple Ralph instances simultaneously. Tab bar for switching between projects.",
+      "acceptanceCriteria": [
+        "Tab bar below StatusBar when multiple projects open",
+        "Each tab shows project name (truncated) and status indicator",
+        "Ctrl+T opens project picker to add new tab",
+        "Ctrl+W closes current tab (confirms if Ralph running)",
+        "Ctrl+1/2/3... switches to tab by number",
+        "Ctrl+Tab cycles through tabs",
+        "Each tab maintains independent state",
+        "Maximum 5 concurrent tabs (memory consideration)",
+        "Tab state included in session persistence"
+      ],
+      "complexity": "complex",
+      "priority": 17,
+      "passes": true
+    },
+    {
+      "id": "US-018",
+      "title": "Add notification system",
+      "description": "Implement in-TUI notifications and integrate with external notification services (ntfy, webhooks) from Ralph Nano.",
+      "acceptanceCriteria": [
+        "NotificationToast component appearing top-right",
+        "Toast shows for 5 seconds then fades out",
+        "Types: info (blue), success (green), warning (yellow), error (red)",
+        "Queue system for multiple notifications",
+        "Trigger notifications on: story complete, run complete, errors",
+        "Pass-through to Ralph Nano's webhook notifications",
+        "Notification sound (terminal bell) option in settings",
+        "Notification history viewable in Status panel"
+      ],
+      "complexity": "medium",
+      "priority": 18,
+      "passes": true
+    },
+    {
+      "id": "US-019",
+      "title": "Add command palette",
+      "description": "Implement VS Code-style command palette accessible via Ctrl+P or ':'. Fuzzy search all available commands.",
+      "acceptanceCriteria": [
+        "CommandPalette.tsx overlay component",
+        "Opens with Ctrl+P or ':' key",
+        "Text input with fuzzy search filtering",
+        "Shows matching commands with keyboard shortcut hints",
+        "Up/Down navigation, Enter to execute",
+        "Recent commands shown when input empty",
+        "Commands include: all shortcuts, view switches, settings, actions",
+        "Escape closes palette",
+        "Palette accessible from any context (no focus requirement)"
+      ],
+      "complexity": "medium",
+      "priority": 19,
+      "passes": true
+    },
+    {
+      "id": "US-020",
+      "title": "Documentation and polish",
+      "description": "Update all documentation, add README with screenshots, create CHANGELOG, ensure consistent code style.",
+      "acceptanceCriteria": [
+        "README.md with: features, screenshots, installation, usage, configuration",
+        "At least 3 screenshots/GIFs showing key features",
+        "CHANGELOG.md following Keep a Changelog format",
+        "CONTRIBUTING.md with development setup instructions",
+        "All code passes linting with zero warnings",
+        "JSDoc comments on all exported functions and components",
+        "Type coverage >95% (no implicit any)",
+        "npm package.json ready for publishing (if desired)",
+        "GitHub release with v2.0.0 tag"
+      ],
+      "complexity": "medium",
+      "priority": 20,
+      "passes": true
+    }
+  ]
+}

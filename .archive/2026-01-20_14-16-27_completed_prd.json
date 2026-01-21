@@ -1,0 +1,187 @@
+{
+  "project": "ralph-ultra",
+  "description": "Ralph Ultra 2.0 - The Most Secure Coding Agent. Testable acceptance criteria system.",
+  "branchName": "ralph/testable-ac",
+  "version": "2.0",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Extend PRD schema for testable acceptance criteria",
+      "description": "Update the PRD JSON schema to support testable acceptance criteria with test commands, individual pass/fail status, and timestamps.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001-1",
+          "text": "UserStory type supports acceptanceCriteria as array of objects",
+          "testCommand": "grep -q 'AcceptanceCriterion' src/types/index.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:04:21.887Z"
+        },
+        {
+          "id": "AC-001-2",
+          "text": "AcceptanceCriterion type has id, text, testCommand, passes, lastRun fields",
+          "testCommand": "grep -A10 'AcceptanceCriterion' src/types/index.ts | grep -q 'testCommand'",
+          "passes": true,
+          "lastRun": "2026-01-20T13:04:21.887Z"
+        },
+        {
+          "id": "AC-001-3",
+          "text": "PRD type updated to use new AcceptanceCriteria type (supports both string[] and AcceptanceCriterion[])",
+          "testCommand": "grep -q 'acceptanceCriteria: AcceptanceCriteria' src/types/index.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:04:21.887Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Create acceptance criteria test runner",
+      "description": "Build a utility that executes test commands for each acceptance criterion and updates the PRD with results.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-002-1",
+          "text": "ac-runner.ts exists in src/utils/",
+          "testCommand": "test -f src/utils/ac-runner.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:05:52.156Z"
+        },
+        {
+          "id": "AC-002-2",
+          "text": "runAcceptanceCriteriaTests function exported",
+          "testCommand": "grep -q 'export.*runAcceptanceCriteriaTests' src/utils/ac-runner.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:05:52.156Z"
+        },
+        {
+          "id": "AC-002-3",
+          "text": "Test runner executes shell commands and captures exit code",
+          "testCommand": "grep -q 'execSync\\|spawn' src/utils/ac-runner.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:05:52.156Z"
+        },
+        {
+          "id": "AC-002-4",
+          "text": "Test runner updates PRD file with results and timestamps",
+          "testCommand": "grep -q 'writeFileSync(prdPath' src/utils/ac-runner.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:05:52.156Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 2,
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Update WorkPane details view to show AC test status",
+      "description": "Enhance the story details view to display individual acceptance criteria with their test status (pass/fail/not run).",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-003-1",
+          "text": "Details view shows checkmark for passed criteria",
+          "testCommand": "grep -q 'passes.*true.*✓\\|✓.*passes' src/components/WorkPane.tsx || grep -q 'theme.success' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:06:52.578Z"
+        },
+        {
+          "id": "AC-003-2",
+          "text": "Details view shows X for failed criteria",
+          "testCommand": "grep -q 'passes.*false.*✗\\|✗.*passes\\|theme.error' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:06:52.578Z"
+        },
+        {
+          "id": "AC-003-3",
+          "text": "Details view shows dash for not-yet-run criteria",
+          "testCommand": "grep -q 'lastRun.*null\\|not.*run\\|pending' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:06:52.578Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 3,
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Add keyboard shortcut to run AC tests for selected story",
+      "description": "Allow user to press a key (e.g., 'T') to run acceptance criteria tests for the currently selected story.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-004-1",
+          "text": "Pressing 'T' in details view triggers test run",
+          "testCommand": "grep -q \"input === 'T'\" src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:08:42.740Z"
+        },
+        {
+          "id": "AC-004-2",
+          "text": "Test results update in real-time as each criterion completes",
+          "testCommand": "grep -q 'setTestProgress\\|isRunningTests' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:08:42.740Z"
+        },
+        {
+          "id": "AC-004-3",
+          "text": "ShortcutsBar shows T:Test hint when in details view",
+          "testCommand": "grep -q 'Test\\|test' src/components/ShortcutsBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:08:42.740Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 4,
+      "passes": true
+    },
+    {
+      "id": "US-005",
+      "title": "Auto-compute story.passes from AC results",
+      "description": "Story passes field should be automatically computed based on all acceptance criteria passing.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-005-1",
+          "text": "Story passes is true only when all AC pass",
+          "testCommand": "grep -q 'every.*passes\\|all.*passes\\|acceptanceCriteria.*every' src/utils/ac-runner.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:10:02.754Z"
+        },
+        {
+          "id": "AC-005-2",
+          "text": "PRD is saved after story.passes is updated",
+          "testCommand": "grep -q 'story.passes.*=\\|passes:.*every' src/utils/ac-runner.ts",
+          "passes": true,
+          "lastRun": "2026-01-20T13:10:02.754Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 5,
+      "passes": true
+    },
+    {
+      "id": "US-006",
+      "title": "Display AC test progress in SessionsPane",
+      "description": "Show progress indicator (e.g., 3/5 criteria passed) next to each story in the sessions list.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-006-1",
+          "text": "SessionsPane shows AC progress count",
+          "testCommand": "grep -q 'acceptanceCriteria.*filter\\|passed.*total\\|/.*criteria' src/components/SessionsPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:16:27.210Z"
+        },
+        {
+          "id": "AC-006-2",
+          "text": "Progress shown as X/Y format",
+          "testCommand": "grep -q '\\${.*}.*\\/.*\\${\\|passed}.*{total' src/components/SessionsPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-20T13:16:27.210Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 6,
+      "passes": true
+    }
+  ]
+}

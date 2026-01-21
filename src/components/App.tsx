@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, useStdout, useApp } from 'ink';
-import { ProjectsRail } from './ProjectsRail';
+
 import { SessionsPane } from './SessionsPane';
 import { WorkPane } from './WorkPane';
 import { StatusBar } from './StatusBar';
@@ -18,7 +18,7 @@ import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { useTabs } from '@hooks/useTabs';
 import { useMultiTabSession } from '@hooks/useMultiTabSession';
 import { useNotifications } from '@hooks/useNotifications';
-import { isFirstLaunch, markFirstLaunchComplete } from '../utils/config';
+import { isFirstLaunch, markFirstLaunchComplete, loadSettings, saveSettings, type SavedProject } from '../utils/config';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
 import {
@@ -29,7 +29,7 @@ import {
 } from '../remote/tailscale';
 import type { Project, PRD } from '../types';
 import { readFileSync, watchFile, unwatchFile } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 
 /**
  * Main application component with multi-tab support
@@ -52,7 +52,7 @@ export const App: React.FC = () => {
     columns: stdout?.columns || 80,
     rows: stdout?.rows || 24,
   });
-  const [railCollapsed, setRailCollapsed] = useState(false);
+
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
@@ -66,15 +66,28 @@ export const App: React.FC = () => {
   const remoteServerRef = useRef<RalphRemoteServer | null>(null);
   const httpServerRef = useRef<RalphHttpServer | null>(null);
 
-  // Mock projects for demonstration
-  const currentPath = process.cwd();
-  const [projects] = useState<Project[]>([
-    { id: '1', name: 'ralph-ultra', path: currentPath, color: '#7FFFD4' },
-    { id: '2', name: 'my-app', path: '/path/to/my-app', color: '#CC5500' },
-    { id: '3', name: 'backend-api', path: '/path/to/backend', color: '#FFD700' },
-  ]);
+  const getInitialProjects = (): Project[] => {
+    const settings = loadSettings();
+    const savedProjects = settings.openProjects;
+    
+    if (savedProjects && savedProjects.length > 0) {
+      return savedProjects.map((sp: SavedProject, index: number) => ({
+        id: `proj-${index}-${Date.now()}`,
+        name: sp.name,
+        path: sp.path,
+        color: sp.color || '#7FFFD4',
+      }));
+    }
+    
+    const currentPath = process.cwd();
+    return [{
+      id: 'proj-initial',
+      name: basename(currentPath),
+      path: currentPath,
+      color: '#7FFFD4',
+    }];
+  };
 
-  // Multi-tab state management
   const {
     tabs,
     activeTabId,
@@ -87,14 +100,37 @@ export const App: React.FC = () => {
     updateTab,
     getRalphService,
     getAgentTree,
-  } = useTabs(projects);
+  } = useTabs(getInitialProjects());
 
-  // Session persistence for multi-tab state
-  useMultiTabSession(tabs, activeTabId, railCollapsed, focusPane);
+  useEffect(() => {
+    const projectsToSave: SavedProject[] = tabs.map(tab => ({
+      path: tab.project.path,
+      name: tab.project.name,
+      color: tab.project.color || '#7FFFD4',
+    }));
+    
+    const settings = loadSettings();
+    settings.openProjects = projectsToSave;
+    settings.activeProjectPath = activeTab.project.path;
+    saveSettings(settings);
+  }, [tabs, activeTab.project.path]);
+
+  useMultiTabSession(tabs, activeTabId, false, focusPane);
+
+  const handleStorySelect = useCallback(
+    (story: import('../types').UserStory | null) => {
+      updateTab(activeTabId, {
+        selectedStory: story,
+        selectedStoryId: story?.id || null,
+      });
+    },
+    [activeTabId, updateTab],
+  );
 
   // Track previous process state for notifications
   const prevProcessStateRef = useRef<typeof activeTab.processState>(activeTab.processState);
-  const prevPassCountRef = useRef<number>(0);
+  const prevPassCountRef = useRef<number>(-1);
+  const prevProjectPathRef = useRef<string>(activeTab.project.path);
   const [prd, setPrd] = useState<PRD | null>(null);
 
   // Load and watch PRD file for story completion notifications
@@ -112,8 +148,9 @@ export const App: React.FC = () => {
 
     loadPRD();
 
+    const PRD_WATCH_INTERVAL_MS = 3000;
     const prdPath = join(activeTab.project.path, 'prd.json');
-    watchFile(prdPath, { interval: 1000 }, loadPRD);
+    watchFile(prdPath, { interval: PRD_WATCH_INTERVAL_MS }, loadPRD);
 
     return () => {
       unwatchFile(prdPath, loadPRD);
@@ -127,23 +164,36 @@ export const App: React.FC = () => {
     const passCount = prd.userStories.filter(s => s.passes).length;
     const totalCount = prd.userStories.length;
 
-    // Story completed
-    if (passCount > prevPassCountRef.current && prevPassCountRef.current > 0) {
+    // Reset counter when switching projects to avoid false notifications
+    if (prevProjectPathRef.current !== activeTab.project.path) {
+      prevPassCountRef.current = passCount;
+      prevProjectPathRef.current = activeTab.project.path;
+      return;
+    }
+
+    // First load - just set the baseline, don't notify
+    if (prevPassCountRef.current === -1) {
+      prevPassCountRef.current = passCount;
+      return;
+    }
+
+    // Story completed (only when count increases from a valid baseline)
+    if (passCount > prevPassCountRef.current) {
       const completedStory = prd.userStories.find((s, i) => {
         return s.passes && i === passCount - 1;
       });
       if (completedStory) {
         notify('success', `Story completed: ${completedStory.id} - ${completedStory.title}`);
       }
-    }
 
-    // All stories completed
-    if (passCount === totalCount && passCount > 0 && prevPassCountRef.current < totalCount) {
-      notify('success', '🎉 All stories completed! Project complete!', 8000);
+      // All stories completed
+      if (passCount === totalCount) {
+        notify('success', '🎉 All stories completed! Project complete!', 8000);
+      }
     }
 
     prevPassCountRef.current = passCount;
-  }, [prd, notify]);
+  }, [prd, notify, activeTab.project.path]);
 
   // Check for first launch
   useEffect(() => {
@@ -195,9 +245,42 @@ export const App: React.FC = () => {
     };
   }, [stdout]);
 
-  // Initialize RemoteServer and HttpServer
   useEffect(() => {
     remoteServerRef.current = new RalphRemoteServer(7890);
+
+    try {
+      remoteServerRef.current.start();
+    } catch (error) {
+      console.error('Failed to start remote server:', error);
+    }
+
+    httpServerRef.current = new RalphHttpServer(7891);
+    try {
+      httpServerRef.current.start();
+    } catch (error) {
+      console.error('Failed to start HTTP server:', error);
+    }
+
+    const CONNECTION_CHECK_INTERVAL_MS = 5000;
+    const connectionCheckInterval = setInterval(() => {
+      if (remoteServerRef.current) {
+        setRemoteConnections(remoteServerRef.current.getConnectionCount());
+      }
+    }, CONNECTION_CHECK_INTERVAL_MS);
+
+    return () => {
+      clearInterval(connectionCheckInterval);
+      if (remoteServerRef.current) {
+        remoteServerRef.current.stop();
+      }
+      if (httpServerRef.current) {
+        httpServerRef.current.stop();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!remoteServerRef.current) return;
 
     remoteServerRef.current.onCommand(command => {
       switch (command.action) {
@@ -218,35 +301,6 @@ export const App: React.FC = () => {
           break;
       }
     });
-
-    try {
-      remoteServerRef.current.start();
-    } catch (error) {
-      console.error('Failed to start remote server:', error);
-    }
-
-    httpServerRef.current = new RalphHttpServer(7891);
-    try {
-      httpServerRef.current.start();
-    } catch (error) {
-      console.error('Failed to start HTTP server:', error);
-    }
-
-    const connectionCheckInterval = setInterval(() => {
-      if (remoteServerRef.current) {
-        setRemoteConnections(remoteServerRef.current.getConnectionCount());
-      }
-    }, 1000);
-
-    return () => {
-      clearInterval(connectionCheckInterval);
-      if (remoteServerRef.current) {
-        remoteServerRef.current.stop();
-      }
-      if (httpServerRef.current) {
-        httpServerRef.current.stop();
-      }
-    };
   }, [activeTab, activeTabId, getRalphService]);
 
   // Detect Tailscale status
@@ -372,14 +426,6 @@ export const App: React.FC = () => {
     },
     // Interface
     {
-      id: 'toggle-rail',
-      label: 'Toggle Projects Rail',
-      description: 'Collapse/expand projects rail',
-      shortcut: '[',
-      category: 'Interface',
-      action: () => setRailCollapsed(prev => !prev),
-    },
-    {
       id: 'help',
       label: 'Help',
       description: 'Show welcome/help overlay',
@@ -475,11 +521,6 @@ export const App: React.FC = () => {
       },
       // Global shortcuts
       {
-        key: '[',
-        handler: () => setRailCollapsed(prev => !prev),
-        priority: KeyPriority.GLOBAL,
-      },
-      {
         key: 'r',
         handler: async () => {
           if (activeTab.processState !== 'idle') return;
@@ -506,7 +547,8 @@ export const App: React.FC = () => {
         priority: KeyPriority.GLOBAL,
       },
       {
-        key: 't',
+        key: (input: string, key: { ctrl?: boolean; shift?: boolean; meta?: boolean }) =>
+          input === 't' && !key.ctrl && !key.shift && !key.meta,
         handler: () => setShowSettings(prev => !prev),
         priority: KeyPriority.GLOBAL,
       },
@@ -535,7 +577,12 @@ export const App: React.FC = () => {
         handler: () => exit(),
         priority: KeyPriority.GLOBAL,
       },
-      // Tab switching (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+1/2/3...)
+      // Tab switching
+      {
+        key: 'n',
+        handler: () => setShowProjectPicker(true),
+        priority: KeyPriority.GLOBAL,
+      },
       {
         key: (_input: string, key: { ctrl?: boolean; shift?: boolean; name?: string }) =>
           Boolean(key.ctrl && key.shift && key.name === 't'),
@@ -564,14 +611,6 @@ export const App: React.FC = () => {
         handler: () => nextTab(),
         priority: KeyPriority.GLOBAL,
       },
-      // Ctrl+1/2/3/4/5 for direct tab switching
-      ...[1, 2, 3, 4, 5].map(num => ({
-        key: (_input: string, key: { ctrl?: boolean; name?: string }) =>
-          Boolean(key.ctrl && key.name === String(num)),
-        handler: () => switchToTabNumber(num),
-        priority: KeyPriority.GLOBAL,
-      })),
-      // Tab: cycle focus
       {
         key: KeyMatchers.tab,
         handler: cycleFocus,
@@ -637,77 +676,43 @@ export const App: React.FC = () => {
     );
   }
 
-  // Calculate pane widths
-  const railWidth = railCollapsed ? 3 : 12;
-  const remainingWidth = dimensions.columns - railWidth;
-  const sessionsWidth = Math.max(30, Math.floor(remainingWidth * 0.4));
-  const workWidth = Math.max(40, remainingWidth - sessionsWidth);
-
-  // Calculate height accounting for StatusBar, TabBar (if shown), and ShortcutsBar
-  const tabBarHeight = tabs.length > 1 ? 1 : 0;
-  const contentHeight = dimensions.rows - 2 - tabBarHeight; // StatusBar + ShortcutsBar + optional TabBar
+  const sessionsWidth = Math.max(30, Math.floor(dimensions.columns * 0.4));
+  const workWidth = Math.max(40, dimensions.columns - sessionsWidth);
+  const contentHeight = dimensions.rows - 3;
 
   return (
     <Box flexDirection="column" height={dimensions.rows}>
       {/* Status Bar (Top) */}
       <StatusBar
         width={dimensions.columns}
-        agentName="claude-sonnet-4-20250514"
-        progress={67}
+        agentName={activeTab.processState === 'running' || activeTab.processState === 'external' ? 'claude-sonnet-4-20250514' : undefined}
+        progress={prd ? Math.round((prd.userStories.filter(s => s.passes).length / prd.userStories.length) * 100) : 0}
         remoteConnections={remoteConnections}
         tailscaleStatus={tailscaleStatus}
       />
 
-      {/* Tab Bar (below status bar when multiple tabs open) */}
-      {tabs.length > 1 && (
-        <TabBar
-          width={dimensions.columns}
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSelectTab={switchTab}
-        />
-      )}
+      <TabBar
+        width={dimensions.columns}
+        tabs={tabs}
+        activeTabId={activeTabId}
+        isFocused={isFocused('tabs')}
+        onSelectTab={switchTab}
+      />
 
-      {/* Main three-pane layout */}
       <Box flexGrow={1}>
-        {/* Projects Rail (Left) */}
-        <Box
-          width={railWidth}
-          flexDirection="column"
-          borderStyle="single"
-          borderColor={isFocused('rail') ? theme.borderFocused : theme.border}
-        >
-          <ProjectsRail
-            collapsed={railCollapsed}
-            onToggleCollapse={() => setRailCollapsed(!railCollapsed)}
-            projects={projects}
-            activeProjectId={activeTab.project.id}
-            onSelectProject={projectId => {
-              const project = projects.find(p => p.id === projectId);
-              if (project) {
-                openTab(project);
-              }
-            }}
-            hasFocus={isFocused('rail')}
-          />
-        </Box>
-
-        {/* Sessions/Tasks Pane (Middle) */}
         <SessionsPane
           isFocused={isFocused('sessions')}
           height={contentHeight}
           projectPath={activeTab.project.path}
-          onStorySelect={story => {
-            updateTab(activeTabId, {
-              selectedStory: story,
-              selectedStoryId: story?.id || null,
-            });
+          onStorySelect={handleStorySelect}
+          onStoryEnter={(story) => {
+            handleStorySelect(story);
+            updateTab(activeTabId, { workPaneView: 'details' });
           }}
           initialScrollIndex={activeTab.sessionsScrollIndex}
           initialSelectedStoryId={activeTab.selectedStoryId}
         />
 
-        {/* Work Pane (Right) */}
         <WorkPane
           isFocused={isFocused('work')}
           height={contentHeight}
@@ -722,11 +727,15 @@ export const App: React.FC = () => {
           agentTree={getAgentTree(activeTabId)}
           initialView={activeTab.workPaneView}
           initialScrollOffset={activeTab.workScrollOffset}
+          availableCLI={activeTab.availableCLI}
+          lastRunDuration={activeTab.lastRunDuration}
+          lastRunExitCode={activeTab.lastRunExitCode}
+          currentStory={activeTab.currentStory}
         />
       </Box>
 
       {/* Shortcuts Bar (Bottom) */}
-      <ShortcutsBar width={dimensions.columns} focusPane={focusPane} />
+      <ShortcutsBar width={dimensions.columns} focusPane={focusPane} workPaneView={activeTab.workPaneView} />
 
       {/* Welcome/Help Overlay */}
       <WelcomeOverlay
@@ -748,13 +757,12 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Project Picker (Ctrl+T) */}
       {showProjectPicker && (
         <ProjectPicker
           width={dimensions.columns}
           height={dimensions.rows}
-          projects={projects}
-          openProjectIds={tabs.map(t => t.project.id)}
+          projects={[]}
+          openProjectIds={tabs.map(t => t.project.path)}
           onSelect={project => {
             openTab(project);
             setShowProjectPicker(false);
@@ -782,8 +790,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Notification Toast (Top-right) */}
-      <NotificationToast notifications={notifications} terminalWidth={dimensions.columns} />
+
 
       {/* Command Palette (Ctrl+P or ':') */}
       {showCommandPalette && (
@@ -797,6 +804,8 @@ export const App: React.FC = () => {
           onCommandExecuted={trackCommandExecution}
         />
       )}
+
+      <NotificationToast notifications={notifications} terminalWidth={dimensions.columns} />
     </Box>
   );
 };

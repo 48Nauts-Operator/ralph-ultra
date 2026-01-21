@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '@hooks/useTheme';
 import type { TailscaleStatus } from '../remote/tailscale';
+import { getSystemStats, type SystemStats } from '@utils/system-stats';
 
 interface StatusBarProps {
   /** Current agent identifier (e.g., 'claude-sonnet-4-20250514') */
@@ -20,102 +21,124 @@ interface StatusBarProps {
  * Top status bar component showing branding, agent status, progress, and timer
  * Exactly 1 line height, spans full terminal width
  */
-export const StatusBar: React.FC<StatusBarProps> = ({
-  agentName,
-  progress = 0,
-  remoteConnections = 0,
-  tailscaleStatus = null,
-  width,
-}) => {
-  const { theme } = useTheme();
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+export const StatusBar: React.FC<StatusBarProps> = memo(
+  ({ agentName, progress = 0, remoteConnections = 0, tailscaleStatus = null, width }) => {
+    const { theme } = useTheme();
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [systemStats, setSystemStats] = useState<SystemStats>({
+      cpuUsage: 0,
+      memUsage: 0,
+      memTotal: 0,
+      memUsed: 0,
+      memFree: 0,
+    });
 
-  // Update timer every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsedSeconds(s => s + 1);
-    }, 1000);
+    useEffect(() => {
+      const TIMER_INTERVAL_MS = 5000;
+      const interval = setInterval(() => {
+        setElapsedSeconds(s => s + 5);
+        setSystemStats(getSystemStats());
+      }, TIMER_INTERVAL_MS);
 
-    return () => clearInterval(interval);
-  }, []);
+      setSystemStats(getSystemStats());
 
-  // Format elapsed time as HH:MM:SS
-  const formatTime = (totalSeconds: number): string => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
+      return () => clearInterval(interval);
+    }, []);
 
-  // Generate progress bar
-  const generateProgressBar = (percent: number, barWidth: number): string => {
-    const clampedPercent = Math.max(0, Math.min(100, percent));
-    const filled = Math.floor((clampedPercent / 100) * barWidth);
-    const empty = barWidth - filled;
-    return '█'.repeat(filled) + '░'.repeat(empty);
-  };
+    // Format elapsed time as HH:MM:SS
+    const formatTime = (totalSeconds: number): string => {
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
 
-  // Layout calculations
-  const version = 'v2.0.0';
-  const branding = `Ralph Ultra ${version}`;
-  const agent = agentName || 'Idle';
-  const progressBarWidth = 10;
-  const progressText = `${generateProgressBar(progress, progressBarWidth)} ${progress}%`;
-  const timer = formatTime(elapsedSeconds);
+    // Generate progress bar
+    const generateProgressBar = (percent: number, barWidth: number): string => {
+      const clampedPercent = Math.max(0, Math.min(100, percent));
+      const filled = Math.floor((clampedPercent / 100) * barWidth);
+      const empty = barWidth - filled;
+      return '█'.repeat(filled) + '░'.repeat(empty);
+    };
 
-  // Remote connection indicator
-  const remoteIcon = remoteConnections > 0 ? '●' : '○';
-  const remoteColor = remoteConnections > 0 ? theme.success : theme.muted;
-  const remoteText = `${remoteIcon} ${remoteConnections}`;
+    const version = 'v2.0.0';
+    const branding = `Ralph Ultra ${version}`;
+    const agent = agentName || 'Idle';
+    const progressBarWidth = 10;
+    const progressText = `${generateProgressBar(progress, progressBarWidth)} ${progress}%`;
+    const timer = formatTime(elapsedSeconds);
 
-  // Tailscale status indicator
-  const getTailscaleIcon = (): string => {
-    if (!tailscaleStatus) return '◌'; // Hollow circle - checking
-    if (!tailscaleStatus.isInstalled) return '○'; // Empty circle - not installed
-    if (!tailscaleStatus.isConnected) return '◐'; // Half-filled circle - disconnected
-    return '●'; // Filled circle - connected
-  };
+    const remoteIcon = remoteConnections > 0 ? '●' : '○';
+    const remoteColor = remoteConnections > 0 ? theme.success : theme.muted;
+    const remoteText = `${remoteIcon} ${remoteConnections}`;
 
-  const getTailscaleColor = () => {
-    if (!tailscaleStatus || !tailscaleStatus.isInstalled) return theme.muted;
-    if (!tailscaleStatus.isConnected) return theme.warning;
-    return theme.success;
-  };
+    const cpuColor =
+      systemStats.cpuUsage > 80
+        ? theme.error
+        : systemStats.cpuUsage > 50
+          ? theme.warning
+          : theme.success;
+    const memColor =
+      systemStats.memUsage > 80
+        ? theme.error
+        : systemStats.memUsage > 50
+          ? theme.warning
+          : theme.success;
+    const cpuText = `CPU:${systemStats.cpuUsage}%`;
+    const memText = `MEM:${systemStats.memUsed}G`;
 
-  const tailscaleIcon = getTailscaleIcon();
-  const tailscaleColor = getTailscaleColor();
+    // Tailscale status indicator
+    const getTailscaleIcon = (): string => {
+      if (!tailscaleStatus) return '◌'; // Hollow circle - checking
+      if (!tailscaleStatus.isInstalled) return '○'; // Empty circle - not installed
+      if (!tailscaleStatus.isConnected) return '◐'; // Half-filled circle - disconnected
+      return '●'; // Filled circle - connected
+    };
 
-  // Calculate spacing to distribute elements across the width
-  // Format: [branding] [spacing] [agent] [spacing] [progress] [spacing] [tailscale] [spacing] [remote] [spacing] [timer]
-  const contentWidth =
-    branding.length +
-    agent.length +
-    progressText.length +
-    1 + // tailscale icon
-    remoteText.length +
-    timer.length;
-  const totalSpacing = Math.max(0, width - contentWidth);
-  const spacing1 = Math.floor(totalSpacing * 0.2);
-  const spacing2 = Math.floor(totalSpacing * 0.2);
-  const spacing3 = Math.floor(totalSpacing * 0.2);
-  const spacing4 = Math.floor(totalSpacing * 0.2);
-  const spacing5 = totalSpacing - spacing1 - spacing2 - spacing3 - spacing4;
+    const getTailscaleColor = () => {
+      if (!tailscaleStatus || !tailscaleStatus.isInstalled) return theme.muted;
+      if (!tailscaleStatus.isConnected) return theme.warning;
+      return theme.success;
+    };
 
-  return (
-    <Box width={width}>
-      <Text bold color={theme.accent}>
-        {branding}
-      </Text>
-      <Text>{' '.repeat(spacing1)}</Text>
-      <Text color={theme.muted}>{agent}</Text>
-      <Text>{' '.repeat(spacing2)}</Text>
-      <Text color={theme.warning}>{progressText}</Text>
-      <Text>{' '.repeat(spacing3)}</Text>
-      <Text color={tailscaleColor}>{tailscaleIcon}</Text>
-      <Text>{' '.repeat(spacing4)}</Text>
-      <Text color={remoteColor}>{remoteText}</Text>
-      <Text>{' '.repeat(spacing5)}</Text>
-      <Text color={theme.success}>{timer}</Text>
-    </Box>
-  );
-};
+    const tailscaleIcon = getTailscaleIcon();
+    const tailscaleColor = getTailscaleColor();
+
+    const contentWidth =
+      branding.length +
+      agent.length +
+      progressText.length +
+      cpuText.length +
+      1 +
+      memText.length +
+      1 +
+      remoteText.length +
+      timer.length;
+    const totalSpacing = Math.max(0, width - contentWidth);
+    const numGaps = 6;
+    const baseSpacing = Math.floor(totalSpacing / numGaps);
+    const remainder = totalSpacing - baseSpacing * numGaps;
+
+    return (
+      <Box width={width}>
+        <Text bold color={theme.accent}>
+          {branding}
+        </Text>
+        <Text>{' '.repeat(baseSpacing)}</Text>
+        <Text color={theme.muted}>{agent}</Text>
+        <Text>{' '.repeat(baseSpacing)}</Text>
+        <Text color={theme.warning}>{progressText}</Text>
+        <Text>{' '.repeat(baseSpacing)}</Text>
+        <Text color={cpuColor}>{cpuText}</Text>
+        <Text> </Text>
+        <Text color={memColor}>{memText}</Text>
+        <Text>{' '.repeat(baseSpacing)}</Text>
+        <Text color={tailscaleColor}>{tailscaleIcon}</Text>
+        <Text>{' '.repeat(baseSpacing)}</Text>
+        <Text color={remoteColor}>{remoteText}</Text>
+        <Text>{' '.repeat(baseSpacing + remainder)}</Text>
+        <Text color={theme.success}>{timer}</Text>
+      </Box>
+    );
+  },
+);

@@ -21,31 +21,32 @@ export interface Project {
 /**
  * Focus states for the application
  */
-export type FocusPane = 'rail' | 'sessions' | 'work';
+export type FocusPane = 'tabs' | 'sessions' | 'work';
 
-/**
- * Complexity level for a user story
- */
 export type Complexity = 'simple' | 'medium' | 'complex';
 
-/**
- * A single user story from the PRD
- */
-export interface UserStory {
-  /** Unique identifier (e.g., "US-001") */
+export interface AcceptanceCriterion {
   id: string;
-  /** Short title of the story */
-  title: string;
-  /** Detailed description */
-  description: string;
-  /** List of acceptance criteria */
-  acceptanceCriteria: string[];
-  /** Complexity level */
-  complexity: Complexity;
-  /** Priority number (lower = higher priority) */
-  priority: number;
-  /** Whether the story has passed all checks */
+  text: string;
+  testCommand?: string;
   passes: boolean;
+  lastRun: string | null;
+}
+
+export type AcceptanceCriteria = string[] | AcceptanceCriterion[];
+
+export interface UserStory {
+  id: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: AcceptanceCriteria;
+  complexity: Complexity;
+  priority: number;
+  passes: boolean;
+}
+
+export function isTestableAC(ac: AcceptanceCriteria): ac is AcceptanceCriterion[] {
+  return ac.length > 0 && typeof ac[0] === 'object';
 }
 
 /**
@@ -65,7 +66,7 @@ export interface PRD {
 /**
  * Process state for a Ralph instance
  */
-export type ProcessState = 'idle' | 'running' | 'stopping';
+export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
 
 /**
  * Work pane view types
@@ -76,28 +77,21 @@ export type WorkView = 'monitor' | 'status' | 'details' | 'help' | 'tracing';
  * Complete state for a single tab/project
  */
 export interface TabState {
-  /** Unique identifier for this tab */
   id: string;
-  /** Project being monitored */
   project: Project;
-  /** Process state */
   processState: ProcessState;
-  /** Process error message (if any) */
   processError?: string;
-  /** Log lines from process output */
   logLines: string[];
-  /** Currently selected story */
   selectedStory: UserStory | null;
-  /** Selected story ID for persistence */
   selectedStoryId: string | null;
-  /** Sessions pane scroll index */
   sessionsScrollIndex: number;
-  /** Current work pane view */
   workPaneView: WorkView;
-  /** Work pane scroll offset */
   workScrollOffset: number;
-  /** Tracing pane selected node index */
   tracingNodeIndex: number;
+  availableCLI?: string | null;
+  lastRunDuration?: number | null;
+  lastRunExitCode?: number | null;
+  currentStory?: string | null;
 }
 
 /**

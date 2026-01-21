@@ -17,12 +17,17 @@ const FIRST_LAUNCH_FLAG = path.join(CONFIG_DIR, '.first-launch');
  */
 const SETTINGS_FILE = path.join(CONFIG_DIR, 'settings.json');
 
-/**
- * Settings structure
- */
+export interface SavedProject {
+  path: string;
+  name: string;
+  color: string;
+}
+
 export interface Settings {
   theme?: string;
   notificationSound?: boolean;
+  openProjects?: SavedProject[];
+  activeProjectPath?: string;
   [key: string]: unknown;
 }
 

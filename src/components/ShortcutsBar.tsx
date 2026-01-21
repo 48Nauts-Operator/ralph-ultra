@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '@hooks/useTheme';
 import type { FocusPane } from '../types';
@@ -13,43 +13,49 @@ interface ShortcutsBarProps {
   width: number;
   /** Currently focused pane (affects which shortcuts are shown) */
   focusPane?: FocusPane;
+  /** Current work pane view (for conditional shortcuts) */
+  workPaneView?: string;
 }
 
 /**
  * ShortcutsBar component - displays context-aware keyboard shortcuts
  * Single-line bar at the bottom of the screen showing available commands
  */
-export const ShortcutsBar: React.FC<ShortcutsBarProps> = ({ width, focusPane = 'rail' }) => {
+export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(({ width, focusPane = 'sessions', workPaneView }) => {
   const { theme } = useTheme();
 
-  // Base shortcuts that are always available (global)
   const globalShortcuts: ShortcutItem[] = [
-    { key: '[', description: 'Rail' },
+    { key: 'Tab', description: 'Focus' },
     { key: 'r', description: 'Run' },
     { key: 's', description: 'Stop' },
-    { key: ':', description: 'Cmd' },
+    { key: 'n', description: 'New Tab' },
+    { key: 't', description: 'Theme' },
     { key: '?', description: 'Help' },
     { key: 'q', description: 'Quit' },
   ];
 
-  // Context-specific shortcuts based on focused pane
   const contextShortcuts: Record<FocusPane, ShortcutItem[]> = {
-    rail: [
-      { key: '↑↓', description: 'Navigate' },
-      { key: 'Enter', description: 'Select' },
+    tabs: [
+      { key: '1-5', description: 'Switch Tab' },
     ],
     sessions: [
       { key: 'j/k', description: 'Navigate' },
       { key: 'Enter', description: 'View' },
     ],
     work: [
-      { key: 'Tab', description: 'Switch View' },
-      { key: '1-4', description: 'Jump' },
+      { key: '1-5', description: 'Views' },
+      { key: 'j/k', description: 'Scroll' },
     ],
   };
 
   // Combine global and context shortcuts
   const currentContextShortcuts = contextShortcuts[focusPane] || [];
+
+  // Add Test shortcut only when in details view
+  if (focusPane === 'work' && workPaneView === 'details') {
+    currentContextShortcuts.push({ key: 'T', description: 'Test' });
+  }
+
   const allShortcuts = [...currentContextShortcuts, ...globalShortcuts];
 
   // Render shortcuts with proper formatting
@@ -86,4 +92,4 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = ({ width, focusPane = '
       {shortcutsText}
     </Box>
   );
-};
+});

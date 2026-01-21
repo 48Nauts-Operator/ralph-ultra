@@ -1,22 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { readFileSync, watchFile, unwatchFile } from 'fs';
 import { join } from 'path';
 import { useTheme } from '@hooks/useTheme';
-import type { PRD, UserStory, Complexity } from '@types';
+import type { PRD, UserStory, Complexity, AcceptanceCriterion } from '@types';
+import { isTestableAC } from '@types';
 
 interface SessionsPaneProps {
-  /** Whether this pane is currently focused */
   isFocused: boolean;
-  /** Available height for the pane content */
   height: number;
-  /** Project directory path */
   projectPath: string;
-  /** Callback when a story is selected */
   onStorySelect?: (story: UserStory | null) => void;
-  /** Initial/restored scroll index for session restoration */
+  onStoryEnter?: (story: UserStory) => void;
   initialScrollIndex?: number;
-  /** Initial/restored selected story ID for session restoration */
   initialSelectedStoryId?: string | null;
 }
 
@@ -24,11 +20,12 @@ interface SessionsPaneProps {
  * Sessions/Tasks pane - displays user stories from prd.json
  * Shows project name, branch, and list of stories with status indicators
  */
-export const SessionsPane: React.FC<SessionsPaneProps> = ({
+export const SessionsPane: React.FC<SessionsPaneProps> = memo(({
   isFocused,
   height,
   projectPath,
   onStorySelect,
+  onStoryEnter,
   initialScrollIndex = 0,
   initialSelectedStoryId = null,
 }) => {
@@ -61,8 +58,9 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
   useEffect(() => {
     loadPRD();
 
+    const PRD_WATCH_INTERVAL_MS = 3000;
     const prdPath = join(projectPath, 'prd.json');
-    watchFile(prdPath, { interval: 1000 }, loadPRD);
+    watchFile(prdPath, { interval: PRD_WATCH_INTERVAL_MS }, loadPRD);
 
     return () => {
       unwatchFile(prdPath, loadPRD);
@@ -91,26 +89,33 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
   }, [prd, selectedIndex]);
 
   // Notify parent when selected story changes
+  const onStorySelectRef = useRef(onStorySelect);
+  onStorySelectRef.current = onStorySelect;
+  
   useEffect(() => {
-    if (prd && prd.userStories.length > 0 && onStorySelect) {
+    if (prd && prd.userStories.length > 0 && onStorySelectRef.current) {
       const story = prd.userStories[selectedIndex];
-      onStorySelect(story || null);
+      onStorySelectRef.current(story || null);
     }
-  }, [selectedIndex, prd, onStorySelect]);
+  }, [selectedIndex, prd]);
 
-  // Handle keyboard navigation (j/k and arrow keys)
   useInput(
     (input, key) => {
       if (!prd || prd.userStories.length === 0) return;
 
-      // Navigate down: j or down arrow
       if (input === 'j' || key.downArrow) {
         setSelectedIndex(prev => Math.min(prev + 1, prd.userStories.length - 1));
       }
 
-      // Navigate up: k or up arrow
       if (input === 'k' || key.upArrow) {
         setSelectedIndex(prev => Math.max(prev - 1, 0));
+      }
+
+      if (key.return) {
+        const story = prd.userStories[selectedIndex];
+        if (story && onStoryEnter) {
+          onStoryEnter(story);
+        }
       }
     },
     { isActive: isFocused },
@@ -151,11 +156,17 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
     }
   };
 
-  // Get status icon
   const getStatusIcon = (story: UserStory, index: number): string => {
     if (story.passes) return '[✓]';
     if (index === selectedIndex) return '[>]';
     return '[ ]';
+  };
+
+  const getACProgress = (story: UserStory): { passed: number; total: number } | null => {
+    if (!isTestableAC(story.acceptanceCriteria)) return null;
+    const criteria = story.acceptanceCriteria as AcceptanceCriterion[];
+    const passed = criteria.filter(ac => ac.passes).length;
+    return { passed, total: criteria.length };
   };
 
   // Calculate visible range for scrolling
@@ -181,6 +192,9 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
           const statusIcon = getStatusIcon(story, actualIndex);
           const statusColor = story.passes ? 'green' : isSelected ? 'yellow' : 'white';
 
+          const acProgress = getACProgress(story);
+          const { passed, total } = acProgress || { passed: 0, total: 0 };
+
           return (
             <Box key={story.id} flexDirection="row" gap={1}>
               <Text color={statusColor}>{statusIcon}</Text>
@@ -199,6 +213,11 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
                 {story.title}
               </Text>
               <Text color={getComplexityColor(story.complexity)}>[{story.complexity}]</Text>
+              {acProgress && (
+                <Text dimColor>
+                  {passed}/{total}
+                </Text>
+              )}
             </Box>
           );
         })}
@@ -215,4 +234,4 @@ export const SessionsPane: React.FC<SessionsPaneProps> = ({
       </Box>
     </Box>
   );
-};
+});

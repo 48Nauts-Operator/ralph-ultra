@@ -20,21 +20,28 @@ function createNewTab(project: Project): TabState {
     workPaneView: 'monitor',
     workScrollOffset: 0,
     tracingNodeIndex: 0,
+    availableCLI: null,
+    lastRunDuration: null,
+    lastRunExitCode: null,
+    currentStory: null,
   };
 }
 
 /**
  * Hook to manage multiple tabs with isolated state
  */
+function createInitialTabs(projects: Project[]): TabState[] {
+  return projects.slice(0, 5).map(p => createNewTab(p));
+}
+
 export function useTabs(projects: Project[], initialActiveId?: string) {
-  // Initialize with the first project as a tab
-  const firstProject = projects[0];
-  if (!firstProject) {
+  if (!projects.length) {
     throw new Error('At least one project is required');
   }
 
-  const [tabs, setTabs] = useState<TabState[]>([createNewTab(firstProject)]);
-  const [activeTabId, setActiveTabId] = useState<string>(initialActiveId || tabs[0]!.id);
+  const [initialTabs] = useState<TabState[]>(() => createInitialTabs(projects));
+  const [tabs, setTabs] = useState<TabState[]>(initialTabs);
+  const [activeTabId, setActiveTabId] = useState<string>(initialActiveId || initialTabs[0]?.id || '');
   const [ralphServices, setRalphServices] = useState<Map<string, RalphService>>(new Map());
   const [agentTrees, setAgentTrees] = useState<Map<string, AgentNode[]>>(new Map());
 
@@ -161,12 +168,18 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
 
         service = new RalphService(tab.project.path);
 
-        // Register callbacks
         service.onStatusChange(status => {
           updateTab(tabId, {
             processState: status.state,
             processError: status.error,
+            currentStory: status.currentStory ?? null,
+            lastRunDuration: status.duration ?? null,
+            lastRunExitCode: status.exitCode ?? null,
           });
+        });
+
+        updateTab(tabId, {
+          availableCLI: service.getAvailableCLI(),
         });
 
         service.onOutput((line, type) => {

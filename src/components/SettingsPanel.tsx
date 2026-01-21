@@ -19,17 +19,30 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
   const { soundEnabled, toggleSound } = useNotifications();
   const themeNames = Object.keys(themes) as ThemeName[];
 
-  // Handle keyboard input
   useInput(
     (input, key) => {
       if (input === 'q' || key.escape) {
         onClose();
-      } else if (input === '1') {
-        setTheme('nano-dark');
-      } else if (input === '2') {
-        setTheme('nano-light');
       } else if (input === 's') {
         toggleSound();
+      } else if (input === '0') {
+        // 0 = theme 10
+        const selectedTheme = themeNames[9];
+        if (selectedTheme) setTheme(selectedTheme);
+      } else if (input === '-') {
+        // - = theme 11
+        const selectedTheme = themeNames[10];
+        if (selectedTheme) setTheme(selectedTheme);
+      } else if (input === '=') {
+        // = = theme 12
+        const selectedTheme = themeNames[11];
+        if (selectedTheme) setTheme(selectedTheme);
+      } else {
+        const num = parseInt(input, 10);
+        if (num >= 1 && num <= 9 && num <= themeNames.length) {
+          const selectedTheme = themeNames[num - 1];
+          if (selectedTheme) setTheme(selectedTheme);
+        }
       }
     },
     { isActive: true },
@@ -75,62 +88,78 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
           </Text>
         </Box>
 
-        {/* Theme section */}
-        <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.foreground}>Theme:</Text>
-          <Box flexDirection="column" marginTop={1} marginLeft={2}>
-            {themeNames.map((name, index) => {
-              const isSelected = name === themeName;
-              const displayTheme = themes[name];
-              return (
-                <Box key={name} marginBottom={index < themeNames.length - 1 ? 1 : 0}>
-                  <Text color={isSelected ? theme.accent : theme.muted}>
-                    {isSelected ? '● ' : '○ '}
-                    {index + 1}. {displayTheme.name}
-                  </Text>
-                  {isSelected && <Text color={theme.success}> (active)</Text>}
-                </Box>
-              );
-            })}
+        <Box flexDirection="row" marginBottom={1}>
+          <Box flexDirection="column" width="50%">
+            <Text color={theme.foreground} bold>Themes (1-9, 0, -, =):</Text>
+            <Box flexDirection="column" marginTop={1}>
+              {themeNames.slice(0, 6).map((name, index) => {
+                const isSelected = name === themeName;
+                const displayTheme = themes[name];
+                return (
+                  <Box key={name}>
+                    <Text color={theme.accent} bold>{index + 1}</Text>
+                    <Text color={theme.muted}>. </Text>
+                    <Text color={isSelected ? theme.accent : theme.foreground} bold={isSelected}>
+                      {displayTheme.name}
+                    </Text>
+                    {isSelected && <Text color={theme.success}> ✓</Text>}
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+          <Box flexDirection="column" width="50%">
+            <Text> </Text>
+            <Box flexDirection="column" marginTop={1}>
+              {themeNames.slice(6, 12).map((name, index) => {
+                const isSelected = name === themeName;
+                const displayTheme = themes[name];
+                const keyNum = index + 7;
+                const keyDisplay = keyNum <= 9 ? String(keyNum) : keyNum === 10 ? '0' : keyNum === 11 ? '-' : '=';
+                return (
+                  <Box key={name}>
+                    <Text color={theme.accent} bold>{keyDisplay}</Text>
+                    <Text color={theme.muted}>. </Text>
+                    <Text color={isSelected ? theme.accent : theme.foreground} bold={isSelected}>
+                      {displayTheme.name}
+                    </Text>
+                    {isSelected && <Text color={theme.success}> ✓</Text>}
+                  </Box>
+                );
+              })}
+            </Box>
           </Box>
         </Box>
 
-        {/* Notification sound section */}
-        <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.foreground}>Notifications:</Text>
-          <Box marginTop={1} marginLeft={2}>
-            <Text color={soundEnabled ? theme.accent : theme.muted}>
-              {soundEnabled ? '● ' : '○ '}
-              Sound {soundEnabled ? 'ON' : 'OFF'}
-            </Text>
-            <Text color={theme.muted}> (press </Text>
-            <Text color={theme.accent}>s</Text>
-            <Text color={theme.muted}> to toggle)</Text>
+        <Box flexDirection="row" marginTop={1}>
+          <Box flexDirection="column" width="50%">
+            <Text color={theme.foreground} bold>Sound:</Text>
+            <Box marginTop={1}>
+              <Text color={theme.accent} bold>s</Text>
+              <Text color={theme.muted}>. </Text>
+              <Text color={soundEnabled ? theme.success : theme.muted}>
+                {soundEnabled ? '● ON' : '○ OFF'}
+              </Text>
+            </Box>
+          </Box>
+          <Box flexDirection="column" width="50%">
+            <Text color={theme.foreground} bold>Preview:</Text>
+            <Box marginTop={1} flexDirection="column">
+              <Text color={theme.accent}>■ Accent </Text>
+              <Text color={theme.accentSecondary}>■ Secondary </Text>
+              <Text><Text color={theme.success}>■</Text> <Text color={theme.warning}>■</Text> <Text color={theme.error}>■</Text> Status</Text>
+            </Box>
           </Box>
         </Box>
 
-        {/* Preview section */}
-        <Box flexDirection="column" marginTop={1} marginBottom={1}>
-          <Text color={theme.foreground}>Preview:</Text>
-          <Box marginTop={1} marginLeft={2} flexDirection="column">
-            <Text color={theme.accent}>Primary Accent (Mint)</Text>
-            <Text color={theme.accentSecondary}>Secondary Accent (Dirty Orange)</Text>
-            <Text color={theme.success}>Success</Text>
-            <Text color={theme.warning}>Warning</Text>
-            <Text color={theme.error}>Error</Text>
-            <Text color={theme.muted}>Muted Text</Text>
-          </Box>
-        </Box>
-
-        {/* Footer instructions */}
         <Box flexGrow={1} />
-        <Box borderStyle="single" borderColor={theme.border} paddingX={1}>
+        <Box paddingX={1}>
           <Text color={theme.muted}>Press </Text>
-          <Text color={theme.accent}>1-2</Text>
-          <Text color={theme.muted}> to select theme, </Text>
-          <Text color={theme.accent}>q</Text>
-          <Text color={theme.muted}> or </Text>
-          <Text color={theme.accent}>ESC</Text>
+          <Text color={theme.accent}>1-9, 0, -, =</Text>
+          <Text color={theme.muted}> for theme, </Text>
+          <Text color={theme.accent}>s</Text>
+          <Text color={theme.muted}> for sound, </Text>
+          <Text color={theme.accent}>q/ESC</Text>
           <Text color={theme.muted}> to close</Text>
         </Box>
       </Box>

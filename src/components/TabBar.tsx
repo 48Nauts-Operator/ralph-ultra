@@ -1,87 +1,111 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { useTheme } from '@hooks/useTheme';
 import type { TabState } from '../types';
 
 export interface TabBarProps {
-  /** Terminal width for layout calculations */
   width: number;
-  /** All open tabs */
   tabs: TabState[];
-  /** Currently active tab ID */
   activeTabId: string;
-  /** Callback when a tab is selected */
+  isFocused: boolean;
   onSelectTab: (tabId: string) => void;
 }
 
-/**
- * TabBar component - displays tabs below StatusBar when multiple projects are open
- * Only shown when 2+ projects are open
- */
-export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabId }) => {
+export const TabBar: React.FC<TabBarProps> = ({
+  width,
+  tabs,
+  activeTabId,
+  isFocused,
+  onSelectTab,
+}) => {
   const { theme } = useTheme();
 
-  // Don't show tab bar if only one tab is open
-  if (tabs.length <= 1) {
-    return null;
-  }
+  useInput(
+    (input, key) => {
+      const num = parseInt(input, 10);
+      if (num >= 1 && num <= Math.min(tabs.length, 9)) {
+        const tab = tabs[num - 1];
+        if (tab) {
+          onSelectTab(tab.id);
+        }
+      }
 
-  // Calculate available space for tabs
-  const maxTabWidth = 20; // Maximum width per tab
-  const minTabWidth = 12; // Minimum width per tab
-  const availableWidth = width - 2; // Account for border padding
-  const tabCount = Math.min(tabs.length, 5); // Maximum 5 tabs shown
+      const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+
+      if ((key.leftArrow || input === 'h') && currentIndex > 0) {
+        const prevTab = tabs[currentIndex - 1];
+        if (prevTab) {
+          onSelectTab(prevTab.id);
+        }
+      }
+
+      if ((key.rightArrow || input === 'l') && currentIndex < tabs.length - 1) {
+        const nextTab = tabs[currentIndex + 1];
+        if (nextTab) {
+          onSelectTab(nextTab.id);
+        }
+      }
+    },
+    { isActive: isFocused },
+  );
+
+  const maxTabWidth = 25;
+  const minTabWidth = 15;
+  const availableWidth = width - 4;
+  const tabCount = Math.min(tabs.length, 5);
   const tabWidth = Math.max(
     minTabWidth,
     Math.min(maxTabWidth, Math.floor(availableWidth / tabCount)),
   );
 
   return (
-    <Box
-      width={width}
-      borderStyle="single"
-      borderColor={theme.border}
-      paddingLeft={1}
-      paddingRight={1}
-    >
-      <Box>
-        {tabs.slice(0, 5).map((tab, index) => {
-          const isActive = tab.id === activeTabId;
-          const truncatedName =
-            tab.project.name.length > tabWidth - 4
-              ? tab.project.name.substring(0, tabWidth - 7) + '...'
-              : tab.project.name;
+    <Box width={width} height={1} paddingLeft={1}>
+      {isFocused && (
+        <Text color={theme.accent} bold>
+          ▶{' '}
+        </Text>
+      )}
+      {tabs.slice(0, 5).map((tab, index) => {
+        const isActive = tab.id === activeTabId;
+        const truncatedName =
+          tab.project.name.length > tabWidth - 6
+            ? tab.project.name.substring(0, tabWidth - 9) + '...'
+            : tab.project.name;
 
-          // Status indicator based on process state
-          let statusIndicator = ' ';
-          let statusColor = theme.muted;
-          if (tab.processState === 'running') {
-            statusIndicator = '▶';
-            statusColor = theme.success;
-          } else if (tab.processState === 'stopping') {
-            statusIndicator = '■';
-            statusColor = theme.warning;
-          } else if (tab.processError) {
-            statusIndicator = '✗';
-            statusColor = theme.error;
-          }
+        let statusIndicator = '○';
+        let statusColor = theme.muted;
+        if (tab.processState === 'running' || tab.processState === 'external') {
+          statusIndicator = '●';
+          statusColor = theme.success;
+        } else if (tab.processState === 'stopping') {
+          statusIndicator = '◐';
+          statusColor = theme.warning;
+        } else if (tab.processError) {
+          statusIndicator = '✗';
+          statusColor = theme.error;
+        }
 
-          return (
-            <Box key={tab.id} width={tabWidth} marginRight={1}>
-              <Text
-                bold={isActive}
-                color={isActive ? theme.accent : theme.foreground}
-                backgroundColor={isActive ? theme.border : undefined}
-              >
-                {' '}
-                <Text color={statusColor}>{statusIndicator}</Text> {truncatedName} {index + 1}{' '}
+        return (
+          <Box key={tab.id} marginRight={1}>
+            {isFocused && (
+              <Text color={theme.accent} bold>
+                [{index + 1}]
               </Text>
-            </Box>
-          );
-        })}
-      </Box>
+            )}
+            <Text color={statusColor}>{statusIndicator} </Text>
+            <Text
+              bold={isActive}
+              color={isActive ? theme.accent : theme.foreground}
+              underline={isActive}
+            >
+              {truncatedName}
+            </Text>
+            {isActive && !isFocused && <Text color={theme.accent}> ◀</Text>}
+            <Text> </Text>
+          </Box>
+        );
+      })}
 
-      {/* Show indicator if more than 5 tabs */}
       {tabs.length > 5 && (
         <Box marginLeft={1}>
           <Text color={theme.muted}>+{tabs.length - 5} more</Text>

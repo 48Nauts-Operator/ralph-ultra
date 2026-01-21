@@ -15,7 +15,16 @@ export interface Theme {
   borderFocused: string;
 }
 
-/**
- * Available theme names
- */
-export type ThemeName = 'nano-dark' | 'nano-light';
+export type ThemeName =
+  | 'nano-dark'
+  | 'nano-light'
+  | 'dracula'
+  | 'monokai'
+  | 'nord'
+  | 'solarized-dark'
+  | 'gruvbox'
+  | 'tokyo-night'
+  | 'catppuccin'
+  | 'one-dark'
+  | 'cyberpunk'
+  | 'github-dark';

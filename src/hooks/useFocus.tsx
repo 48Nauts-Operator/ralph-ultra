@@ -27,14 +27,11 @@ const FocusContext = createContext<FocusContextValue | undefined>(undefined);
 export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [focusPane, setFocusPane] = useState<FocusPane>('sessions');
 
-  /**
-   * Cycle focus through panes: rail -> sessions -> work -> rail
-   */
   const cycleFocus = useCallback(() => {
     setFocusPane(prev => {
-      if (prev === 'rail') return 'sessions';
       if (prev === 'sessions') return 'work';
-      return 'rail';
+      if (prev === 'work') return 'tabs';
+      return 'sessions';
     });
   }, []);
 
