@@ -8,6 +8,12 @@ import type { UserStory, AcceptanceCriterion } from '@types';
 import { runStoryTestsAndSave, type ACTestResult } from '../utils/ac-runner';
 import type { TailscaleStatus } from '../remote/tailscale';
 import { TracingPane, type AgentNode } from './TracingPane';
+import {
+  getSessionInfo,
+  formatCost,
+  formatTokens,
+  type SessionInfo,
+} from '../utils/session-tracker';
 
 /**
  * View types for the work pane
@@ -67,6 +73,11 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     const [testProgress, setTestProgress] = useState<{ current: number; total: number } | null>(
       null,
     );
+    const [sessionInfo, setSessionInfo] = useState<SessionInfo>({
+      model: null,
+      cost: { cost: 0, tokens: { input: 0, output: 0 } },
+      processes: [],
+    });
 
     // Update log content when logLines prop changes
     useEffect(() => {
@@ -112,6 +123,18 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
         unwatchFile(logPath, loadLog);
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectPath]);
+
+    useEffect(() => {
+      const updateSessionInfo = () => {
+        setSessionInfo(getSessionInfo(projectPath));
+      };
+
+      updateSessionInfo();
+      const SESSION_POLL_INTERVAL_MS = 10000;
+      const interval = setInterval(updateSessionInfo, SESSION_POLL_INTERVAL_MS);
+
+      return () => clearInterval(interval);
     }, [projectPath]);
 
     // Handle keyboard input for view switching and scrolling
@@ -582,6 +605,12 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
               {availableCLI || 'Not found'}
             </Text>
           </Text>
+          <Text>
+            <Text dimColor>Model: </Text>
+            <Text color={sessionInfo.model ? theme.success : theme.muted}>
+              {sessionInfo.model || 'Unknown'}
+            </Text>
+          </Text>
           {currentStory && (
             <Text>
               <Text dimColor>Current Story: </Text>
@@ -596,6 +625,40 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
                 : 'Not started'}
             </Text>
           </Text>
+          <Text> </Text>
+          <Text bold color={theme.accent}>
+            Session Cost
+          </Text>
+          <Text>
+            <Text dimColor>Total: </Text>
+            <Text color={theme.warning}>{formatCost(sessionInfo.cost.cost)}</Text>
+          </Text>
+          <Text>
+            <Text dimColor>Tokens: </Text>
+            <Text>
+              {formatTokens(sessionInfo.cost.tokens.input)} in /{' '}
+              {formatTokens(sessionInfo.cost.tokens.output)} out
+            </Text>
+          </Text>
+          <Text> </Text>
+          <Text bold color={theme.accent}>
+            Running Processes ({sessionInfo.processes.length})
+          </Text>
+          {sessionInfo.processes.length === 0 ? (
+            <Text dimColor>No Ralph processes running</Text>
+          ) : (
+            sessionInfo.processes.slice(0, 5).map((proc, i) => (
+              <Text key={i}>
+                <Text color={proc.status === 'attached' ? theme.success : theme.accent}>
+                  {proc.status === 'attached' ? '●' : '○'}
+                </Text>
+                <Text> {proc.name}</Text>
+              </Text>
+            ))
+          )}
+          {sessionInfo.processes.length > 5 && (
+            <Text dimColor>... and {sessionInfo.processes.length - 5} more</Text>
+          )}
           <Text> </Text>
           <Text bold color={theme.accent}>
             Remote Access
