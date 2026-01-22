@@ -461,8 +461,8 @@ export const App: React.FC = () => {
     {
       id: 'close-tab',
       label: 'Close Tab',
-      description: 'Close current tab',
-      shortcut: 'Ctrl+Shift+W',
+      description: 'Close current tab/project',
+      shortcut: 'e',
       category: 'Tabs',
       action: () => {
         if (tabs.length > 1) {
@@ -598,11 +598,15 @@ export const App: React.FC = () => {
         priority: KeyPriority.GLOBAL,
       },
       {
-        key: (_input: string, key: { ctrl?: boolean; shift?: boolean; name?: string }) =>
-          Boolean(key.ctrl && key.shift && key.name === 'w'),
+        key: (input: string, key: { ctrl?: boolean; shift?: boolean; name?: string }) =>
+          input === 'e' ||
+          Boolean(
+            key.ctrl &&
+            key.shift &&
+            (key.name === 'w' || key.name === 'W' || input.toLowerCase() === 'w'),
+          ),
         handler: () => {
           if (tabs.length > 1) {
-            // Check if Ralph is running
             if (activeTab.processState === 'running') {
               setTabToClose(activeTabId);
               setShowCloseConfirm(true);
