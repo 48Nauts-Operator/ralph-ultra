@@ -110,6 +110,113 @@ export RALPH_NANO_PATH="/path/to/ralph-nano/ralph.sh"
 
 ---
 
+## 📝 Creating a PRD
+
+Ralph Ultra uses **PRD files** (`prd.json`) to define what work needs to be done. Each PRD contains user stories with **testable acceptance criteria**.
+
+### Setup (One-Time)
+
+Copy the global AGENTS.md to your config directory:
+
+```bash
+# Create config directory
+mkdir -p ~/.config/opencode
+
+# Copy from ralph-ultra repo
+cp /path/to/ralph-ultra/AGENTS.md ~/.config/opencode/AGENTS.md
+```
+
+This file tells your AI assistant (Claude, OpenCode, etc.) how to create properly formatted PRDs.
+
+### Creating a PRD
+
+In your AI coding assistant, ask:
+
+```
+Create a PRD for [your project description]
+```
+
+**Example prompts:**
+
+- "Create a PRD for a todo app with user authentication"
+- "Write a PRD for adding dark mode to my React app"
+- "Make a prd.json for implementing a REST API"
+
+### What You Should Get
+
+The AI should generate a `prd.json` with this structure:
+
+```json
+{
+  "project": "my-project",
+  "description": "Project description",
+  "branchName": "ralph/my-project",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Initialize Project",
+      "description": "Set up the project structure",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001-1",
+          "text": "Package.json exists with dependencies",
+          "testCommand": "test -f package.json && grep -q 'dependencies' package.json",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-001-2",
+          "text": "TypeScript configured",
+          "testCommand": "test -f tsconfig.json",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "simple",
+      "passes": false
+    }
+  ]
+}
+```
+
+**Key requirement:** Every acceptance criterion MUST have a `testCommand` that exits 0 on success.
+
+### Common testCommand Patterns
+
+| Check             | Command                                |
+| ----------------- | -------------------------------------- |
+| File exists       | `test -f src/file.ts`                  |
+| Directory exists  | `test -d src/components`               |
+| Pattern in file   | `grep -q 'pattern' src/file.ts`        |
+| Multiple patterns | `grep -q 'a' f.ts && grep -q 'b' f.ts` |
+| Build passes      | `npm run build`                        |
+| Tests pass        | `npm test`                             |
+| Type check        | `npm run typecheck`                    |
+
+### Troubleshooting
+
+**Problem:** AI creates string arrays instead of testable criteria
+
+```json
+"acceptanceCriteria": ["User can log in", "Shows dashboard"]
+```
+
+**Solution:** Your `~/.config/opencode/AGENTS.md` is missing or outdated. Re-copy it from the ralph-ultra repo.
+
+---
+
+**Problem:** testCommand fails but the work is done
+
+**Solution:** The testCommand may be too strict or checking the wrong path. Edit the `prd.json` to fix the testCommand, then re-run Ralph.
+
+---
+
+**Problem:** Ralph skips stories or marks wrong ones complete
+
+**Solution:** Check that all `passes` fields are `false` in your `prd.json`. Ralph only works on stories where `passes: false`.
+
+---
+
 ## 📖 Usage
 
 ### Basic Navigation
