@@ -203,11 +203,17 @@ export const App: React.FC = () => {
     prevPassCountRef.current = passCount;
   }, [prd, notify, activeTab.project.path]);
 
-  // Check for first launch
+  // Always show welcome splash on startup
   useEffect(() => {
-    if (isFirstLaunch()) {
-      setShowWelcome(true);
-    }
+    setShowWelcome(true);
+    const SPLASH_DURATION_MS = 2000;
+    const timer = setTimeout(() => {
+      setShowWelcome(false);
+      if (isFirstLaunch()) {
+        markFirstLaunchComplete();
+      }
+    }, SPLASH_DURATION_MS);
+    return () => clearTimeout(timer);
   }, []);
 
   // Trigger notifications on process state changes

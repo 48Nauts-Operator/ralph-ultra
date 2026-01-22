@@ -42,23 +42,14 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
     return null;
   }
 
-  // ASCII art banner for Ralph Ultra
-  const asciiArt = [
-    '                                                            ',
-    '  ██████╗  █████╗ ██╗     ██████╗ ██╗  ██╗                  ',
-    '  ██╔══██╗██╔══██╗██║     ██╔══██╗██║  ██║                  ',
-    '  ██████╔╝███████║██║     ██████╔╝███████║                  ',
-    '  ██╔══██╗██╔══██║██║     ██╔═══╝ ██╔══██║                  ',
-    '  ██║  ██║██║  ██║███████╗██║     ██║  ██║                  ',
-    '  ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝                  ',
-    '                                                            ',
-    '  ██╗   ██╗██╗  ████████╗██████╗  █████╗                    ',
-    '  ██║   ██║██║  ╚══██╔══╝██╔══██╗██╔══██╗                   ',
-    '  ██║   ██║██║     ██║   ██████╔╝███████║                   ',
-    '  ██║   ██║██║     ██║   ██╔══██╗██╔══██║                   ',
-    '  ╚██████╔╝███████╗██║   ██║  ██║██║  ██║                   ',
-    '   ╚═════╝ ╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝                   ',
-    '                                                            ',
+  const logoText = [
+    '  ██████╗  █████╗ ██╗     ██████╗ ██╗  ██╗',
+    '  ██╔══██╗██╔══██╗██║     ██╔══██╗██║  ██║',
+    '  ██████╔╝███████║██║     ██████╔╝███████║',
+    '  ██╔══██╗██╔══██║██║     ██╔═══╝ ██╔══██║',
+    '  ██║  ██║██║  ██║███████╗██║     ██║  ██║',
+    '  ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝',
+    '       ╚ U L T R A  2 . 0 ╝              ',
   ];
 
   const tagline = '⚡ The Autonomous Coding Cockpit ⚡';
@@ -120,10 +111,10 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
         paddingX={2}
         paddingY={1}
       >
-        {/* ASCII Banner */}
+        {/* Logo Banner */}
         <Box flexDirection="column" alignItems="center" marginBottom={1}>
-          {asciiArt.map((line, i) => (
-            <Text key={i} color={theme.accent} bold>
+          {logoText.map((line, i) => (
+            <Text key={`logo-${i}`} color={theme.accent} bold>
               {line}
             </Text>
           ))}
