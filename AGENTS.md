@@ -24,6 +24,72 @@ with PRD-based workflows, multi-tab support, themes, and remote control via Tail
 └── 05-User-Docs/          # User documentation
 ```
 
+## PRD Creation Guidelines - Pragmatic Programmer Principles
+
+When creating PRDs for Ralph Ultra, follow these proven principles for better success rates:
+
+### 📐 Story Structure Principles
+
+#### 1. Tracer Bullet First
+The first user story should create a minimal end-to-end working skeleton:
+
+**✅ GOOD Example:**
+- US-001: Create basic API endpoint returning hardcoded data
+- US-002: Add database integration to API
+- US-003: Add authentication to API
+- US-004: Add caching layer
+
+**❌ BAD Example:**
+- US-001: Create complete API with auth, database, caching, and monitoring
+
+#### 2. DRY in User Stories
+Each story must have unique, non-overlapping scope:
+
+**✅ GOOD:** Each story adds one distinct capability
+**❌ BAD:** Multiple stories touching the same code
+
+#### 3. Orthogonal Stories
+Stories should be as independent as possible:
+
+**✅ GOOD:** Stories can be implemented in any order
+**❌ BAD:** Story B breaks if Story A isn't done first
+
+#### 4. Small Steps Principle
+Break features into small, verifiable increments:
+
+- **Simple** stories: 1-3 acceptance criteria
+- **Medium** stories: 3-5 acceptance criteria
+- **Complex** stories: 5-8 acceptance criteria (max)
+
+### ✅ Acceptance Criteria Best Practices
+
+1. **Testable**: Every criterion MUST have a `testCommand` that exits 0 on success
+2. **Specific**: No ambiguity allowed
+   - ❌ "System should be fast"
+   - ✅ "API response time < 200ms when tested with: `curl -w '%{time_total}'`"
+3. **Independent**: Each criterion tests one specific thing
+4. **Minimal**: Only test what this story adds, not previous functionality
+
+### 🚫 Anti-Patterns to Avoid
+
+- **Big Bang Stories**: Trying to implement everything at once
+- **Vague Criteria**: "It should work well", "Good performance"
+- **Untestable Criteria**: No test command provided
+- **Hidden Dependencies**: Story needs another but doesn't say so
+- **Gold Plating**: Adding requirements beyond the ask
+
+### 📊 Complexity Guidelines
+
+| Complexity | Scope | Files | Integration | Max ACs |
+|------------|-------|-------|-------------|---------|
+| Simple | Single feature, clear path | 1-2 | None | 3 |
+| Medium | Multi-file changes | 3-5 | Some | 5 |
+| Complex | Cross-cutting concerns | 6+ | Heavy | 8 |
+
+Remember: **Each story should be completable in one AI session**.
+
+---
+
 ## PRD Format (CRITICAL)
 
 When creating a PRD for Ralph Ultra, **you MUST use this exact format** with **testable acceptance criteria**:

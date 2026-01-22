@@ -1,6 +1,7 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
 import { readFileSync, existsSync, copyFileSync, mkdirSync } from 'fs';
 import { join, basename } from 'path';
+import { homedir } from 'os';
 import type { PRD, UserStory } from '../types';
 import { isTestableAC } from '../types';
 import { runStoryTestsAndSave, type ACTestResult } from './ac-runner';
@@ -236,7 +237,7 @@ export class RalphService {
     return prd.userStories.find(s => !s.passes) || null;
   }
 
-  private buildPrompt(story: UserStory, prd: PRD): string {
+  private buildPrompt(story: UserStory, _prd: PRD): string {
     let acText = '';
     if (isTestableAC(story.acceptanceCriteria)) {
       acText = story.acceptanceCriteria
@@ -246,7 +247,39 @@ export class RalphService {
       acText = story.acceptanceCriteria.map(ac => `- ${ac}`).join('\n');
     }
 
-    return `You are implementing a user story for the project "${prd.project}".
+    const customPrinciples = this.loadCustomPrinciples();
+
+    return `You are a pragmatic programmer implementing a user story.
+
+## Core Principles (Apply to ALL code you write)
+
+### 🎯 Design Principles
+- **DRY (Don't Repeat Yourself)**: Before writing new code, search for existing similar implementations. Never duplicate knowledge; every piece of logic should have a single source of truth.
+- **ETC (Easier To Change)**: Every decision should make future changes easier. Prefer flexibility over rigid solutions.
+- **Orthogonality**: Design components to be independent. Changes to one module should not affect unrelated modules.
+- **Match Existing Patterns**: Study the codebase first. Follow established conventions, naming patterns, and architectural decisions.
+
+### 🔨 Implementation Rules
+- **Tracer Bullets First**: For complex features, get a minimal end-to-end version working first, then iterate.
+- **Crash Early**: Fail fast with clear error messages. A dead program does less damage than a crippled one.
+- **Small Steps**: Make incremental changes. Verify each step works before proceeding.
+- **No Magic**: Understand WHY your code works, not just THAT it works. Don't use code you don't understand.
+
+### ✨ Code Quality
+- **Assertions**: Use assertions for conditions that "can't happen"
+- **Clear Naming**: Names should express intent. Rename immediately when intent shifts.
+- **No Broken Windows**: Don't leave bad code. Fix issues as you find them or add a TODO with explanation.
+- **Law of Demeter**: Avoid method chains like \`a.b().c().d()\`. Keep dependencies minimal.
+
+### 📋 Before Writing Code
+1. Search for existing similar code in the codebase using grep/find
+2. Understand the existing patterns and conventions
+3. Plan how your changes fit into the existing architecture
+4. Consider what tests are needed
+
+${customPrinciples ? `\n### 🔧 Project-Specific Principles\n${customPrinciples}\n` : ''}
+
+---
 
 ## User Story: ${story.id} - ${story.title}
 
@@ -258,13 +291,45 @@ ${acText}
 
 **Complexity:** ${story.complexity}
 
-## Instructions:
-1. Implement this user story completely
-2. Make sure all acceptance criteria are met
-3. Run any test commands to verify your implementation
-4. When done, summarize what you implemented
+---
 
-Start implementing now.`;
+## Instructions
+
+1. **Explore First**: Look at existing code that's similar to what you need to implement
+2. **Follow Patterns**: Match the existing codebase style and conventions exactly
+3. **Implement Incrementally**: Build the feature step by step, verifying as you go
+4. **Test Thoroughly**: Run all test commands to verify your implementation works
+5. **Clean Up**: Ensure no broken windows are left behind
+6. **Summarize**: When complete, describe what you implemented and any key decisions made
+
+Begin implementation now.`;
+  }
+
+  private loadCustomPrinciples(): string | null {
+    try {
+      const principlesPath = join(
+        homedir(),
+        '.config',
+        'ralph-ultra',
+        'principles.md'
+      );
+
+      if (existsSync(principlesPath)) {
+        const content = readFileSync(principlesPath, 'utf-8');
+        // Strip HTML comments and empty lines
+        const cleaned = content
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .split('\n')
+          .filter(line => line.trim())
+          .join('\n');
+
+        // Only return if there's meaningful content
+        return cleaned.length > 100 ? cleaned : null;
+      }
+    } catch (_error) {
+      // Silently fall back to defaults - no logging needed
+    }
+    return null;
   }
 
   private detectAICLI(): string | null {

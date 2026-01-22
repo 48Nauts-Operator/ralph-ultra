@@ -23,6 +23,7 @@ import {
   markFirstLaunchComplete,
   loadSettings,
   saveSettings,
+  ensurePrinciplesFile,
   type SavedProject,
 } from '../utils/config';
 import { RalphRemoteServer } from '../remote/server';
@@ -206,6 +207,9 @@ export const App: React.FC = () => {
   // Always show welcome splash on startup
   useEffect(() => {
     setShowWelcome(true);
+    // Ensure principles file exists on every startup
+    ensurePrinciplesFile();
+
     const SPLASH_DURATION_MS = 2000;
     const timer = setTimeout(() => {
       setShowWelcome(false);
