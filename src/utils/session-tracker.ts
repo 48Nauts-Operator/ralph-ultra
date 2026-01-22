@@ -42,17 +42,27 @@ export function getClaudeModel(projectPath: string): string | null {
   try {
     const files = readdirSync(projectDir)
       .filter(f => f.endsWith('.jsonl'))
-      .sort()
-      .reverse();
+      .map(f => ({ name: f, path: join(projectDir, f) }))
+      .sort((a, b) => {
+        try {
+          const aStat = require('fs').statSync(a.path);
+          const bStat = require('fs').statSync(b.path);
+          return bStat.mtime.getTime() - aStat.mtime.getTime();
+        } catch {
+          return 0;
+        }
+      });
 
     for (const file of files) {
-      const filePath = join(projectDir, file);
-      const content = readFileSync(filePath, 'utf-8');
+      const content = readFileSync(file.path, 'utf-8');
       const lines = content.split('\n').filter(l => l.trim());
 
       for (let i = lines.length - 1; i >= 0; i--) {
         try {
           const parsed = JSON.parse(lines[i] || '{}');
+          if (parsed.message?.model) {
+            return parsed.message.model;
+          }
           if (parsed.model) {
             return parsed.model;
           }
