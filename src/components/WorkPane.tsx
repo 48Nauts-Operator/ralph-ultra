@@ -302,17 +302,31 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
         }
       }
 
+      const isJsonOrCode = (l: string) =>
+        l.startsWith('{') ||
+        l.startsWith('[') ||
+        l.startsWith('"') ||
+        l.includes('tool_use_id') ||
+        l.includes('"type":') ||
+        l.includes('"message":') ||
+        l.includes('"content":') ||
+        /^\s*[)}{\[\]];?\s*$/.test(l) ||
+        /^\s*(const|let|var|function|import|export|await|return|if|for|while)\s/.test(l) ||
+        /^\s*\d+[→\-]/.test(l) ||
+        l.includes('# Mark as');
+
       const activityLines = lines
         .filter(
           l =>
-            l.includes('✓') ||
-            l.includes('✗') ||
-            l.includes('Starting') ||
-            l.includes('VERIFIED') ||
-            l.includes('FAILED') ||
-            l.includes('Moving') ||
-            l.includes('completed') ||
-            l.includes('PROJECT'),
+            !isJsonOrCode(l) &&
+            (l.includes('✓') ||
+              l.includes('✗') ||
+              l.includes('Starting') ||
+              l.includes('VERIFIED') ||
+              l.includes('FAILED') ||
+              l.includes('Moving') ||
+              l.includes('completed') ||
+              l.includes('PROJECT')),
         )
         .slice(-6);
       data.recentActivity = activityLines.map(l => l.replace(/[═─]/g, '').trim()).filter(Boolean);
