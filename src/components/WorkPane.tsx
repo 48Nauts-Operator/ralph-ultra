@@ -504,12 +504,13 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             <Text dimColor>Progress: </Text>
             {(() => {
               const pct = data.acTotal > 0 ? Math.round((data.acPassed / data.acTotal) * 100) : 0;
-              const barWidth = Math.min(20, boxWidth - 20);
-              const filled = Math.round((pct / 100) * barWidth);
+              const barWidth = Math.max(1, Math.min(20, boxWidth - 20));
+              const filled = Math.max(0, Math.min(barWidth, Math.round((pct / 100) * barWidth)));
+              const empty = Math.max(0, barWidth - filled);
               return (
                 <>
                   <Text color={theme.success}>{'█'.repeat(filled)}</Text>
-                  <Text dimColor>{'░'.repeat(barWidth - filled)}</Text>
+                  <Text dimColor>{'░'.repeat(empty)}</Text>
                   <Text> {pct}%</Text>
                 </>
               );
