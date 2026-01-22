@@ -43,20 +43,26 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
   }
 
   // ASCII art banner for Ralph Ultra
-  const banner = [
-    '╔═══════════════════════════════════════════════════════════╗',
-    '║                                                           ║',
-    '║   ██████╗  █████╗ ██╗     ██████╗ ██╗  ██╗              ║',
-    '║   ██╔══██╗██╔══██╗██║     ██╔══██╗██║  ██║              ║',
-    '║   ██████╔╝███████║██║     ██████╔╝███████║              ║',
-    '║   ██╔══██╗██╔══██║██║     ██╔═══╝ ██╔══██║              ║',
-    '║   ██║  ██║██║  ██║███████╗██║     ██║  ██║              ║',
-    '║   ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝              ║',
-    '║                                                           ║',
-    '║               ULTRA 2.0 - The Coding Cockpit             ║',
-    '║                                                           ║',
-    '╚═══════════════════════════════════════════════════════════╝',
+  const asciiArt = [
+    '                                                            ',
+    '  ██████╗  █████╗ ██╗     ██████╗ ██╗  ██╗                  ',
+    '  ██╔══██╗██╔══██╗██║     ██╔══██╗██║  ██║                  ',
+    '  ██████╔╝███████║██║     ██████╔╝███████║                  ',
+    '  ██╔══██╗██╔══██║██║     ██╔═══╝ ██╔══██║                  ',
+    '  ██║  ██║██║  ██║███████╗██║     ██║  ██║                  ',
+    '  ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝  ╚═╝                  ',
+    '                                                            ',
+    '  ██╗   ██╗██╗  ████████╗██████╗  █████╗                    ',
+    '  ██║   ██║██║  ╚══██╔══╝██╔══██╗██╔══██╗                   ',
+    '  ██║   ██║██║     ██║   ██████╔╝███████║                   ',
+    '  ██║   ██║██║     ██║   ██╔══██╗██╔══██║                   ',
+    '  ╚██████╔╝███████╗██║   ██║  ██║██║  ██║                   ',
+    '   ╚═════╝ ╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝                   ',
+    '                                                            ',
   ];
+
+  const tagline = '⚡ The Autonomous Coding Cockpit ⚡';
+  const version = 'v2.0.0';
 
   // Command categories
   const commands = {
@@ -115,12 +121,16 @@ export const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({
         paddingY={1}
       >
         {/* ASCII Banner */}
-        <Box flexDirection="column" marginBottom={1}>
-          {banner.map((line, i) => (
+        <Box flexDirection="column" alignItems="center" marginBottom={1}>
+          {asciiArt.map((line, i) => (
             <Text key={i} color={theme.accent} bold>
               {line}
             </Text>
           ))}
+          <Text color={theme.accentSecondary} bold>
+            {tagline}
+          </Text>
+          <Text dimColor>{version}</Text>
         </Box>
 
         {/* Commands organized by category */}
