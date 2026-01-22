@@ -81,6 +81,7 @@ export interface TabState {
   project: Project;
   processState: ProcessState;
   processError?: string;
+  processPid?: number;
   logLines: string[];
   selectedStory: UserStory | null;
   selectedStoryId: string | null;

@@ -17,6 +17,7 @@ export interface RalphStatus {
   acTestsPassed?: number;
   acTestsTotal?: number;
   storyPassed?: boolean;
+  pid?: number;
 }
 
 const MAX_RETRIES_PER_STORY = 3;
@@ -468,6 +469,7 @@ Start implementing now.`;
       state: this.state,
       startTime: this.startTime,
       currentStory: this.currentStoryId,
+      pid: this.process?.pid,
     };
   }
 

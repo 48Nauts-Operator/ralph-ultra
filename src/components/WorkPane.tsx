@@ -29,6 +29,7 @@ interface WorkPaneProps {
   logLines?: string[];
   processState?: string;
   processError?: string;
+  processPid?: number | null;
   tailscaleStatus?: TailscaleStatus | null;
   remoteURL?: string | null;
   agentTree?: AgentNode[];
@@ -54,6 +55,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     logLines = [],
     processState = 'idle',
     processError,
+    processPid = null,
     tailscaleStatus = null,
     remoteURL = null,
     agentTree = [],
@@ -592,6 +594,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           <Text>
             <Text dimColor>Process State: </Text>
             <Text color={stateColor}>{stateText}</Text>
+            {processPid && <Text dimColor> (PID {processPid})</Text>}
           </Text>
           {processError && (
             <Text>

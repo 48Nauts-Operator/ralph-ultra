@@ -18,7 +18,13 @@ import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
 import { useTabs } from '@hooks/useTabs';
 import { useMultiTabSession } from '@hooks/useMultiTabSession';
 import { useNotifications } from '@hooks/useNotifications';
-import { isFirstLaunch, markFirstLaunchComplete, loadSettings, saveSettings, type SavedProject } from '../utils/config';
+import {
+  isFirstLaunch,
+  markFirstLaunchComplete,
+  loadSettings,
+  saveSettings,
+  type SavedProject,
+} from '../utils/config';
 import { RalphRemoteServer } from '../remote/server';
 import { RalphHttpServer } from '../remote/http-server';
 import {
@@ -69,7 +75,7 @@ export const App: React.FC = () => {
   const getInitialProjects = (): Project[] => {
     const settings = loadSettings();
     const savedProjects = settings.openProjects;
-    
+
     if (savedProjects && savedProjects.length > 0) {
       return savedProjects.map((sp: SavedProject, index: number) => ({
         id: `proj-${index}-${Date.now()}`,
@@ -78,14 +84,16 @@ export const App: React.FC = () => {
         color: sp.color || '#7FFFD4',
       }));
     }
-    
+
     const currentPath = process.cwd();
-    return [{
-      id: 'proj-initial',
-      name: basename(currentPath),
-      path: currentPath,
-      color: '#7FFFD4',
-    }];
+    return [
+      {
+        id: 'proj-initial',
+        name: basename(currentPath),
+        path: currentPath,
+        color: '#7FFFD4',
+      },
+    ];
   };
 
   const {
@@ -108,7 +116,7 @@ export const App: React.FC = () => {
       name: tab.project.name,
       color: tab.project.color || '#7FFFD4',
     }));
-    
+
     const settings = loadSettings();
     settings.openProjects = projectsToSave;
     settings.activeProjectPath = activeTab.project.path;
@@ -685,8 +693,18 @@ export const App: React.FC = () => {
       {/* Status Bar (Top) */}
       <StatusBar
         width={dimensions.columns}
-        agentName={activeTab.processState === 'running' || activeTab.processState === 'external' ? 'claude-sonnet-4-20250514' : undefined}
-        progress={prd ? Math.round((prd.userStories.filter(s => s.passes).length / prd.userStories.length) * 100) : 0}
+        agentName={
+          activeTab.processState === 'running' || activeTab.processState === 'external'
+            ? 'claude-sonnet-4-20250514'
+            : undefined
+        }
+        progress={
+          prd
+            ? Math.round(
+                (prd.userStories.filter(s => s.passes).length / prd.userStories.length) * 100,
+              )
+            : 0
+        }
         remoteConnections={remoteConnections}
         tailscaleStatus={tailscaleStatus}
       />
@@ -705,7 +723,7 @@ export const App: React.FC = () => {
           height={contentHeight}
           projectPath={activeTab.project.path}
           onStorySelect={handleStorySelect}
-          onStoryEnter={(story) => {
+          onStoryEnter={story => {
             handleStorySelect(story);
             updateTab(activeTabId, { workPaneView: 'details' });
           }}
@@ -722,6 +740,7 @@ export const App: React.FC = () => {
           logLines={activeTab.logLines}
           processState={activeTab.processState}
           processError={activeTab.processError}
+          processPid={activeTab.processPid}
           tailscaleStatus={tailscaleStatus}
           remoteURL={remoteURL}
           agentTree={getAgentTree(activeTabId)}
@@ -735,7 +754,11 @@ export const App: React.FC = () => {
       </Box>
 
       {/* Shortcuts Bar (Bottom) */}
-      <ShortcutsBar width={dimensions.columns} focusPane={focusPane} workPaneView={activeTab.workPaneView} />
+      <ShortcutsBar
+        width={dimensions.columns}
+        focusPane={focusPane}
+        workPaneView={activeTab.workPaneView}
+      />
 
       {/* Welcome/Help Overlay */}
       <WelcomeOverlay
@@ -789,8 +812,6 @@ export const App: React.FC = () => {
           }}
         />
       )}
-
-
 
       {/* Command Palette (Ctrl+P or ':') */}
       {showCommandPalette && (

@@ -123,15 +123,19 @@ export function getClaudeSessionCost(projectPath: string): SessionCost {
 }
 
 export function getRalphProcesses(): RalphProcess[] {
+  const processes: RalphProcess[] = [];
+
   try {
-    const output = execSync('tmux list-sessions 2>/dev/null || true', {
+    const tmuxOutput = execSync('tmux list-sessions 2>/dev/null || true', {
       encoding: 'utf-8',
       timeout: 5000,
     });
 
-    const lines = output.split('\n').filter(l => l.includes('ralph-') || l.includes('tui-'));
+    const tmuxLines = tmuxOutput
+      .split('\n')
+      .filter(l => l.includes('ralph-') || l.includes('tui-'));
 
-    return lines.map(line => {
+    for (const line of tmuxLines) {
       const parts = line.split(':');
       const name = parts[0] || 'unknown';
       const isAttached = line.includes('(attached)');
@@ -143,15 +147,46 @@ export function getRalphProcesses(): RalphProcess[] {
         project = name.replace('tui-', '');
       }
 
-      return {
+      processes.push({
         name,
         project,
         status: isAttached ? 'attached' : 'running',
-      };
-    });
-  } catch {
-    return [];
+      });
+    }
+  } catch (_) {
+    void _;
   }
+
+  try {
+    const psOutput = execSync('pgrep -fl "claude|opencode|aider" 2>/dev/null || true', {
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+
+    const psLines = psOutput.split('\n').filter(l => l.trim());
+
+    for (const line of psLines) {
+      const match = line.match(/^(\d+)\s+(.+)$/);
+      if (match) {
+        const pid = match[1];
+        const cmd = match[2] || '';
+        const cliName = cmd.includes('claude')
+          ? 'claude'
+          : cmd.includes('opencode')
+            ? 'opencode'
+            : 'aider';
+        processes.push({
+          name: `${cliName} (PID ${pid})`,
+          project: 'active',
+          status: 'running',
+        });
+      }
+    }
+  } catch (_) {
+    void _;
+  }
+
+  return processes;
 }
 
 export function getSessionInfo(projectPath: string): SessionInfo {

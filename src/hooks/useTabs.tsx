@@ -41,7 +41,9 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
 
   const [initialTabs] = useState<TabState[]>(() => createInitialTabs(projects));
   const [tabs, setTabs] = useState<TabState[]>(initialTabs);
-  const [activeTabId, setActiveTabId] = useState<string>(initialActiveId || initialTabs[0]?.id || '');
+  const [activeTabId, setActiveTabId] = useState<string>(
+    initialActiveId || initialTabs[0]?.id || '',
+  );
   const [ralphServices, setRalphServices] = useState<Map<string, RalphService>>(new Map());
   const [agentTrees, setAgentTrees] = useState<Map<string, AgentNode[]>>(new Map());
 
@@ -172,6 +174,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
           updateTab(tabId, {
             processState: status.state,
             processError: status.error,
+            processPid: status.pid,
             currentStory: status.currentStory ?? null,
             lastRunDuration: status.duration ?? null,
             lastRunExitCode: status.exitCode ?? null,
