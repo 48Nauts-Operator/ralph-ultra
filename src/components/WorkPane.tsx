@@ -241,7 +241,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
 
       for (const line of lines) {
         if (line.includes('Starting ') && line.includes('═══')) {
-          const match = line.match(/Starting (US-\d+): (.+?) ═/);
+          const match = line.match(/Starting ([A-Z]+-\d+): (.+?) ═/);
           if (match) {
             data.currentStoryId = match[1] || null;
             data.currentStoryTitle = match[2] || null;
