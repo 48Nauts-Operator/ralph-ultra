@@ -1,0 +1,1220 @@
+cat prd.json
+{
+  "name": "RDY - Mentorship Program Course Tracking Platform",
+  "description": "A coaching and self-development platform with two applications: (1) Desktop/Web app for Superadmin, Admin, and Mentor management, (2) Mobile PWA for Mentees with simplified daily exercise tracking, calendar views, and reminder notifications.",
+  "version": "1.0.0",
+  "projectPath": "/home/stefan/projects/rdy",
+  "workingDirectory": "/home/stefan/projects/rdy",
+  "branchName": "ralph/rdy-foundation",
+  "ralphInstructions": {
+    "critical": [
+      "ALL work must be done in /home/stefan/projects/rdy directory",
+      "DO NOT work in /home/stefan/ralph-ultra directory",
+      "Change to project directory before ANY file operations: cd /home/stefan/projects/rdy",
+      "All file paths are relative to /home/stefan/projects/rdy",
+      "Verify you are in correct directory before starting work"
+    ]
+  },
+  "agentConfig": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "note": "Ralph uses Claude Sonnet 4 for balanced cost/quality. Oracle uses Opus for complex decisions."
+  },
+  "techStack": {
+    "frontend": "Next.js 14 (App Router) + React 18",
+    "backend": "Next.js API Routes + tRPC",
+    "database": "PostgreSQL + Drizzle ORM",
+    "auth": "Keycloak (shared instance at /home/stefan/infrastructure/keycloak)",
+    "ui": "Tailwind CSS + shadcn/ui",
+    "state": "Zustand + TanStack Query",
+    "i18n": "next-intl (DE primary, EN secondary)",
+    "ai": {
+      "note": "AI provider/model configurable in Settings by Admin (like Cerebro)",
+      "supported": ["anthropic", "gemini"],
+      "uses": [
+        "voice transcription",
+        "text translation",
+        "context generation",
+        "sentiment analysis"
+      ]
+    },
+    "push": "Web Push API with VAPID",
+    "storage": "Local file storage (uploads directory)"
+  },
+  "applications": {
+    "desktop": {
+      "name": "RDY Admin Dashboard",
+      "description": "Desktop-only web application for administration",
+      "users": ["superadmin", "admin"],
+      "features": [
+        "tenant management",
+        "user management",
+        "curriculum builder",
+        "class management",
+        "analytics",
+        "AI settings",
+        "system configuration"
+      ]
+    },
+    "mobile": {
+      "name": "RDY Mobile App",
+      "description": "Mobile-first PWA for mentors and mentees",
+      "users": ["mentor", "mentee"],
+      "mentorFeatures": [
+        "class overview",
+        "session scheduling",
+        "availability management",
+        "mentee diary viewing",
+        "calendar",
+        "notifications"
+      ],
+      "menteeFeatures": [
+        "daily calendar view",
+        "exercise scheduling",
+        "appointment shifting",
+        "weekly topic display",
+        "monthly schwerpunkt explanations",
+        "reminder notifications with tone",
+        "diary entries",
+        "session booking"
+      ]
+    }
+  },
+  "multiTenancy": {
+    "hierarchy": "Superadmin -> Tenant -> Admin -> Mentor -> Mentee",
+    "superadmin": "Creates and manages tenants (organizations)",
+    "admin": "Manages tenant content, users (mentors/mentees), classes",
+    "mentor": "Manages assigned classes, schedules sessions, views mentee progress",
+    "mentee": "Executes daily plan, tracks progress, journals"
+  },
+  "epics": [
+    {
+      "id": "E1",
+      "name": "Project Foundation",
+      "description": "Core infrastructure, Keycloak authentication, database setup, multi-tenancy"
+    },
+    {
+      "id": "E2",
+      "name": "Multi-Tenancy & User Management",
+      "description": "Tenant CRUD (superadmin), user management, role system (superadmin/admin/mentor/mentee), invitation system"
+    },
+    {
+      "id": "E3",
+      "name": "Content Structure",
+      "description": "Schwerpunktebenen (focus areas), weeks, exercises, and curriculum builder"
+    },
+    {
+      "id": "E4",
+      "name": "Class Management",
+      "description": "Classes, members, curriculum assignment, mentor-class relationships"
+    },
+    {
+      "id": "E5",
+      "name": "Desktop: Admin Dashboard",
+      "description": "Desktop-only management interface for superadmins and admins"
+    },
+    {
+      "id": "E6",
+      "name": "Mobile: Mentor & Mentee App",
+      "description": "Mobile-first PWA for mentors (scheduling, class view, diary access) and mentees (calendar, exercises, diary)"
+    },
+    {
+      "id": "E7",
+      "name": "Session Management",
+      "description": "1:1 and group sessions, availability slots, booking system, RSVP"
+    },
+    {
+      "id": "E8",
+      "name": "Diary & Journaling",
+      "description": "Text and voice diary entries, AI transcription, mentor access"
+    },
+    {
+      "id": "E9",
+      "name": "Push Notifications & Reminders",
+      "description": "Web Push setup, exercise reminders with tone, session reminders"
+    },
+    {
+      "id": "E10",
+      "name": "AI Integration & Settings",
+      "description": "AI provider configuration in Settings, transcription, translation, sentiment analysis"
+    },
+    {
+      "id": "E11",
+      "name": "Measurements & Analytics",
+      "description": "Progress tracking, pattern tracking, mood barometer, weekly summaries"
+    }
+  ],
+  "designSystem": {
+    "theme": "Twilight Studio - mindfulness and wellness aesthetic",
+    "colors": {
+      "primary": "#2F5B44 (Emerald mist)",
+      "secondary": "#8B7355 (Warm clay)",
+      "background": "#FFFFFF / #1A1A1A",
+      "foreground": "#1A1A1A / #F5F5F5"
+    },
+    "typography": {
+      "fontFamily": "Montserrat",
+      "headlines": "Light weight (300), uppercase, wide letter-spacing",
+      "body": "Regular weight (400)"
+    },
+    "style": "Clean, minimalist, white/simple design, mobile-first for mentee app"
+  },
+  "languages": [
+    {
+      "code": "de",
+      "name": "German",
+      "notes": "Primary language"
+    },
+    {
+      "code": "en",
+      "name": "English",
+      "notes": "Secondary language"
+    }
+  ],
+  "securityRequirements": {
+    "authentication": [
+      "Keycloak SSO (shared instance at https://auth.neonnidavellir.com)",
+      "JWT token management via NextAuth v5 (Auth.js)",
+      "Role-based access control (Superadmin, Admin, Mentor, Mentee)",
+      "Tenant isolation",
+      "SSL/TLS via Caddy reverse proxy"
+    ],
+    "dataProtection": [
+      "Parameterized queries only (Drizzle ORM)",
+      "Input sanitization",
+      "File upload validation",
+      "MIME type checking"
+    ],
+    "packageSecurity": {
+      "policy": "CRITICAL - Check all packages for vulnerabilities before installation",
+      "procedure": [
+        "1. Before installing ANY npm package, check for known vulnerabilities using npm audit",
+        "2. If vulnerabilities found, check previous versions going backwards chronologically",
+        "3. Install the newest version WITHOUT known vulnerabilities using npm install package@version",
+        "4. If NO safe version exists, find an alternative package or consult user",
+        "5. Run 'npm audit' after installation to verify no vulnerabilities were introduced",
+        "6. Document any security decisions in commit messages"
+      ],
+      "blockedPackages": [
+        "DO NOT use packages with high/critical vulnerabilities",
+        "DO NOT use deprecated packages without explicit approval"
+      ]
+    }
+  },
+  "keycloakConfig": {
+    "server": "https://auth.neonnidavellir.com",
+    "realm": "rdy",
+    "clientId": "rdy-app",
+    "appUrl": "https://rdy.neonnidavellir.com",
+    "localPort": 3001,
+    "roles": ["superadmin", "admin", "mentor", "mentee"],
+    "sharedInstance": {
+      "location": "/home/stefan/infrastructure/keycloak",
+      "internalPort": 8180,
+      "publicUrl": "https://auth.neonnidavellir.com",
+      "reverseProxy": "Caddy handles SSL termination at port 443",
+      "adminConsole": "https://auth.neonnidavellir.com/admin",
+      "adminCredentials": "See /home/stefan/infrastructure/keycloak/.env"
+    },
+    "currentStatus": {
+      "keycloakRunning": true,
+      "realmExists": false,
+      "clientConfigured": false,
+      "testUsersCreated": false,
+      "note": "S1.3 and S1.4 are marked as skipped - Ralph needs to implement these"
+    },
+    "ralphInstructions": {
+      "critical": [
+        "DO NOT install or modify /home/stefan/infrastructure/keycloak - it is SHARED across all projects",
+        "DO NOT restart Keycloak service - Cerebro is using it in production",
+        "USE the existing Keycloak instance at https://auth.neonnidavellir.com",
+        "ONLY create the 'rdy' realm and configure the 'rdy-app' client"
+      ],
+      "implementation": [
+        "1. Use the bootstrap script template at /home/stefan/infrastructure/keycloak/bootstrap.sh as reference",
+        "2. Create a RDY-specific bootstrap script at /home/stefan/projects/rdy/scripts/bootstrap-keycloak.sh",
+        "3. The script should: (a) Get admin token from Keycloak, (b) Create 'rdy' realm, (c) Create 'rdy-app' client with redirects for https://rdy.neonnidavellir.com and http://localhost:3001, (d) Create roles: superadmin, admin, mentor, mentee, (e) Create test users for each role",
+        "4. After running bootstrap, update .env.local with the generated client secret",
+        "5. Implement NextAuth v5 (Auth.js) configuration following Cerebro's pattern at /home/stefan/projects/Cerebro/src/lib/auth/",
+        "6. Test authentication flow locally before marking complete"
+      ],
+      "environment": {
+        "production": {
+          "KEYCLOAK_URL": "https://auth.neonnidavellir.com",
+          "NEXTAUTH_URL": "https://rdy.neonnidavellir.com"
+        },
+        "development": {
+          "KEYCLOAK_URL": "https://auth.neonnidavellir.com",
+          "NEXTAUTH_URL": "http://localhost:3001"
+        }
+      }
+    }
+  },
+  "contentStructure": {
+    "cycles": "Programs run in 3-month sprints",
+    "phases": "Divided into 3-week blocks (~20 days)",
+    "schwerpunktebenen": "Monthly focus themes with herkunft (origin) and ziel (goal)",
+    "weeks": "Weekly topics within each schwerpunktebene",
+    "exercises": "Video, audio, or text content with duration"
+  },
+  "userStories": [
+    {
+      "id": "S1.1",
+      "epicId": "E1",
+      "title": "Initialize Next.js Project with TypeScript",
+      "description": "Set up Next.js 14 with App Router, TypeScript strict mode, ESLint, Prettier, and Tailwind CSS. Configure project structure following Cerebro patterns.",
+      "priority": 1,
+      "acceptanceCriteria": [
+        "Next.js 14 with App Router initialized",
+        "TypeScript in strict mode",
+        "ESLint + Prettier configured",
+        "Tailwind CSS configured with Twilight Studio theme colors",
+        "npm run dev starts without errors",
+        "npm run build succeeds"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S1.2",
+      "epicId": "E1",
+      "title": "Set Up PostgreSQL with Drizzle ORM",
+      "description": "Configure PostgreSQL database connection and Drizzle ORM. Use docker-compose for local PostgreSQL. Create initial schema.",
+      "priority": 2,
+      "acceptanceCriteria": [
+        "docker-compose.yml for PostgreSQL in infrastructure/postgres",
+        "Drizzle ORM configured with PostgreSQL",
+        "Database connection with connection pooling",
+        "Environment variables for DB credentials",
+        "npm run db:push works"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S1.3",
+      "epicId": "E1",
+      "title": "Create Keycloak Realm for RDY",
+      "description": "Create 'rdy' realm in shared Keycloak. Configure client and create roles: superadmin, admin, mentor, mentee.",
+      "priority": 3,
+      "acceptanceCriteria": [
+        "Realm 'rdy' created in Keycloak",
+        "Client 'rdy-app' configured",
+        "Redirect URIs set for localhost:3000",
+        "Roles created: superadmin, admin, mentor, mentee",
+        "Client authentication configured"
+      ],
+      "technicalNotes": {
+        "keycloakLocation": "/home/stefan/infrastructure/keycloak",
+        "port": 8180,
+        "adminConsole": "http://localhost:8180/admin"
+      },
+      "passes": false,
+      "skipped": false,
+      "ralphNotes": {
+        "status": "READY TO IMPLEMENT",
+        "existingWork": [
+          "PostgreSQL container running on port 5434",
+          "Drizzle schema created with tenants and users tables",
+          "tRPC v10 installed and configured with base routers",
+          "shadcn/ui installed with Twilight Studio theme",
+          ".env.local configured with placeholder Keycloak URLs"
+        ],
+        "nextSteps": [
+          "1. Study Cerebro's auth implementation at /home/stefan/projects/Cerebro/src/lib/auth/",
+          "2. Create bootstrap script at scripts/bootstrap-keycloak.sh based on /home/stefan/infrastructure/keycloak/bootstrap.sh",
+          "3. Run bootstrap script to create 'rdy' realm and client",
+          "4. Update .env.local with generated client secret",
+          "5. Mark S1.3 as passes: true"
+        ],
+        "criticalWarning": "DO NOT modify /home/stefan/infrastructure/keycloak - it is shared with Cerebro production"
+      }
+    },
+    {
+      "id": "S1.4",
+      "epicId": "E1",
+      "title": "Integrate Keycloak Authentication",
+      "description": "Set up Keycloak integration using next-auth. Implement login/logout flows, JWT validation, and role-based middleware for all four roles.",
+      "priority": 4,
+      "acceptanceCriteria": [
+        "Keycloak client configuration",
+        "Login/logout flows working",
+        "Session management with JWT",
+        "Role-based middleware (Superadmin, Admin, Mentor, Mentee)",
+        "Protected routes redirect unauthenticated users",
+        "User info available in React context"
+      ],
+      "passes": false,
+      "skipped": false,
+      "ralphNotes": {
+        "status": "BLOCKED BY S1.3",
+        "dependencies": ["S1.3 must be completed first"],
+        "implementation": [
+          "Use NextAuth v5 (Auth.js) - check for latest stable version without vulnerabilities",
+          "Follow Cerebro's auth pattern at /home/stefan/projects/Cerebro/src/lib/auth/",
+          "Create auth configuration at src/lib/auth/config.ts",
+          "Implement Keycloak provider with role mapping",
+          "Create protected route middleware",
+          "Test login/logout flows locally"
+        ],
+        "testUsers": {
+          "note": "Bootstrap script should create these test users",
+          "users": [
+            { "username": "testsuperadmin", "password": "Super1234!", "role": "superadmin" },
+            { "username": "testadmin", "password": "Admin1234!", "role": "admin" },
+            { "username": "testmentor", "password": "Mentor1234!", "role": "mentor" },
+            { "username": "testmentee", "password": "Mentee1234!", "role": "mentee" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "S1.5",
+      "epicId": "E1",
+      "title": "Set Up tRPC with Type-Safe API",
+      "description": "Configure tRPC for type-safe API communication. Create base routers. Integrate with TanStack Query.",
+      "priority": 5,
+      "acceptanceCriteria": [
+        "tRPC server configured with Next.js",
+        "Base routers created (tenants, users, classes, exercises)",
+        "tRPC client with TanStack Query hooks",
+        "Error handling middleware",
+        "Type inference working end-to-end"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S1.6",
+      "epicId": "E1",
+      "title": "Install and Configure shadcn/ui Components",
+      "description": "Set up shadcn/ui component library with Twilight Studio theme. Install core components.",
+      "priority": 6,
+      "acceptanceCriteria": [
+        "shadcn/ui CLI configured",
+        "Core components installed (Button, Card, Dialog, Input, Select, Table, Tabs, Calendar)",
+        "Twilight Studio theme customization working",
+        "Dark mode support",
+        "Montserrat font configured"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S2.1",
+      "epicId": "E2",
+      "title": "Create Tenant Database Schema",
+      "description": "Implement tenants table for multi-tenancy. Each tenant represents an organization using the platform.",
+      "priority": 7,
+      "acceptanceCriteria": [
+        "Tenants table with id, name, slug, settings",
+        "Logo and branding fields",
+        "Status (active/disabled)",
+        "Created/updated timestamps",
+        "All other tables include tenant_id foreign key"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S2.2",
+      "epicId": "E2",
+      "title": "Create User Database Schema",
+      "description": "Implement users table with role enum (superadmin, admin, mentor, mentee), tenant association, and profile fields.",
+      "priority": 8,
+      "acceptanceCriteria": [
+        "Users table with all required fields",
+        "Role enum (superadmin, admin, mentor, mentee)",
+        "Tenant_id foreign key (null for superadmin)",
+        "Self-referencing mentor_id for mentee-mentor relationship",
+        "Address fields (address, plz, city)",
+        "Created/updated timestamps"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S2.3",
+      "epicId": "E2",
+      "title": "Build Superadmin Tenant Management",
+      "description": "Create superadmin-only interface for creating and managing tenants.",
+      "priority": 9,
+      "acceptanceCriteria": [
+        "Superadmin-only access enforced",
+        "Tenant list with search/filter",
+        "Create tenant form",
+        "Edit tenant settings",
+        "Enable/disable tenant",
+        "View tenant usage statistics"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S2.4",
+      "epicId": "E2",
+      "title": "Build Admin User Management Page",
+      "description": "Create admin interface for managing users within their tenant. Admins manage mentors and mentees.",
+      "priority": 10,
+      "acceptanceCriteria": [
+        "User list page at /admin/users",
+        "Filter by role (mentor, mentee)",
+        "Search by name/email",
+        "Role assignment (mentor or mentee only)",
+        "Mentor assignment for mentees",
+        "Pagination"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S2.5",
+      "epicId": "E2",
+      "title": "Implement Invitation System",
+      "description": "Create invitation system for onboarding new users. Support email invitations with role pre-assignment.",
+      "priority": 11,
+      "acceptanceCriteria": [
+        "Invitations table in database",
+        "Create invitation with role and expiry",
+        "Invitation status tracking (pending, accepted, expired, revoked)",
+        "Resend and revoke functionality",
+        "Admin invitation management page"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S2.6",
+      "epicId": "E2",
+      "title": "Build Admin View Switcher",
+      "description": "Allow admins to switch view to Mentor or Mentee perspective. Superadmins can also switch to Admin view.",
+      "priority": 12,
+      "acceptanceCriteria": [
+        "View switcher component in header",
+        "Superadmin: Admin, Mentor, Mentee views",
+        "Admin: Mentor, Mentee views",
+        "Persist selection in localStorage",
+        "UI adapts based on selected view"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S3.1",
+      "epicId": "E3",
+      "title": "Create Schwerpunktebenen Schema and CRUD",
+      "description": "Implement focus areas (Schwerpunktebenen) table. These are monthly themes in the 3-month program cycle.",
+      "priority": 13,
+      "acceptanceCriteria": [
+        "Schwerpunktebenen table with tenant_id",
+        "Fields: title, description, herkunft, ziel (all bilingual)",
+        "Month number (1-3 for 3-month cycle)",
+        "Image URL support",
+        "Full CRUD API endpoints",
+        "Admin management page"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S3.2",
+      "epicId": "E3",
+      "title": "Create Weeks Schema and CRUD",
+      "description": "Implement weeks table belonging to Schwerpunktebenen. Each phase has ~3 weeks.",
+      "priority": 14,
+      "acceptanceCriteria": [
+        "Weeks table with foreign key to schwerpunktebenen",
+        "Week number and ordering",
+        "Bilingual fields (title, description, herkunft, ziel)",
+        "Measurement type and question fields",
+        "Reorder functionality"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S3.3",
+      "epicId": "E3",
+      "title": "Create Exercises Schema and CRUD",
+      "description": "Implement exercises table with support for video, audio, and text content. This is the content library.",
+      "priority": 15,
+      "acceptanceCriteria": [
+        "Exercises table with tenant_id",
+        "Type enum (video, audio, text)",
+        "Bilingual fields",
+        "Duration in minutes",
+        "Media URLs (video_url, audio_url)",
+        "Text content field",
+        "Admin exercise management page"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S3.4",
+      "epicId": "E3",
+      "title": "Build Week-Exercise Relationships",
+      "description": "Create weekExercises junction table linking weeks to exercises with ordering and frequency.",
+      "priority": 16,
+      "acceptanceCriteria": [
+        "weekExercises table with foreign keys",
+        "Order index for sequencing",
+        "Obligatory vs optional flag",
+        "Frequency settings (daily/weekly/custom)",
+        "API to add/remove exercises from weeks"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S3.5",
+      "epicId": "E3",
+      "title": "Build Curriculum Builder UI",
+      "description": "Create visual curriculum builder for admins to structure the 3-month program: Schwerpunktebenen > Weeks > Exercises.",
+      "priority": 17,
+      "acceptanceCriteria": [
+        "Hierarchical view: Schwerpunktebene > Weeks > Exercises",
+        "Drag-and-drop reordering",
+        "Mark exercises as obligatory/optional",
+        "Preview mode showing full program flow",
+        "Bilingual content entry with AI translation"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S4.1",
+      "epicId": "E4",
+      "title": "Create Classes Schema",
+      "description": "Implement classes table with mentor assignment and duration settings.",
+      "priority": 18,
+      "acceptanceCriteria": [
+        "Classes table with tenant_id",
+        "Mentor foreign key",
+        "Status enum (active, disabled)",
+        "Duration (default 3 months)",
+        "Start/end dates",
+        "Session configuration (monthly counts, duration)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S4.2",
+      "epicId": "E4",
+      "title": "Create Class Members Schema",
+      "description": "Implement classMembers junction table for mentee enrollment with payment tracking.",
+      "priority": 19,
+      "acceptanceCriteria": [
+        "classMembers table with user/class foreign keys",
+        "Enrollment and completion timestamps",
+        "Payment fields (paid, amount, due_date)",
+        "Unique constraint on class_id + user_id"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S4.3",
+      "epicId": "E4",
+      "title": "Implement Class Curriculum Assignment",
+      "description": "Link schwerpunktebenen to classes by month. This assigns the curriculum template to a class.",
+      "priority": 20,
+      "acceptanceCriteria": [
+        "classCurriculum table linking classes to schwerpunktebenen",
+        "Month-based assignment (month 1, 2, 3)",
+        "API endpoints for curriculum CRUD",
+        "Mentor can customize curriculum per class"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S5.1",
+      "epicId": "E5",
+      "title": "Build Superadmin Dashboard",
+      "description": "Create superadmin dashboard showing all tenants and system-wide statistics. Desktop only.",
+      "priority": 21,
+      "acceptanceCriteria": [
+        "Dashboard at /superadmin/dashboard",
+        "Tenant list with status",
+        "System-wide user counts",
+        "Recent tenant activity",
+        "Quick action buttons"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S5.2",
+      "epicId": "E5",
+      "title": "Build Admin Dashboard",
+      "description": "Create admin dashboard showing tenant overview statistics. Desktop only.",
+      "priority": 22,
+      "acceptanceCriteria": [
+        "Dashboard at /admin/dashboard",
+        "User count by role (mentors, mentees)",
+        "Active classes count",
+        "Recent activity feed",
+        "Quick action buttons"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S5.3",
+      "epicId": "E5",
+      "title": "Build Admin Class Management",
+      "description": "Create class listing and detail pages for admin management. Desktop only.",
+      "priority": 23,
+      "acceptanceCriteria": [
+        "Class list with filters (status, mentor)",
+        "Class detail page with members",
+        "Create/edit class forms",
+        "Member add/remove functionality",
+        "Curriculum assignment UI"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S5.4",
+      "epicId": "E5",
+      "title": "Build Admin Analytics Page",
+      "description": "Create analytics dashboard for admins showing tenant-wide metrics. Desktop only.",
+      "priority": 24,
+      "acceptanceCriteria": [
+        "Exercise completion rates across tenant",
+        "Session utilization metrics",
+        "Mentor workload overview",
+        "Mentee progress aggregates"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.1",
+      "epicId": "E6",
+      "title": "Create Scheduled Exercises Schema",
+      "description": "Implement scheduledExercises table for tracking mentee exercise occurrences.",
+      "priority": 25,
+      "acceptanceCriteria": [
+        "scheduledExercises table",
+        "User, exercise, class foreign keys",
+        "Scheduled datetime",
+        "Completion tracking (completed, completed_at)",
+        "Notes field"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.2",
+      "epicId": "E6",
+      "title": "Create Weekly Recurring Exercises Schema",
+      "description": "Implement recurring exercise patterns for daily routines.",
+      "priority": 26,
+      "acceptanceCriteria": [
+        "weeklyRecurringExercises table",
+        "Default time field",
+        "Applicable days (1-7 for Mon-Sun)",
+        "Active from/through dates",
+        "Duration minutes"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.3",
+      "epicId": "E6",
+      "title": "Build Mobile App Shell and Navigation",
+      "description": "Create the mobile PWA shell with bottom navigation for mentor and mentee views.",
+      "priority": 27,
+      "acceptanceCriteria": [
+        "PWA manifest configured",
+        "Bottom navigation component",
+        "Role-based navigation items (mentor vs mentee)",
+        "Mobile-optimized layout",
+        "Add to Home Screen support"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.4",
+      "epicId": "E6",
+      "title": "Build Mentor Mobile Dashboard",
+      "description": "Create mobile dashboard for mentors showing classes and upcoming sessions.",
+      "priority": 28,
+      "acceptanceCriteria": [
+        "My classes list with mentee counts",
+        "Today's sessions highlighted",
+        "Upcoming sessions list",
+        "Quick action buttons",
+        "Pull to refresh"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.5",
+      "epicId": "E6",
+      "title": "Build Mentor Mobile Calendar",
+      "description": "Create mobile calendar for mentors to view and manage sessions.",
+      "priority": 29,
+      "acceptanceCriteria": [
+        "Monthly calendar view optimized for mobile",
+        "Sessions displayed as dots/indicators",
+        "Tap day to see session list",
+        "Create session from calendar",
+        "Swipe to navigate months"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.6",
+      "epicId": "E6",
+      "title": "Build Mentor Mobile Availability Management",
+      "description": "Allow mentors to set and manage availability slots from mobile.",
+      "priority": 30,
+      "acceptanceCriteria": [
+        "View existing availability slots",
+        "Add new availability slot",
+        "Delete slot with swipe",
+        "Bulk add slots for recurring times"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.7",
+      "epicId": "E6",
+      "title": "Build Mentor Mobile Class View",
+      "description": "Create mobile view for mentors to see class details and mentee progress.",
+      "priority": 31,
+      "acceptanceCriteria": [
+        "Class detail with enrolled mentees",
+        "Mentee progress indicators",
+        "Tap mentee to view diary",
+        "Session history for class"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.8",
+      "epicId": "E6",
+      "title": "Build Mentee Daily Calendar View",
+      "description": "Create mobile-first daily view showing today's exercises with times.",
+      "priority": 32,
+      "acceptanceCriteria": [
+        "Daily view as default for mentees",
+        "Exercises listed with scheduled times",
+        "Obligatory exercises highlighted",
+        "Optional exercises available to add",
+        "Completion checkboxes",
+        "Video/audio popup on tap"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.9",
+      "epicId": "E6",
+      "title": "Build Mentee Weekly Calendar View",
+      "description": "Create weekly view for mentees to see and plan the full week.",
+      "priority": 33,
+      "acceptanceCriteria": [
+        "Weekly calendar grid",
+        "Week theme displayed prominently",
+        "All scheduled exercises visible",
+        "Tap to see day detail",
+        "Navigate between weeks"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.10",
+      "epicId": "E6",
+      "title": "Build Exercise Time Setting UI",
+      "description": "Create scroll wheel time picker for setting exercise times. Support bulk setting for the week.",
+      "priority": 34,
+      "acceptanceCriteria": [
+        "Scroll wheel time picker (not drag-and-drop for time)",
+        "Set time for individual exercise",
+        "Bulk set time for whole week",
+        "Duration adjustment",
+        "Conflict detection/warning"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.11",
+      "epicId": "E6",
+      "title": "Implement Appointment Shifting",
+      "description": "Allow mentees to move exercises to different days via drag-and-drop.",
+      "priority": 35,
+      "acceptanceCriteria": [
+        "Drag-and-drop to move exercise to different day",
+        "Visual feedback during drag",
+        "Automatic save on drop",
+        "Option to update single occurrence or series"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.12",
+      "epicId": "E6",
+      "title": "Display Weekly Topic and Monthly Schwerpunkt",
+      "description": "Show current week's theme and monthly focus area explanations to mentees.",
+      "priority": 36,
+      "acceptanceCriteria": [
+        "Weekly topic card at top of calendar",
+        "Monthly Schwerpunktebene explanation accessible",
+        "Herkunft (background) displayed",
+        "Ziel (goal) displayed",
+        "Bilingual support (DE/EN toggle)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S6.13",
+      "epicId": "E6",
+      "title": "Build Exercise Execution View",
+      "description": "Create the view shown when mentee executes an exercise - video/audio player with completion.",
+      "priority": 37,
+      "acceptanceCriteria": [
+        "Video player for video exercises",
+        "Audio player for audio exercises",
+        "Text display for text exercises",
+        "Mark as Done button",
+        "Skip explanation option for advanced users",
+        "Notes field after completion"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S7.1",
+      "epicId": "E7",
+      "title": "Create Sessions Schema",
+      "description": "Implement mentoringSessions table supporting both 1:1 and group sessions.",
+      "priority": 34,
+      "acceptanceCriteria": [
+        "mentoringSessions table with all fields",
+        "Session type enum (1on1, group)",
+        "Status enum (scheduled, available, booked, completed, cancelled)",
+        "Meeting link field",
+        "Summary fields with voice flag"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S7.2",
+      "epicId": "E7",
+      "title": "Build Mentor Availability Slots",
+      "description": "Create availability slot management for 1:1 session booking.",
+      "priority": 35,
+      "acceptanceCriteria": [
+        "Availability slots table",
+        "Slot creation UI for mentors",
+        "Bulk slot creation",
+        "Delete/edit slot functionality",
+        "Calendar integration"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S7.3",
+      "epicId": "E7",
+      "title": "Build Mentee Session Booking",
+      "description": "Create booking flow for mentees to book available mentor slots.",
+      "priority": 36,
+      "acceptanceCriteria": [
+        "View available slots in mentee app",
+        "Book slot with confirmation",
+        "Booking cancellation",
+        "Monthly session limit enforcement",
+        "Booking shown in calendar"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S7.4",
+      "epicId": "E7",
+      "title": "Build Group Session Management",
+      "description": "Create UI for mentors to create group sessions with RSVP.",
+      "priority": 37,
+      "acceptanceCriteria": [
+        "Create group session form",
+        "Associate with class",
+        "RSVP tracking (pending, accepted, declined)",
+        "Max participants setting",
+        "Session agenda field"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S8.1",
+      "epicId": "E8",
+      "title": "Create Diary Entries Schema",
+      "description": "Implement diaryEntries table supporting text and voice entries.",
+      "priority": 38,
+      "acceptanceCriteria": [
+        "diaryEntries table",
+        "User and class foreign keys",
+        "Content field",
+        "is_voice flag",
+        "Audio URL for voice entries",
+        "Entry date timestamp"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S8.2",
+      "epicId": "E8",
+      "title": "Build Mentee Diary Page",
+      "description": "Create mobile-friendly diary interface for text and voice journaling.",
+      "priority": 39,
+      "acceptanceCriteria": [
+        "Text entry with simple editor",
+        "Voice recording button",
+        "Entry list chronologically",
+        "Filter by date",
+        "Edit/delete entries"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S8.3",
+      "epicId": "E8",
+      "title": "Implement Voice Recording",
+      "description": "Add voice recording with playback and waveform visualization.",
+      "priority": 40,
+      "acceptanceCriteria": [
+        "Record button with visual feedback",
+        "Recording duration display",
+        "Playback before save",
+        "Audio waveform visualization",
+        "Save to file storage"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S8.4",
+      "epicId": "E8",
+      "title": "Build Mentor Diary Access",
+      "description": "Allow mentors to view diary entries of mentees in their classes.",
+      "priority": 41,
+      "acceptanceCriteria": [
+        "Mentor can view class diary entries",
+        "Filter by mentee",
+        "Read-only access",
+        "Voice playback support"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S9.1",
+      "epicId": "E9",
+      "title": "Set Up Web Push Infrastructure",
+      "description": "Configure Web Push API with VAPID keys and service worker.",
+      "priority": 42,
+      "acceptanceCriteria": [
+        "VAPID key generation/storage",
+        "Service worker registration",
+        "Push subscription management",
+        "pushSubscriptions table in database"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S9.2",
+      "epicId": "E9",
+      "title": "Create Notification Preferences Schema",
+      "description": "Implement notification preferences for exercise and session reminders.",
+      "priority": 43,
+      "acceptanceCriteria": [
+        "notificationPreferences table",
+        "Exercise reminder enabled/minutes before",
+        "Session reminder enabled/minutes before",
+        "Reminder tone selection",
+        "Push enabled flag"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S9.3",
+      "epicId": "E9",
+      "title": "Build Notification Settings Page",
+      "description": "Create mentee settings page for configuring reminders.",
+      "priority": 44,
+      "acceptanceCriteria": [
+        "Toggle switches for each reminder type",
+        "Minutes-before configuration",
+        "Tone selection dropdown",
+        "Test notification button",
+        "Push opt-in flow"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S9.4",
+      "epicId": "E9",
+      "title": "Implement Exercise Reminders with Tone",
+      "description": "Send push notifications at scheduled times with configurable alarm tone.",
+      "priority": 45,
+      "acceptanceCriteria": [
+        "Notification at (exercise_time - reminder_minutes)",
+        "Include exercise name",
+        "Play selected tone/sound",
+        "Deep link to exercise on tap",
+        "Respect quiet hours if configured"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S9.5",
+      "epicId": "E9",
+      "title": "Implement Session Reminders",
+      "description": "Send push notifications before booked sessions.",
+      "priority": 46,
+      "acceptanceCriteria": [
+        "Reminder for 1:1 sessions",
+        "Reminder for group sessions",
+        "Include session details and meeting link",
+        "Configurable reminder time"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S10.1",
+      "epicId": "E10",
+      "title": "Create AI Settings Infrastructure",
+      "description": "Build settings system for AI configuration like Cerebro - admin can set provider/model/API keys.",
+      "priority": 47,
+      "acceptanceCriteria": [
+        "AI settings table per tenant",
+        "Provider selection (anthropic, gemini)",
+        "Model selection per task type",
+        "API key storage (encrypted)",
+        "Settings UI for admin"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S10.2",
+      "epicId": "E10",
+      "title": "Build AI Settings Admin Page",
+      "description": "Create admin interface for configuring AI providers and API keys.",
+      "priority": 48,
+      "acceptanceCriteria": [
+        "Admin-only access",
+        "Provider dropdown (Anthropic, Gemini)",
+        "Model selection per task",
+        "API key input (masked)",
+        "Test connection button",
+        "Usage statistics display"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S10.3",
+      "epicId": "E10",
+      "title": "Implement Voice Transcription",
+      "description": "Use configured AI provider to transcribe diary voice entries.",
+      "priority": 49,
+      "acceptanceCriteria": [
+        "Transcribe audio using tenant's AI config",
+        "Support German and English",
+        "Store transcription with diary entry",
+        "Error handling for failed transcriptions"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S10.4",
+      "epicId": "E10",
+      "title": "Implement Text Translation",
+      "description": "Use AI to translate content between German and English.",
+      "priority": 50,
+      "acceptanceCriteria": [
+        "Translate DE -> EN",
+        "Translate EN -> DE",
+        "Use in curriculum builder",
+        "Customizable translation prompts"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S10.5",
+      "epicId": "E10",
+      "title": "Implement Context Generation",
+      "description": "Use AI to auto-generate Herkunft and Ziel fields for curriculum content.",
+      "priority": 51,
+      "acceptanceCriteria": [
+        "Generate Herkunft from description",
+        "Generate Ziel from description",
+        "Preview before save",
+        "Customizable prompts"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S10.6",
+      "epicId": "E10",
+      "title": "Build AI Prompts Configuration",
+      "description": "Create admin interface for customizing AI prompts used throughout the system.",
+      "priority": 52,
+      "acceptanceCriteria": [
+        "Prompts table in database",
+        "Admin UI to edit prompts",
+        "Reset to default option",
+        "Test prompt functionality"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S11.1",
+      "epicId": "E11",
+      "title": "Create Measurements Schema",
+      "description": "Implement measurements table for tracking mentee progress and patterns.",
+      "priority": 53,
+      "acceptanceCriteria": [
+        "Measurements table with user/week references",
+        "Measurement value storage (numeric)",
+        "Measurement type field",
+        "Created timestamp"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S11.2",
+      "epicId": "E11",
+      "title": "Build Pattern Tracking UI",
+      "description": "Create interface for mentees to log emotional patterns by time blocks (e.g., stress tracking).",
+      "priority": 54,
+      "acceptanceCriteria": [
+        "Time block grid (hourly)",
+        "Pattern selection (e.g., Stress, Energy)",
+        "Intensity levels (Strong, Weak, None)",
+        "Color coding by intensity",
+        "Daily pattern view"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S11.3",
+      "epicId": "E11",
+      "title": "Implement Sentiment Analysis",
+      "description": "Analyze diary entries for mood/mental health indicators using AI.",
+      "priority": 55,
+      "acceptanceCriteria": [
+        "Analyze transcribed/text diary entries",
+        "Extract sentiment score",
+        "Identify emotional patterns and keywords",
+        "Generate mood barometer data"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S11.4",
+      "epicId": "E11",
+      "title": "Build Weekly Summary Dashboard",
+      "description": "Create dashboard showing weekly stats: exercise completion, emotional highlights, mood trends.",
+      "priority": 56,
+      "acceptanceCriteria": [
+        "Exercise completion stats",
+        "Mood/emotional highlights from diary",
+        "Pattern frequency charts",
+        "Week-over-week comparison",
+        "Mood barometer visualization"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S11.5",
+      "epicId": "E11",
+      "title": "Build Mentor Analytics View",
+      "description": "Create analytics dashboard for mentors to see aggregated mentee progress.",
+      "priority": 57,
+      "acceptanceCriteria": [
+        "Class-level completion rates",
+        "Individual mentee progress",
+        "Mood trends across class",
+        "Identify mentees needing attention"
+      ],
+      "passes": false
+    }
+  ]
+}

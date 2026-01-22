@@ -157,35 +157,6 @@ export function getRalphProcesses(): RalphProcess[] {
     void _;
   }
 
-  try {
-    const psOutput = execSync('pgrep -fl "claude|opencode|aider" 2>/dev/null || true', {
-      encoding: 'utf-8',
-      timeout: 5000,
-    });
-
-    const psLines = psOutput.split('\n').filter(l => l.trim());
-
-    for (const line of psLines) {
-      const match = line.match(/^(\d+)\s+(.+)$/);
-      if (match) {
-        const pid = match[1];
-        const cmd = match[2] || '';
-        const cliName = cmd.includes('claude')
-          ? 'claude'
-          : cmd.includes('opencode')
-            ? 'opencode'
-            : 'aider';
-        processes.push({
-          name: `${cliName} (PID ${pid})`,
-          project: 'active',
-          status: 'running',
-        });
-      }
-    }
-  } catch (_) {
-    void _;
-  }
-
   return processes;
 }
 
