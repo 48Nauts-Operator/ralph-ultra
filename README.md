@@ -2,10 +2,12 @@
 
 > **The Most Secure Coding Agent** — Beautiful TUI with Remote Control & Real-Time Subagent Tracing
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/48Nauts-Operator/ralph-ultra/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0--beta-orange.svg)](https://github.com/48Nauts-Operator/ralph-ultra/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Built with TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178C6.svg)](https://www.typescriptlang.org/)
 [![Powered by Bun](https://img.shields.io/badge/powered%20by-Bun-FBF0DF.svg)](https://bun.sh/)
+
+> **⚠️ BETA VERSION** — This is a beta release. Features are functional but may contain bugs. Feedback and issue reports are welcome!
 
 Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monitor and control autonomous coding agents. Built with TypeScript, Bun, and Ink (React for terminals), it provides a premium developer experience with remote control via Tailscale and real-time subagent tracing.
 
@@ -14,6 +16,7 @@ Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monit
 ## ✨ Key Features
 
 ### 🎨 Beautiful Terminal UI
+
 - **Three-Pane Layout** — Projects rail, sessions/tasks pane, and dynamic work pane
 - **Collapsible Panels** — Maximize workspace with `[` key
 - **Multiple Views** — Monitor logs, view status, inspect stories, browse help, or trace agents
@@ -21,6 +24,7 @@ Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monit
 - **Responsive Design** — Adapts to any terminal size (minimum 80x24)
 
 ### 🌐 Remote Control via Tailscale
+
 - **Secure Access** — Monitor Ralph from anywhere via encrypted Tailscale connection
 - **Web-Based Client** — View and control from phone, tablet, or any browser
 - **Token Authentication** — Auto-generated secure tokens for each session
@@ -28,6 +32,7 @@ Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monit
 - **Read/Write Modes** — View-only or full remote control
 
 ### 🔍 Subagent Tracing
+
 - **Tree Visualization** — Real-time hierarchy of nested agent calls
 - **Status Tracking** — Running (yellow), complete (green), error (red)
 - **Performance Metrics** — Duration tracking for each agent
@@ -35,6 +40,7 @@ Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monit
 - **Task Context** — See what each agent is working on
 
 ### 💾 Session Persistence
+
 - **Auto-Save** — State saved every 30 seconds
 - **Crash Recovery** — Resume exactly where you left off
 - **Scroll Positions** — All UI state preserved
@@ -42,6 +48,7 @@ Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monit
 - **Multi-Project** — Independent sessions per project
 
 ### 📑 Multi-Tab Support
+
 - **Up to 5 Tabs** — Monitor multiple Ralph instances simultaneously
 - **Independent State** — Each tab maintains its own state
 - **Quick Switching** — Ctrl+1/2/3... or Ctrl+Tab navigation
@@ -49,6 +56,7 @@ Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monit
 - **Status Indicators** — At-a-glance view of all tabs
 
 ### 🔔 Notification System
+
 - **Toast Notifications** — In-TUI toasts for important events
 - **Color-Coded** — Info (blue), success (green), warning (yellow), error (red)
 - **History** — View notification history in Status panel
@@ -56,6 +64,7 @@ Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monit
 - **Auto-Dismiss** — Toasts fade after 5 seconds
 
 ### ⌨️ Command Palette
+
 - **Quick Access** — Ctrl+P or `:` to open
 - **Fuzzy Search** — Find any command instantly
 - **Recent Commands** — Quick access to frequently used actions
@@ -105,49 +114,49 @@ export RALPH_NANO_PATH="/path/to/ralph-nano/ralph.sh"
 
 ### Basic Navigation
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Cycle focus between panes |
+| Key     | Action                       |
+| ------- | ---------------------------- |
+| `Tab`   | Cycle focus between panes    |
 | `↑` `↓` | Navigate within focused pane |
-| `j` `k` | Vim-style navigation |
-| `Enter` | Activate selected item |
-| `Esc` | Close overlay/modal |
+| `j` `k` | Vim-style navigation         |
+| `Enter` | Activate selected item       |
+| `Esc`   | Close overlay/modal          |
 
 ### Global Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `[` | Toggle projects rail collapse |
-| `r` | Run Ralph on current project |
-| `s` | Stop running Ralph process |
-| `t` | Open theme settings |
-| `?` | Show help overlay |
-| `q` | Quit application |
-| `:` or `Ctrl+P` | Open command palette |
+| Key             | Action                        |
+| --------------- | ----------------------------- |
+| `[`             | Toggle projects rail collapse |
+| `r`             | Run Ralph on current project  |
+| `s`             | Stop running Ralph process    |
+| `t`             | Open theme settings           |
+| `?`             | Show help overlay             |
+| `q`             | Quit application              |
+| `:` or `Ctrl+P` | Open command palette          |
 
 ### View Switching
 
-| Key | Action |
-|-----|--------|
-| `1` | Monitor view (logs) |
+| Key | Action                    |
+| --- | ------------------------- |
+| `1` | Monitor view (logs)       |
 | `2` | Status view (system info) |
 | `3` | Details view (story info) |
-| `4` | Help view (commands) |
-| `5` | Tracing view (subagents) |
+| `4` | Help view (commands)      |
+| `5` | Tracing view (subagents)  |
 
 ### Multi-Tab Navigation
 
-| Key | Action |
-|-----|--------|
-| `Ctrl+Shift+T` | Open new tab / project picker |
-| `Ctrl+Shift+W` | Close current tab |
-| `Ctrl+Tab` | Cycle through tabs |
-| `Ctrl+1/2/3...` | Jump to specific tab |
+| Key             | Action                        |
+| --------------- | ----------------------------- |
+| `Ctrl+Shift+T`  | Open new tab / project picker |
+| `Ctrl+Shift+W`  | Close current tab             |
+| `Ctrl+Tab`      | Cycle through tabs            |
+| `Ctrl+1/2/3...` | Jump to specific tab          |
 
 ### Remote Control
 
-| Key | Action |
-|-----|--------|
+| Key | Action                       |
+| --- | ---------------------------- |
 | `c` | Copy remote URL to clipboard |
 
 ---
@@ -192,12 +201,14 @@ Ralph Ultra is designed with security in mind:
 Ralph Ultra includes two built-in themes:
 
 ### Nano Dark (Default)
+
 - **Primary Accent**: Mint (#7FFFD4)
 - **Secondary Accent**: Dirty Orange (#CC5500)
 - **Background**: Dark terminal colors
 - **Best for**: Extended coding sessions
 
 ### Nano Light
+
 - **Primary Accent**: Cyan (#00CED1)
 - **Secondary Accent**: Orange (#FF8C00)
 - **Background**: Light terminal colors
@@ -359,6 +370,7 @@ MIT License — see [LICENSE](LICENSE) for details.
 - **Ralph Nano** — Lightweight execution engine ([GitHub](https://github.com/48Nauts-Operator/ralph-nano))
 
 Special thanks to:
+
 - [Ink](https://github.com/vadimdemedes/ink) — React for CLIs
 - [Bun](https://bun.sh) — Fast all-in-one JavaScript runtime
 - [Tailscale](https://tailscale.com) — Secure remote access
