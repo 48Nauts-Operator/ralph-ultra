@@ -21,7 +21,7 @@ export interface Project {
 /**
  * Focus states for the application
  */
-export type FocusPane = 'tabs' | 'sessions' | 'work';
+export type FocusPane = 'projects' | 'tabs' | 'sessions' | 'work';
 
 export type Complexity = 'simple' | 'medium' | 'complex';
 
@@ -93,6 +93,9 @@ export interface TabState {
   lastRunDuration?: number | null;
   lastRunExitCode?: number | null;
   currentStory?: string | null;
+  searchState?: SearchState;
+  logFilter?: LogFilter;
+  retryCount?: number;
 }
 
 /**
@@ -114,4 +117,33 @@ export interface Notification {
   timestamp: Date;
   /** Duration in ms before auto-dismiss (default 5000) */
   duration?: number;
+}
+
+/**
+ * Search state for log filtering
+ */
+export interface SearchState {
+  /** Current search query */
+  searchQuery: string;
+  /** Whether search mode is active */
+  searchMode: boolean;
+  /** Current search match index */
+  currentMatchIndex: number;
+  /** Total number of matches */
+  totalMatches: number;
+  /** Indices of matching lines */
+  matchingLines: number[];
+}
+
+/**
+ * Log filter levels for filtering displayed log lines
+ */
+export type LogFilterLevel = 'all' | 'errors' | 'warnings_errors';
+
+/**
+ * Log filter state
+ */
+export interface LogFilter {
+  /** Current filter level */
+  level: LogFilterLevel;
 }

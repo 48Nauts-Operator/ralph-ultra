@@ -1,10 +1,11 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
-import { readFileSync, existsSync, copyFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
-import { homedir } from 'os';
+import { homedir, tmpdir } from 'os';
 import type { PRD, UserStory } from '../types';
 import { isTestableAC } from '../types';
 import { runStoryTestsAndSave, type ACTestResult } from './ac-runner';
+import { checkApiStatus, shouldWarnAboutStatus } from './status-check';
 
 export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
 
@@ -19,9 +20,11 @@ export interface RalphStatus {
   acTestsTotal?: number;
   storyPassed?: boolean;
   pid?: number;
+  retryCount?: number;
 }
 
 const MAX_RETRIES_PER_STORY = 3;
+const MAX_ITERATIONS = 10; // Maximum iterations to prevent runaway execution
 
 export class RalphService {
   private process: ChildProcess | null = null;
@@ -33,6 +36,7 @@ export class RalphService {
   private projectPath: string;
   private externalCheckInterval?: ReturnType<typeof setInterval>;
   private storyRetryCount: Map<string, number> = new Map();
+  private storyIterationCount: Map<string, number> = new Map();
 
   constructor(projectPath: string) {
     this.projectPath = projectPath;
@@ -307,12 +311,7 @@ Begin implementation now.`;
 
   private loadCustomPrinciples(): string | null {
     try {
-      const principlesPath = join(
-        homedir(),
-        '.config',
-        'ralph-ultra',
-        'principles.md'
-      );
+      const principlesPath = join(homedir(), '.config', 'ralph-ultra', 'principles.md');
 
       if (existsSync(principlesPath)) {
         const content = readFileSync(principlesPath, 'utf-8');
@@ -346,29 +345,86 @@ Begin implementation now.`;
     return null;
   }
 
+  private promptTempFile: string | null = null;
+
+  /**
+   * Write prompt to temp file and return path.
+   * Claude CLI works better with file-based prompts (like ralph-nano does).
+   */
+  private writePromptToFile(prompt: string): string {
+    const tempPath = join(tmpdir(), `ralph-prompt-${Date.now()}.txt`);
+    writeFileSync(tempPath, prompt, 'utf-8');
+    this.promptTempFile = tempPath;
+    return tempPath;
+  }
+
+  /**
+   * Clean up temp prompt file if it exists.
+   */
+  private cleanupPromptFile(): void {
+    if (this.promptTempFile && existsSync(this.promptTempFile)) {
+      try {
+        unlinkSync(this.promptTempFile);
+      } catch {
+        // Ignore cleanup errors
+      }
+      this.promptTempFile = null;
+    }
+  }
+
   private getCLIConfig(
     cli: string,
     prompt: string,
-  ): { args: string[]; useStdin: boolean; parseJson: boolean } {
+  ): { args: string[]; useStdin: boolean; parseJson: boolean; shell: boolean } {
+    // Write prompt to temp file to avoid arg length limits and escaping issues
+    const promptFile = this.writePromptToFile(prompt);
+
     switch (cli) {
       case 'claude':
+        // Use shell to read from file, exactly like ralph-nano does
         return {
-          args: ['--print', '--verbose', '--output-format', 'stream-json'],
-          useStdin: true,
-          parseJson: true,
+          args: ['--print', '--dangerously-skip-permissions', `"$(cat ${promptFile})"`],
+          useStdin: false,
+          parseJson: false,
+          shell: true,
         };
       case 'opencode':
-        return { args: ['-p', prompt], useStdin: false, parseJson: false };
+        return {
+          args: ['run', '--title', 'Ralph', `"$(cat ${promptFile})"`],
+          useStdin: false,
+          parseJson: false,
+          shell: true,
+        };
       case 'codex':
-        return { args: ['exec', prompt], useStdin: false, parseJson: false };
+        return {
+          args: ['exec', `"$(cat ${promptFile})"`],
+          useStdin: false,
+          parseJson: false,
+          shell: true,
+        };
       case 'gemini':
-        return { args: ['-p', prompt], useStdin: false, parseJson: false };
+        return {
+          args: ['-p', `"$(cat ${promptFile})"`],
+          useStdin: false,
+          parseJson: false,
+          shell: true,
+        };
       case 'aider':
-        return { args: ['--message', prompt, '--yes'], useStdin: false, parseJson: false };
+        return {
+          args: ['--message', `"$(cat ${promptFile})"`, '--yes'],
+          useStdin: false,
+          parseJson: false,
+          shell: true,
+        };
       case 'cody':
-        return { args: ['chat', '-m', prompt], useStdin: false, parseJson: false };
+        return {
+          args: ['chat', '-m', `"$(cat ${promptFile})"`],
+          useStdin: false,
+          parseJson: false,
+          shell: true,
+        };
       default:
-        return { args: [prompt], useStdin: false, parseJson: false };
+        return { args: [`"$(cat ${promptFile})"`], useStdin: false, parseJson: false, shell: true };
     }
   }
 
@@ -399,7 +455,45 @@ Begin implementation now.`;
     return lines;
   }
 
-  public async run(projectPath: string): Promise<void> {
+  /**
+   * Run a specific story by its ID, skipping any uncompleted stories before it.
+   * This allows jumping directly to a specific story for debugging or resuming work.
+   */
+  public async runStory(projectPath: string, storyId: string, options?: { ignoreApiStatus?: boolean }): Promise<void> {
+    if (this.state !== 'idle') {
+      throw new Error(`Cannot start: process is ${this.state}`);
+    }
+
+    const prd = this.loadPRD();
+    if (!prd) {
+      const error = 'No prd.json found in project directory';
+      this.emitStatus({ state: 'idle', error });
+      throw new Error(error);
+    }
+
+    const story = prd.userStories.find(s => s.id === storyId);
+    if (!story) {
+      const error = `Story ${storyId} not found in PRD`;
+      this.emitStatus({ state: 'idle', error });
+      throw new Error(error);
+    }
+
+    if (story.passes) {
+      this.outputCallback?.(`Story ${storyId} is already complete\n`, 'stdout');
+      this.emitStatus({ state: 'idle' });
+      return;
+    }
+
+    const backupPath = this.backupPRD();
+    if (backupPath) {
+      this.outputCallback?.(`PRD backed up to: ${backupPath}\n`, 'stdout');
+    }
+
+    // Run the specific story
+    return this.runStoryInternal(projectPath, story, prd, options);
+  }
+
+  public async run(projectPath: string, options?: { ignoreApiStatus?: boolean }): Promise<void> {
     if (this.state !== 'idle') {
       throw new Error(`Cannot start: process is ${this.state}`);
     }
@@ -423,6 +517,24 @@ Begin implementation now.`;
       return;
     }
 
+    // Run the next uncompleted story
+    return this.runStoryInternal(projectPath, story, prd, options);
+  }
+
+  private async runStoryInternal(projectPath: string, story: UserStory, prd: PRD, options?: { ignoreApiStatus?: boolean }): Promise<void> {
+    // Check API status unless bypassed
+    if (!options?.ignoreApiStatus) {
+      const apiStatus = await checkApiStatus();
+      if (shouldWarnAboutStatus(apiStatus)) {
+        const statusMessage = `⚠️  Warning: Claude API status is '${apiStatus.status}' - ${apiStatus.message}\n`;
+        this.outputCallback?.(statusMessage, 'stderr');
+
+        // Give user 3 seconds to cancel before proceeding
+        this.outputCallback?.('   Starting in 3 seconds... Press Ctrl+C to cancel or set RALPH_IGNORE_API_STATUS=true\n', 'stdout');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+
     const cli = this.detectAICLI();
     if (!cli) {
       const error = 'No AI CLI found. Install: claude, opencode, codex, gemini, aider, or cody';
@@ -430,23 +542,47 @@ Begin implementation now.`;
       throw new Error(error);
     }
 
+    // Track iterations for this story
+    const iterationCount = this.storyIterationCount.get(story.id) || 0;
+    const newIterationCount = iterationCount + 1;
+    this.storyIterationCount.set(story.id, newIterationCount);
+
+    // Check if we've exceeded max iterations
+    if (newIterationCount > MAX_ITERATIONS) {
+      const error = `Story ${story.id} exceeded maximum iterations limit (${MAX_ITERATIONS}). Stopping to prevent runaway execution.`;
+      this.outputCallback?.(`\n⚠ ${error}\n`, 'stderr');
+      this.emitStatus({ state: 'idle', error });
+      return;
+    }
+
     this.state = 'running';
     this.startTime = Date.now();
     this.currentStoryId = story.id;
-    this.emitStatus({ state: 'running', startTime: this.startTime, currentStory: story.id });
+    const retryCount = this.storyRetryCount.get(story.id) || 0;
+    this.emitStatus({
+      state: 'running',
+      startTime: this.startTime,
+      currentStory: story.id,
+      retryCount
+    });
 
     const prompt = this.buildPrompt(story, prd);
-    const { args, useStdin, parseJson } = this.getCLIConfig(cli, prompt);
+    const { args, useStdin, parseJson, shell } = this.getCLIConfig(cli, prompt);
 
     this.outputCallback?.(`\n═══ Starting ${story.id}: ${story.title} ═══\n`, 'stdout');
     this.outputCallback?.(`Using CLI: ${cli}\n`, 'stdout');
-    this.outputCallback?.(`Complexity: ${story.complexity}\n\n`, 'stdout');
+    this.outputCallback?.(`Complexity: ${story.complexity}\n`, 'stdout');
+    this.outputCallback?.(`Iteration: ${newIterationCount}/${MAX_ITERATIONS}\n\n`, 'stdout');
 
     try {
-      this.process = spawn(cli, args, {
+      const command = shell ? `${cli} ${args.join(' ')}` : cli;
+      const spawnArgs = shell ? [] : args;
+
+      this.process = spawn(command, spawnArgs, {
         cwd: projectPath,
         env: { ...process.env },
-        stdio: useStdin ? ['pipe', 'pipe', 'pipe'] : undefined,
+        shell: shell,
+        stdio: useStdin ? ['pipe', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
       });
 
       if (useStdin && this.process.stdin) {
@@ -475,6 +611,7 @@ Begin implementation now.`;
       this.process.on('exit', (code: number | null) => {
         const duration = this.startTime ? Date.now() - this.startTime : 0;
         this.process = null;
+        this.cleanupPromptFile();
 
         const exitMessage = `\n═══ ${story.id} completed (exit: ${code ?? 'unknown'}, ${(duration / 1000).toFixed(1)}s) ═══\n`;
         this.outputCallback?.(exitMessage, 'stdout');
@@ -495,6 +632,7 @@ Begin implementation now.`;
       this.process.on('error', (err: Error) => {
         this.state = 'idle';
         this.process = null;
+        this.cleanupPromptFile();
         const error = `Failed to start: ${err.message}`;
         this.emitStatus({ state: 'idle', error });
         this.outputCallback?.(error, 'stderr');
@@ -504,6 +642,7 @@ Begin implementation now.`;
       this.state = 'idle';
       this.process = null;
       this.currentStoryId = undefined;
+      this.cleanupPromptFile();
       const error = err instanceof Error ? err.message : String(err);
       this.emitStatus({ state: 'idle', error });
       throw err;
@@ -530,11 +669,15 @@ Begin implementation now.`;
   }
 
   public getStatus(): RalphStatus {
+    const retryCount = this.currentStoryId
+      ? this.storyRetryCount.get(this.currentStoryId) || 0
+      : 0;
     return {
       state: this.state,
       startTime: this.startTime,
       currentStory: this.currentStoryId,
       pid: this.process?.pid,
+      retryCount,
     };
   }
 
@@ -547,6 +690,52 @@ Begin implementation now.`;
 
   public getAvailableCLI(): string | null {
     return this.detectAICLI();
+  }
+
+  public getCurrentRetryCount(): number {
+    if (!this.currentStoryId) return 0;
+    return this.storyRetryCount.get(this.currentStoryId) || 0;
+  }
+
+  public retryCurrentStory(): void {
+    // Only retry if we're idle and have a failed story
+    if (this.state !== 'idle') {
+      this.outputCallback?.('[ERROR] Cannot retry: Ralph is not idle\n', 'stderr');
+      return;
+    }
+
+    const prd = this.loadPRD();
+    if (!prd) {
+      this.outputCallback?.('[ERROR] No prd.json found\n', 'stderr');
+      return;
+    }
+
+    // Find the last failed story (the one that would run next)
+    const nextStory = this.getNextStory(prd);
+    if (!nextStory) {
+      this.outputCallback?.('[INFO] No failed stories to retry\n', 'stdout');
+      return;
+    }
+
+    // Check if we've exceeded max retries for this story
+    const currentRetries = this.storyRetryCount.get(nextStory.id) || 0;
+    if (currentRetries >= MAX_RETRIES_PER_STORY) {
+      this.outputCallback?.(
+        `[WARN] Story ${nextStory.id} already exceeded max retries (${MAX_RETRIES_PER_STORY})\n`,
+        'stderr',
+      );
+      return;
+    }
+
+    this.outputCallback?.(
+      `[INFO] Manually retrying ${nextStory.id} (attempt ${currentRetries + 1}/${MAX_RETRIES_PER_STORY})\n`,
+      'stdout',
+    );
+
+    // Run the story again
+    this.run(this.projectPath).catch(err => {
+      this.outputCallback?.(`[ERROR] Failed to retry story: ${err.message}\n`, 'stderr');
+    });
   }
 
   private emitStatus(status: RalphStatus): void {
@@ -583,6 +772,7 @@ Begin implementation now.`;
 
       if (testResults.allPassed) {
         this.storyRetryCount.delete(story.id);
+        this.storyIterationCount.delete(story.id);
         this.outputCallback?.(`✓ ${story.id} VERIFIED - all acceptance criteria pass!\n`, 'stdout');
 
         if (testResults.projectComplete) {
@@ -627,6 +817,7 @@ Begin implementation now.`;
             'stderr',
           );
           this.storyRetryCount.delete(story.id);
+          this.storyIterationCount.delete(story.id);
           this.currentStoryId = undefined;
           this.state = 'idle';
 

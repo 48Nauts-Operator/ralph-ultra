@@ -3,6 +3,8 @@ import type { Project, TabState } from '../types';
 import { RalphService } from '../utils/ralph-service';
 import { parseAgentTree } from '../utils/log-parser';
 import type { AgentNode } from '../components/TracingPane';
+import { useNotifications } from './useNotifications';
+import { addToRecentProjects } from '../utils/config';
 
 /**
  * Create a new tab for a project
@@ -24,6 +26,16 @@ function createNewTab(project: Project): TabState {
     lastRunDuration: null,
     lastRunExitCode: null,
     currentStory: null,
+    searchState: {
+      searchQuery: '',
+      searchMode: false,
+      currentMatchIndex: 0,
+      totalMatches: 0,
+      matchingLines: [],
+    },
+    logFilter: {
+      level: 'all',
+    },
   };
 }
 
@@ -39,6 +51,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
     throw new Error('At least one project is required');
   }
 
+  const { notify } = useNotifications();
   const [initialTabs] = useState<TabState[]>(() => createInitialTabs(projects));
   const [tabs, setTabs] = useState<TabState[]>(initialTabs);
   const [activeTabId, setActiveTabId] = useState<string>(
@@ -51,14 +64,31 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   const activeTab = tabs.find(tab => tab.id === activeTabId) || tabs[0]!;
 
   /**
+   * Helper to track project access in recent projects
+   */
+  const trackProjectAccess = useCallback((project: Project) => {
+    addToRecentProjects({
+      path: project.path,
+      name: project.name,
+      color: project.color,
+      icon: project.icon,
+    });
+  }, []);
+
+  /**
    * Open a new tab for a project
    */
   const openTab = useCallback((project: Project) => {
+    // Track in recent projects
+    trackProjectAccess(project);
+
     setTabs(prev => {
       // Check if already open
       const existing = prev.find(t => t.project.id === project.id);
       if (existing) {
         setActiveTabId(existing.id);
+        // Still track access even when switching to existing tab
+        trackProjectAccess(existing.project);
         return prev;
       }
 
@@ -71,7 +101,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
       setActiveTabId(newTab.id);
       return [...prev, newTab];
     });
-  }, []);
+  }, [trackProjectAccess]);
 
   /**
    * Close a tab
@@ -117,9 +147,11 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
       const tab = tabs.find(t => t.id === tabId);
       if (tab) {
         setActiveTabId(tabId);
+        // Track tab switch in recent projects
+        trackProjectAccess(tab.project);
       }
     },
-    [tabs],
+    [tabs, trackProjectAccess],
   );
 
   /**
@@ -131,8 +163,10 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
     const nextTab = tabs[nextIndex];
     if (nextTab) {
       setActiveTabId(nextTab.id);
+      // Track tab switch in recent projects
+      trackProjectAccess(nextTab.project);
     }
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, trackProjectAccess]);
 
   /**
    * Switch to tab by number (Ctrl+1/2/3...)
@@ -143,10 +177,12 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
         const tab = tabs[number - 1];
         if (tab) {
           setActiveTabId(tab.id);
+          // Track tab switch in recent projects
+          trackProjectAccess(tab.project);
         }
       }
     },
-    [tabs],
+    [tabs, trackProjectAccess],
   );
 
   /**
@@ -171,6 +207,20 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
         service = new RalphService(tab.project.path);
 
         service.onStatusChange(status => {
+          // Check for story completion or error
+          if (status.state === 'idle' && status.currentStory) {
+            if (status.storyPassed) {
+              // Story completed successfully
+              notify('success', `Story ${status.currentStory} completed successfully!`);
+            } else if (status.exitCode !== undefined && status.exitCode !== 0) {
+              // Story failed with error
+              notify('error', `Story ${status.currentStory} failed with exit code ${status.exitCode}`);
+            }
+          } else if (status.error) {
+            // Process error
+            notify('error', `Process error: ${status.error}`);
+          }
+
           updateTab(tabId, {
             processState: status.state,
             processError: status.error,
@@ -178,6 +228,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
             currentStory: status.currentStory ?? null,
             lastRunDuration: status.duration ?? null,
             lastRunExitCode: status.exitCode ?? null,
+            retryCount: status.retryCount ?? 0,
           });
         });
 
@@ -186,6 +237,19 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
         });
 
         service.onOutput((line, type) => {
+          // Check for story completion or error messages
+          if (line.includes('✓') && line.includes('VERIFIED - all acceptance criteria pass!')) {
+            const storyMatch = line.match(/✓\s+(\S+)\s+VERIFIED/);
+            const storyId = storyMatch ? storyMatch[1] : 'Story';
+            notify('success', `${storyId} completed successfully!`);
+          } else if (line.includes('✗') && line.includes('FAILED - ')) {
+            const storyMatch = line.match(/✗\s+(\S+)\s+FAILED/);
+            const storyId = storyMatch ? storyMatch[1] : 'Story';
+            notify('error', `${storyId} failed acceptance criteria`);
+          } else if (line.includes('🎉 PROJECT COMPLETE!')) {
+            notify('success', '🎉 Project complete! All stories verified.');
+          }
+
           setTabs(prev =>
             prev.map(t => {
               if (t.id !== tabId) return t;

@@ -12,6 +12,7 @@ interface SessionsPaneProps {
   projectPath: string;
   onStorySelect?: (story: UserStory | null) => void;
   onStoryEnter?: (story: UserStory) => void;
+  onStoryJump?: (story: UserStory) => void;
   initialScrollIndex?: number;
   initialSelectedStoryId?: string | null;
 }
@@ -26,6 +27,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(({
   projectPath,
   onStorySelect,
   onStoryEnter,
+  onStoryJump,
   initialScrollIndex = 0,
   initialSelectedStoryId = null,
 }) => {
@@ -115,6 +117,14 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(({
         const story = prd.userStories[selectedIndex];
         if (story && onStoryEnter) {
           onStoryEnter(story);
+        }
+      }
+
+      // Jump to specific story (skip to it even if previous stories haven't passed)
+      if (input === 'g') {
+        const story = prd.userStories[selectedIndex];
+        if (story && onStoryJump) {
+          onStoryJump(story);
         }
       }
     },

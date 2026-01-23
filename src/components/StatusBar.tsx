@@ -2,6 +2,7 @@ import React, { useState, useEffect, memo } from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '@hooks/useTheme';
 import type { TailscaleStatus } from '../remote/tailscale';
+import type { AnthropicStatus, ApiStatus } from '@utils/status-check';
 import { getSystemStats, type SystemStats } from '@utils/system-stats';
 
 interface StatusBarProps {
@@ -13,6 +14,8 @@ interface StatusBarProps {
   remoteConnections?: number;
   /** Tailscale status information */
   tailscaleStatus?: TailscaleStatus | null;
+  /** Anthropic API status */
+  apiStatus?: AnthropicStatus | null;
   /** Total terminal width for layout calculations */
   width: number;
 }
@@ -22,7 +25,7 @@ interface StatusBarProps {
  * Exactly 1 line height, spans full terminal width
  */
 export const StatusBar: React.FC<StatusBarProps> = memo(
-  ({ agentName, progress = 0, remoteConnections = 0, tailscaleStatus = null, width }) => {
+  ({ agentName, progress = 0, remoteConnections = 0, tailscaleStatus = null, apiStatus = null, width }) => {
     const { theme } = useTheme();
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [systemStats, setSystemStats] = useState<SystemStats>({
@@ -104,6 +107,32 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
     const tailscaleIcon = getTailscaleIcon();
     const tailscaleColor = getTailscaleColor();
 
+    // API status indicator
+    const getApiStatusIcon = (): string => {
+      if (!apiStatus) return '○'; // Not checked yet
+      const icons: Record<ApiStatus, string> = {
+        operational: '✓',
+        degraded: '⚠',
+        outage: '✗',
+        unknown: '?',
+      };
+      return icons[apiStatus.status];
+    };
+
+    const getApiStatusColor = () => {
+      if (!apiStatus) return theme.muted;
+      const colors: Record<ApiStatus, string> = {
+        operational: theme.success,
+        degraded: theme.warning,
+        outage: theme.error,
+        unknown: theme.muted,
+      };
+      return colors[apiStatus.status];
+    };
+
+    const apiIcon = getApiStatusIcon();
+    const apiColor = getApiStatusColor();
+
     const contentWidth =
       branding.length +
       agent.length +
@@ -112,10 +141,12 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
       1 +
       memText.length +
       1 +
+      apiIcon.length +
+      1 +
       remoteText.length +
       timer.length;
     const totalSpacing = Math.max(0, width - contentWidth);
-    const numGaps = 6;
+    const numGaps = 7;
     const baseSpacing = Math.floor(totalSpacing / numGaps);
     const remainder = totalSpacing - baseSpacing * numGaps;
 
@@ -132,6 +163,8 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
         <Text color={cpuColor}>{cpuText}</Text>
         <Text> </Text>
         <Text color={memColor}>{memText}</Text>
+        <Text>{' '.repeat(baseSpacing)}</Text>
+        <Text color={apiColor}>{apiIcon}</Text>
         <Text>{' '.repeat(baseSpacing)}</Text>
         <Text color={tailscaleColor}>{tailscaleIcon}</Text>
         <Text>{' '.repeat(baseSpacing)}</Text>

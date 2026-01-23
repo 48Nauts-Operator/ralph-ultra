@@ -1,10 +1,11 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { readFileSync, watchFile, unwatchFile, existsSync } from 'fs';
 import { join } from 'path';
 import { useTheme } from '@hooks/useTheme';
 import { useNotifications } from '@hooks/useNotifications';
-import type { UserStory, AcceptanceCriterion } from '@types';
+import { useSearch } from '@hooks/useSearch';
+import type { UserStory, AcceptanceCriterion, LogFilter, LogFilterLevel } from '@types';
 import { runStoryTestsAndSave, type ACTestResult } from '../utils/ac-runner';
 import type { TailscaleStatus } from '../remote/tailscale';
 import { TracingPane, type AgentNode } from './TracingPane';
@@ -39,6 +40,9 @@ interface WorkPaneProps {
   lastRunDuration?: number | null;
   lastRunExitCode?: number | null;
   currentStory?: string | null;
+  retryCount?: number;
+  logFilter?: LogFilter;
+  allStoriesComplete?: boolean;
 }
 
 /**
@@ -65,6 +69,9 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     lastRunDuration = null,
     lastRunExitCode = null,
     currentStory = null,
+    retryCount = 0,
+    logFilter = { level: 'all' },
+    allStoriesComplete = false,
   }) => {
     const { theme } = useTheme();
     const { history: notificationHistory, notify } = useNotifications();
@@ -75,6 +82,92 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     const [testProgress, setTestProgress] = useState<{ current: number; total: number } | null>(
       null,
     );
+
+    // Filter log lines based on current filter level
+    const filterLogLines = (lines: string[]): string[] => {
+      if (logFilter.level === 'all') {
+        return lines;
+      }
+
+      return lines.filter(line => {
+        const lowerLine = line.toLowerCase();
+
+        if (logFilter.level === 'errors') {
+          // Show only error lines
+          return (
+            lowerLine.includes('error') ||
+            lowerLine.includes('fail') ||
+            lowerLine.includes('failed') ||
+            lowerLine.includes('exception') ||
+            lowerLine.includes('fatal') ||
+            line.includes('✗') ||
+            line.includes('FAILED') ||
+            line.includes('ERROR')
+          );
+        }
+
+        if (logFilter.level === 'warnings_errors') {
+          // Show warnings and errors
+          return (
+            lowerLine.includes('error') ||
+            lowerLine.includes('fail') ||
+            lowerLine.includes('failed') ||
+            lowerLine.includes('exception') ||
+            lowerLine.includes('fatal') ||
+            lowerLine.includes('warn') ||
+            lowerLine.includes('warning') ||
+            lowerLine.includes('retry') ||
+            lowerLine.includes('retrying') ||
+            line.includes('✗') ||
+            line.includes('⚠') ||
+            line.includes('FAILED') ||
+            line.includes('ERROR') ||
+            line.includes('WARNING') ||
+            line.includes('WARN')
+          );
+        }
+
+        return false;
+      });
+    };
+
+    // Apply filter to log content
+    const filteredLogContent = useMemo(
+      () => filterLogLines(logContent),
+      [logContent, logFilter.level],
+    );
+
+    // Initialize search hook with filtered content
+    const search = useSearch(filteredLogContent);
+
+    // Helper function to highlight matching text
+    const highlightMatch = (text: string, lineIndex: number): React.ReactNode => {
+      if (!search.searchState.searchQuery || !search.isLineMatch(lineIndex)) {
+        return text;
+      }
+
+      const query = search.searchState.searchQuery.toLowerCase();
+      const lowerText = text.toLowerCase();
+      const index = lowerText.indexOf(query);
+
+      if (index === -1) {
+        return text;
+      }
+
+      const isCurrentMatch = search.isCurrentMatch(lineIndex);
+      const highlightColor = isCurrentMatch ? theme.accent : theme.warning;
+
+      return (
+        <>
+          {text.substring(0, index)}
+          <Text backgroundColor={highlightColor} color="black">
+            {text.substring(index, index + query.length)}
+          </Text>
+          {text.substring(index + query.length)}
+        </>
+      );
+    };
+
     const [sessionInfo, setSessionInfo] = useState<SessionInfo>({
       model: null,
       cost: { cost: 0, tokens: { input: 0, output: 0 } },
@@ -360,7 +453,8 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     };
 
     const renderMonitor = () => {
-      const data = parseMonitorData(logContent);
+      // Use filtered content for monitor view
+      const data = parseMonitorData(filteredLogContent);
       const boxWidth = Math.max(40, width - 4);
 
       const phaseColor =
@@ -385,7 +479,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
                 ? '▶ RUN'
                 : '○ IDLE';
 
-      if (data.projectComplete) {
+      if (allStoriesComplete) {
         return (
           <Box flexDirection="column" padding={1}>
             <Box
@@ -404,6 +498,9 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
       }
 
       if (!data.currentStoryId && data.phase === 'idle') {
+        const hasFilter = logFilter.level !== 'all';
+        const filteredCount = logContent.length - filteredLogContent.length;
+
         return (
           <Box flexDirection="column" padding={1}>
             <Box
@@ -416,6 +513,9 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
                 Monitor
               </Text>
               <Text dimColor>Press 'r' to start Ralph</Text>
+              {hasFilter && filteredCount > 0 && (
+                <Text color={theme.warning}>({filteredCount} lines filtered)</Text>
+              )}
             </Box>
           </Box>
         );
@@ -527,9 +627,15 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
                   const maxLen = boxWidth - 8;
                   const shortLine =
                     cleanLine.length > maxLen ? cleanLine.slice(0, maxLen - 3) + '...' : cleanLine;
+
+                  // Find the line index in the filtered content array for proper highlighting
+                  const lineIndex = filteredLogContent.indexOf(line);
+                  const highlighted =
+                    lineIndex >= 0 ? highlightMatch(shortLine, lineIndex) : shortLine;
+
                   return (
                     <Text key={i} color={textColor}>
-                      {icon} {shortLine}
+                      {icon} {highlighted}
                     </Text>
                   );
                 })
@@ -618,6 +724,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             <Text>
               <Text dimColor>Current Story: </Text>
               <Text color={theme.accent}>{currentStory}</Text>
+              {retryCount > 0 && <Text color={theme.warning}> (attempt {retryCount + 1})</Text>}
             </Text>
           )}
           <Text>
@@ -645,9 +752,16 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           </Text>
           <Text> </Text>
           <Text bold color={theme.accent}>
-            Running Processes ({sessionInfo.processes.length})
+            Running Processes ({processState === 'running' ? 1 : sessionInfo.processes.length})
           </Text>
-          {sessionInfo.processes.length === 0 ? (
+          {processState === 'running' && processPid ? (
+            <Text>
+              <Text color={theme.success}>●</Text>
+              <Text> claude </Text>
+              <Text dimColor>(PID: {processPid})</Text>
+              {currentStory && <Text color={theme.accent}> → {currentStory}</Text>}
+            </Text>
+          ) : sessionInfo.processes.length === 0 ? (
             <Text dimColor>No Ralph processes running</Text>
           ) : (
             sessionInfo.processes.slice(0, 5).map((proc, i) => (
@@ -972,6 +1086,19 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
       );
     }
 
+    // Get filter display text
+    const getFilterDisplay = () => {
+      if (currentView !== 'monitor' || !logFilter) return '';
+
+      const filterLabels: Record<LogFilterLevel, string> = {
+        all: 'All',
+        errors: 'Errors',
+        warnings_errors: 'Warn+Err',
+      };
+
+      return filterLabels[logFilter.level as LogFilterLevel];
+    };
+
     return (
       <Box
         flexDirection="column"
@@ -985,6 +1112,15 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           <Text bold color={theme.accent}>
             Work: {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
           </Text>
+          {currentView === 'monitor' && logFilter && (
+            <>
+              <Text dimColor> | Filter: </Text>
+              <Text color={logFilter.level === 'all' ? theme.muted : theme.warning}>
+                {getFilterDisplay()}
+              </Text>
+              <Text dimColor> [f]</Text>
+            </>
+          )}
           <Text dimColor> [1-5 to switch]</Text>
         </Box>
 

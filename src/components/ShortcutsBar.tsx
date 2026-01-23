@@ -28,8 +28,10 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
     const globalShortcuts: ShortcutItem[] = [
       { key: 'Tab', description: 'Focus' },
       { key: 'r', description: 'Run' },
+      { key: 'R', description: 'Retry' },
       { key: 's', description: 'Stop' },
-      { key: 'n', description: 'New Tab' },
+      { key: 'p', description: 'Recent' },
+      { key: 'Ctrl+Shift+T', description: 'New Tab' },
       { key: 'e', description: 'Close' },
       { key: 't', description: 'Theme' },
       { key: '?', description: 'Help' },
@@ -37,14 +39,20 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
     ];
 
     const contextShortcuts: Record<FocusPane, ShortcutItem[]> = {
+      projects: [
+        { key: '[', description: 'Toggle' },
+        { key: 'r', description: 'Recent' },
+      ],
       tabs: [{ key: '1-5', description: 'Switch Tab' }],
       sessions: [
         { key: 'j/k', description: 'Navigate' },
         { key: 'Enter', description: 'View' },
+        { key: 'g', description: 'Go to Story' },
       ],
       work: [
         { key: '1-5', description: 'Views' },
         { key: 'j/k', description: 'Scroll' },
+        { key: '/', description: 'Search' },
       ],
     };
 

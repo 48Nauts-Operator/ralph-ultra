@@ -1,0 +1,214 @@
+{
+  "project": "ralph-ultra-v2.1-pragmatic-foundation",
+  "description": "Ralph Ultra v2.1 - Pragmatic Foundation: Core improvements to execution control, error recovery, and developer experience based on Pragmatic Programmer principles",
+  "branchName": "ralph/v2.1-pragmatic-foundation",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Search within logs",
+      "description": "Add the ability to search within the log output in the Monitor view. User presses '/' to enter search mode, types a query, and matching lines are highlighted. Press 'n' for next match, 'N' for previous match, 'Esc' to exit search mode. This is a tracer bullet - minimal end-to-end first.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001-1",
+          "text": "Search state and types are defined in types/index.ts",
+          "testCommand": "grep -q 'searchQuery\\|searchMode\\|SearchState' src/types/index.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T00:33:24.641Z"
+        },
+        {
+          "id": "AC-001-2",
+          "text": "useSearch hook exists with search logic",
+          "testCommand": "test -f src/hooks/useSearch.tsx && grep -q 'export.*useSearch' src/hooks/useSearch.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T00:33:24.641Z"
+        },
+        {
+          "id": "AC-001-3",
+          "text": "WorkPane integrates search highlighting for matching log lines",
+          "testCommand": "grep -q 'searchQuery\\|useSearch\\|highlightMatch' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T00:33:24.641Z"
+        },
+        {
+          "id": "AC-001-4",
+          "text": "Keyboard handler responds to '/' key to activate search mode",
+          "testCommand": "grep -q \"'/'\" src/components/App.tsx || grep -q 'searchMode' src/components/App.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T00:33:24.641Z"
+        },
+        {
+          "id": "AC-001-5",
+          "text": "ShortcutsBar shows search shortcut hint",
+          "testCommand": "grep -q 'Search\\|/' src/components/ShortcutsBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T00:33:24.641Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Retry failed stories",
+      "description": "Add the ability to retry the current story with 'R' key. When a story fails (AC tests don't pass), pressing 'R' should re-run the same story. The retry count should be displayed in the UI. This implements the 'Crash Early, Fix Fast' principle.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-002-1",
+          "text": "RalphService has a public retryCurrentStory() method",
+          "testCommand": "grep -q 'retryCurrentStory' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T00:48:58.466Z"
+        },
+        {
+          "id": "AC-002-2",
+          "text": "App.tsx handles 'R' key press to trigger retry",
+          "testCommand": "grep -q \"key: 'R'\" src/components/App.tsx && grep -q 'retry' src/components/App.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T00:48:58.466Z"
+        },
+        {
+          "id": "AC-002-3",
+          "text": "StatusBar or WorkPane displays retry count for current story",
+          "testCommand": "grep -q 'retryCount\\|retry' src/components/StatusBar.tsx || grep -q 'retryCount\\|attempt' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T00:48:58.466Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 2,
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Max iterations limit with backstop",
+      "description": "Add a configurable maximum iterations limit to prevent runaway execution. Default to 10 iterations per story. When limit is reached, Ralph should stop with a clear warning message. This implements the 'Crash Early' principle - preventing infinite loops that waste time and money.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-003-1",
+          "text": "MAX_ITERATIONS constant or config option exists",
+          "testCommand": "grep -q 'MAX_ITERATIONS\\|maxIterations' src/utils/ralph-service.ts || grep -q 'maxIterations' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T00:52:02.306Z"
+        },
+        {
+          "id": "AC-003-2",
+          "text": "RalphService tracks iteration count per story",
+          "testCommand": "grep -q 'iterationCount\\|storyIterations' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T00:52:02.306Z"
+        },
+        {
+          "id": "AC-003-3",
+          "text": "Execution stops with warning when max iterations reached",
+          "testCommand": "grep -q 'max.*iteration\\|iteration.*limit\\|exceeded' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T00:52:02.306Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 3,
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Skip to specific story",
+      "description": "Add ability to skip to any story in the PRD using keyboard navigation. In the SessionsPane, allow selecting a story and pressing Enter or 'g' (go) to jump to it, even if previous stories haven't passed. Useful for debugging specific stories or resuming work.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-004-1",
+          "text": "RalphService has method to run a specific story by ID",
+          "testCommand": "grep -q 'runStory\\|runSpecificStory\\|runById' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T01:02:40.983Z"
+        },
+        {
+          "id": "AC-004-2",
+          "text": "SessionsPane keyboard handler supports jumping to selected story",
+          "testCommand": "grep -q \"input === 'g'\" src/components/SessionsPane.tsx && grep -q 'key.return\\|onStoryEnter' src/components/SessionsPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:02:40.983Z"
+        },
+        {
+          "id": "AC-004-3",
+          "text": "ShortcutsBar shows the jump-to-story shortcut",
+          "testCommand": "grep -q 'Jump\\|Go to' src/components/ShortcutsBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:02:40.983Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 4,
+      "passes": true
+    },
+    {
+      "id": "US-005",
+      "title": "Log filtering by level",
+      "description": "Add ability to filter log output by level (all, errors only, warnings+errors). Press 'f' to cycle through filter modes. Filtered view should update in real-time. This helps developers focus on relevant information - a key debugging principle.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-005-1",
+          "text": "LogFilter type defined with filter levels",
+          "testCommand": "grep -q 'LogFilter\\|logFilter\\|filterLevel' src/types/index.ts || grep -q 'LogFilter' src/hooks/useSession.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:21:31.992Z"
+        },
+        {
+          "id": "AC-005-2",
+          "text": "WorkPane or hook filters log lines based on current filter",
+          "testCommand": "grep -q 'filter.*log\\|filterLogs\\|filteredLines' src/components/WorkPane.tsx || grep -q 'filterLogs' src/hooks/useSession.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:21:31.992Z"
+        },
+        {
+          "id": "AC-005-3",
+          "text": "Keyboard handler cycles filter with 'f' key",
+          "testCommand": "grep -q \"input === 'f'\\|key: 'f'\" src/components/App.tsx || grep -q 'cycleFilter\\|toggleFilter\\|filterMode' src/components/App.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:21:31.992Z"
+        },
+        {
+          "id": "AC-005-4",
+          "text": "Current filter mode is displayed in UI",
+          "testCommand": "grep -q 'logFilter\\|LogFilter\\|filtered' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:21:31.992Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 5,
+      "passes": true
+    },
+    {
+      "id": "US-006",
+      "title": "Terminal bell on completion/error",
+      "description": "Add optional terminal bell notification when a story completes or errors. Enable via settings. This provides immediate feedback without requiring constant visual monitoring - essential for long-running tasks.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-006-1",
+          "text": "Settings includes notificationSound boolean option",
+          "testCommand": "grep -q 'notificationSound' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T01:25:27.591Z"
+        },
+        {
+          "id": "AC-006-2",
+          "text": "Bell sound triggers on story completion or error when enabled",
+          "testCommand": "grep -q 'bell\\|\\\\x07\\|\\\\a' src/utils/ralph-service.ts || grep -q 'bell\\|\\\\x07' src/hooks/useNotifications.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:25:27.591Z"
+        },
+        {
+          "id": "AC-006-3",
+          "text": "Settings panel has toggle for notification sounds",
+          "testCommand": "grep -q 'notificationSound\\|bell\\|sound' src/components/SettingsPanel.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T01:25:27.591Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 6,
+      "passes": true
+    }
+  ]
+}

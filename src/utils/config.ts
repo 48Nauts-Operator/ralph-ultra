@@ -29,11 +29,20 @@ export interface SavedProject {
   color: string;
 }
 
+export interface RecentProject {
+  path: string;
+  name: string;
+  color?: string;
+  icon?: string;
+  lastAccessed: string; // ISO timestamp
+}
+
 export interface Settings {
   theme?: string;
   notificationSound?: boolean;
   openProjects?: SavedProject[];
   activeProjectPath?: string;
+  recentProjects?: RecentProject[];
   [key: string]: unknown;
 }
 
@@ -176,4 +185,56 @@ export function loadPrinciples(): string | null {
  */
 export function getPrinciplesPath(): string {
   return PRINCIPLES_FILE;
+}
+
+/**
+ * Maximum number of recent projects to store
+ */
+const MAX_RECENT_PROJECTS = 10;
+
+/**
+ * Add or update a project in recent projects list
+ * @param project Project details to add/update
+ */
+export function addToRecentProjects(project: {
+  path: string;
+  name: string;
+  color?: string;
+  icon?: string;
+}): void {
+  const settings = loadSettings();
+  const recent = settings.recentProjects || [];
+
+  // Remove existing entry if present (will re-add at top)
+  const filtered = recent.filter(p => p.path !== project.path);
+
+  // Add new entry at the beginning
+  const newRecent: RecentProject = {
+    ...project,
+    lastAccessed: new Date().toISOString(),
+  };
+
+  // Keep only MAX_RECENT_PROJECTS items
+  const updated = [newRecent, ...filtered].slice(0, MAX_RECENT_PROJECTS);
+
+  settings.recentProjects = updated;
+  saveSettings(settings);
+}
+
+/**
+ * Get recent projects list
+ * @returns Array of recent projects sorted by last accessed (newest first)
+ */
+export function getRecentProjects(): RecentProject[] {
+  const settings = loadSettings();
+  return settings.recentProjects || [];
+}
+
+/**
+ * Clear recent projects history
+ */
+export function clearRecentProjects(): void {
+  const settings = loadSettings();
+  settings.recentProjects = [];
+  saveSettings(settings);
 }

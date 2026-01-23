@@ -12,6 +12,7 @@ import { ProjectPicker } from './ProjectPicker';
 import { ConfirmDialog } from './ConfirmDialog';
 import { NotificationToast } from './NotificationToast';
 import { CommandPalette } from './CommandPalette';
+import { ProjectsRail } from './ProjectsRail';
 import { useTheme } from '@hooks/useTheme';
 import { useFocus } from '@hooks/useFocus';
 import { useKeyboard, KeyMatchers, KeyPriority } from '@hooks/useKeyboard';
@@ -34,6 +35,12 @@ import {
   copyToClipboard,
   type TailscaleStatus,
 } from '../remote/tailscale';
+import {
+  checkApiStatus,
+  formatStatusMessage,
+  shouldWarnAboutStatus,
+  type AnthropicStatus,
+} from '../utils/status-check';
 import type { Project, PRD } from '../types';
 import { readFileSync, watchFile, unwatchFile } from 'fs';
 import { join, basename } from 'path';
@@ -70,6 +77,8 @@ export const App: React.FC = () => {
   const [remoteConnections, setRemoteConnections] = useState(0);
   const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null);
   const [remoteURL, setRemoteURL] = useState<string | null>(null);
+  const [apiStatus, setApiStatus] = useState<AnthropicStatus | null>(null);
+  const [projectsRailCollapsed, setProjectsRailCollapsed] = useState(false);
   const remoteServerRef = useRef<RalphRemoteServer | null>(null);
   const httpServerRef = useRef<RalphHttpServer | null>(null);
 
@@ -204,6 +213,29 @@ export const App: React.FC = () => {
     prevPassCountRef.current = passCount;
   }, [prd, notify, activeTab.project.path]);
 
+  // Check API status on startup
+  useEffect(() => {
+    checkApiStatus().then(status => {
+      setApiStatus(status);
+      if (shouldWarnAboutStatus(status)) {
+        const { message } = formatStatusMessage(status);
+        notify('warning', message, 10000);
+      }
+    });
+
+    // Refresh status periodically (every 5 minutes)
+    const interval = setInterval(
+      () => {
+        checkApiStatus().then(status => {
+          setApiStatus(status);
+        });
+      },
+      5 * 60 * 1000,
+    );
+
+    return () => clearInterval(interval);
+  }, [notify]);
+
   // Always show welcome splash on startup
   useEffect(() => {
     setShowWelcome(true);
@@ -304,8 +336,9 @@ export const App: React.FC = () => {
       switch (command.action) {
         case 'run':
           if (activeTab.processState === 'idle') {
+            const ignoreApiStatus = process.env['RALPH_IGNORE_API_STATUS'] === 'true';
             getRalphService(activeTabId)
-              .run(activeTab.project.path)
+              .run(activeTab.project.path, { ignoreApiStatus })
               .catch(() => {});
           }
           break;
@@ -364,7 +397,8 @@ export const App: React.FC = () => {
       action: async () => {
         if (activeTab.processState === 'idle') {
           try {
-            await getRalphService(activeTabId).run(activeTab.project.path);
+            const ignoreApiStatus = process.env['RALPH_IGNORE_API_STATUS'] === 'true';
+            await getRalphService(activeTabId).run(activeTab.project.path, { ignoreApiStatus });
           } catch {
             // Error handled by service callbacks
           }
@@ -506,6 +540,36 @@ export const App: React.FC = () => {
         }
       },
     },
+    // Logs
+    {
+      id: 'cycle-filter',
+      label: 'Cycle Log Filter',
+      description: 'Cycle through log filter levels (all/errors/warnings+errors)',
+      shortcut: 'f',
+      category: 'Logs',
+      action: () => {
+        const currentLevel = activeTab.logFilter?.level || 'all';
+        const levels: Array<import('../types').LogFilterLevel> = [
+          'all',
+          'errors',
+          'warnings_errors',
+        ];
+        const currentIndex = levels.indexOf(currentLevel as import('../types').LogFilterLevel);
+        const nextIndex = (currentIndex + 1) % levels.length;
+        const nextLevel = levels[nextIndex]!;
+
+        updateTab(activeTabId, {
+          logFilter: { level: nextLevel },
+        });
+
+        const filterLabels: Record<import('../types').LogFilterLevel, string> = {
+          all: 'All logs',
+          errors: 'Errors only',
+          warnings_errors: 'Warnings & Errors',
+        };
+        notify('info', `Log filter: ${filterLabels[nextLevel]}`);
+      },
+    },
   ];
 
   // Register global keyboard shortcuts
@@ -543,10 +607,19 @@ export const App: React.FC = () => {
         handler: async () => {
           if (activeTab.processState !== 'idle') return;
           try {
-            await getRalphService(activeTabId).run(activeTab.project.path);
+            const ignoreApiStatus = process.env['RALPH_IGNORE_API_STATUS'] === 'true';
+            await getRalphService(activeTabId).run(activeTab.project.path, { ignoreApiStatus });
           } catch {
             // Error handled by service callbacks
           }
+        },
+        priority: KeyPriority.GLOBAL,
+      },
+      {
+        key: 'R',
+        handler: () => {
+          if (activeTab.processState !== 'idle') return;
+          getRalphService(activeTabId).retryCurrentStory();
         },
         priority: KeyPriority.GLOBAL,
       },
@@ -582,6 +655,34 @@ export const App: React.FC = () => {
         priority: KeyPriority.GLOBAL,
       },
       {
+        key: 'f',
+        handler: () => {
+          // Cycle through log filter levels: all -> errors -> warnings_errors -> all
+          const currentLevel = activeTab.logFilter?.level || 'all';
+          const levels: Array<import('../types').LogFilterLevel> = [
+            'all',
+            'errors',
+            'warnings_errors',
+          ];
+          const currentIndex = levels.indexOf(currentLevel as import('../types').LogFilterLevel);
+          const nextIndex = (currentIndex + 1) % levels.length;
+          const nextLevel = levels[nextIndex]!;
+
+          updateTab(activeTabId, {
+            logFilter: { level: nextLevel },
+          });
+
+          // Notify user of filter change
+          const filterLabels: Record<import('../types').LogFilterLevel, string> = {
+            all: 'All logs',
+            errors: 'Errors only',
+            warnings_errors: 'Warnings & Errors',
+          };
+          notify('info', `Log filter: ${filterLabels[nextLevel]}`);
+        },
+        priority: KeyPriority.GLOBAL,
+      },
+      {
         key: 'c',
         handler: async () => {
           if (remoteURL) {
@@ -595,12 +696,133 @@ export const App: React.FC = () => {
         handler: () => exit(),
         priority: KeyPriority.GLOBAL,
       },
-      // Tab switching
+      // Filter shortcut
+      {
+        key: 'f',
+        handler: () => {
+          if (activeTab.workPaneView === 'monitor') {
+            // Cycle through filter levels
+            const currentLevel = activeTab.logFilter?.level || 'all';
+            const levels: import('../types').LogFilterLevel[] = [
+              'all',
+              'errors',
+              'warnings_errors',
+            ];
+            const currentIndex = levels.indexOf(currentLevel);
+            const nextIndex = (currentIndex + 1) % levels.length;
+            const nextLevel = levels[nextIndex]!;
+
+            updateTab(activeTabId, {
+              logFilter: {
+                level: nextLevel,
+              },
+            });
+
+            // Notify user of filter change
+            const filterNames: Record<import('../types').LogFilterLevel, string> = {
+              all: 'All logs',
+              errors: 'Errors only',
+              warnings_errors: 'Warnings & Errors',
+            };
+            notify('info', `Filter: ${filterNames[nextLevel]}`);
+          }
+        },
+        priority: KeyPriority.GLOBAL,
+        isActive:
+          !showWelcome &&
+          !showSettings &&
+          !showProjectPicker &&
+          !showCloseConfirm &&
+          !showCommandPalette,
+      },
+      // Search shortcuts
+      {
+        key: '/',
+        handler: () => {
+          if (activeTab.workPaneView === 'monitor') {
+            updateTab(activeTabId, {
+              searchState: {
+                ...activeTab.searchState,
+                searchMode: true,
+                searchQuery: '',
+                currentMatchIndex: 0,
+                totalMatches: 0,
+                matchingLines: [],
+              },
+            });
+          }
+        },
+        priority: KeyPriority.GLOBAL,
+        isActive:
+          !showWelcome &&
+          !showSettings &&
+          !showProjectPicker &&
+          !showCloseConfirm &&
+          !showCommandPalette,
+      },
       {
         key: 'n',
-        handler: () => setShowProjectPicker(true),
+        handler: () => {
+          if (activeTab.searchState?.searchMode && activeTab.searchState.totalMatches > 0) {
+            const nextIndex =
+              (activeTab.searchState.currentMatchIndex + 1) % activeTab.searchState.totalMatches;
+            updateTab(activeTabId, {
+              searchState: {
+                ...activeTab.searchState,
+                currentMatchIndex: nextIndex,
+              },
+            });
+          } else {
+            // Original 'n' handler - show project picker
+            setShowProjectPicker(true);
+          }
+        },
         priority: KeyPriority.GLOBAL,
+        isActive:
+          !showWelcome &&
+          !showSettings &&
+          !showProjectPicker &&
+          !showCloseConfirm &&
+          !showCommandPalette,
       },
+      {
+        key: 'N',
+        handler: () => {
+          if (activeTab.searchState?.searchMode && activeTab.searchState.totalMatches > 0) {
+            const prevIndex =
+              activeTab.searchState.currentMatchIndex === 0
+                ? activeTab.searchState.totalMatches - 1
+                : activeTab.searchState.currentMatchIndex - 1;
+            updateTab(activeTabId, {
+              searchState: {
+                ...activeTab.searchState,
+                currentMatchIndex: prevIndex,
+              },
+            });
+          }
+        },
+        priority: KeyPriority.GLOBAL,
+        isActive: activeTab.searchState?.searchMode === true,
+      },
+      {
+        key: KeyMatchers.escape,
+        handler: () => {
+          if (activeTab.searchState?.searchMode) {
+            updateTab(activeTabId, {
+              searchState: {
+                searchQuery: '',
+                searchMode: false,
+                currentMatchIndex: 0,
+                totalMatches: 0,
+                matchingLines: [],
+              },
+            });
+          }
+        },
+        priority: KeyPriority.GLOBAL,
+        isActive: activeTab.searchState?.searchMode === true,
+      },
+      // Tab switching (removed 'n' key since it's now used for search navigation)
       {
         key: (_input: string, key: { ctrl?: boolean; shift?: boolean; name?: string }) =>
           Boolean(key.ctrl && key.shift && key.name === 't'),
@@ -698,8 +920,10 @@ export const App: React.FC = () => {
     );
   }
 
-  const sessionsWidth = Math.max(30, Math.floor(dimensions.columns * 0.4));
-  const workWidth = Math.max(40, dimensions.columns - sessionsWidth);
+  const projectsRailWidth = projectsRailCollapsed ? 3 : 12;
+  const remainingWidth = dimensions.columns - projectsRailWidth;
+  const sessionsWidth = Math.max(30, Math.floor(remainingWidth * 0.4));
+  const workWidth = Math.max(40, remainingWidth - sessionsWidth);
   const contentHeight = dimensions.rows - 3;
 
   return (
@@ -721,6 +945,7 @@ export const App: React.FC = () => {
         }
         remoteConnections={remoteConnections}
         tailscaleStatus={tailscaleStatus}
+        apiStatus={apiStatus}
       />
 
       <TabBar
@@ -731,7 +956,32 @@ export const App: React.FC = () => {
         onSelectTab={switchTab}
       />
 
-      <Box flexGrow={1}>
+      <Box flexGrow={1} flexDirection="row">
+        <ProjectsRail
+          collapsed={projectsRailCollapsed}
+          onToggleCollapse={() => setProjectsRailCollapsed(prev => !prev)}
+          projects={tabs.map(t => t.project)}
+          activeProjectId={activeTab.project.id}
+          onSelectProject={projectId => {
+            const tab = tabs.find(t => t.project.id === projectId);
+            if (tab) {
+              switchTab(tab.id);
+            }
+          }}
+          onSelectRecentProject={path => {
+            // Create a new project from the recent path
+            const name = path.split('/').pop() || 'Unknown';
+            const newProject: Project = {
+              id: `proj-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+              name,
+              path,
+              color: '#7FFFD4',
+            };
+            openTab(newProject);
+          }}
+          hasFocus={isFocused('projects')}
+        />
+
         <SessionsPane
           isFocused={isFocused('sessions')}
           height={contentHeight}
@@ -740,6 +990,21 @@ export const App: React.FC = () => {
           onStoryEnter={story => {
             handleStorySelect(story);
             updateTab(activeTabId, { workPaneView: 'details' });
+          }}
+          onStoryJump={async story => {
+            // Jump directly to the selected story, skipping previous uncompleted ones
+            if (activeTab.processState !== 'idle') {
+              // Can't jump when Ralph is running
+              return;
+            }
+            try {
+              const ignoreApiStatus = process.env['RALPH_IGNORE_API_STATUS'] === 'true';
+              await getRalphService(activeTabId).runStory(activeTab.project.path, story.id, {
+                ignoreApiStatus,
+              });
+            } catch {
+              // Error will be handled by the service's output callbacks
+            }
           }}
           initialScrollIndex={activeTab.sessionsScrollIndex}
           initialSelectedStoryId={activeTab.selectedStoryId}
@@ -764,6 +1029,9 @@ export const App: React.FC = () => {
           lastRunDuration={activeTab.lastRunDuration}
           lastRunExitCode={activeTab.lastRunExitCode}
           currentStory={activeTab.currentStory}
+          retryCount={activeTab.retryCount}
+          logFilter={activeTab.logFilter}
+          allStoriesComplete={prd ? prd.userStories.every(s => s.passes) : false}
         />
       </Box>
 
