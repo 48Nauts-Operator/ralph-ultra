@@ -75,7 +75,7 @@ export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
 /**
  * Work pane view types
  */
-export type WorkView = 'monitor' | 'status' | 'details' | 'quota' | 'plan' | 'help' | 'version';
+export type WorkView = 'monitor' | 'status' | 'details' | 'quota' | 'plan' | 'help' | 'version' | 'costs';
 
 /**
  * Complete state for a single tab/project

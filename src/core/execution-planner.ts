@@ -12,6 +12,7 @@ import type {
   ProviderQuotas,
   TaskType,
   Provider,
+  ModelLearningDB,
 } from './types';
 import { detectTaskType } from './task-detector';
 import { getRecommendedModel, TASK_MODEL_MAPPING } from './capability-matrix';
@@ -57,6 +58,80 @@ export const TOKEN_ESTIMATES: Record<
 export { estimateCost };
 
 // =============================================================================
+// CONFIDENCE CALCULATION
+// =============================================================================
+
+/**
+ * Calculate confidence score for a model recommendation based on learning data.
+ *
+ * Confidence reflects how proven the model is for the given task type:
+ * - High confidence (0.9-1.0): Model has proven track record (5+ successful runs)
+ * - Medium confidence (0.7-0.9): Model has some history (3-5 runs)
+ * - Low confidence (0.5-0.7): Limited history (1-2 runs)
+ * - Default confidence (0.5): No historical data
+ *
+ * @param provider - Model provider
+ * @param modelId - Model identifier
+ * @param taskType - Type of task
+ * @param learningData - Learning database (optional)
+ * @returns Confidence score between 0.5 and 1.0
+ */
+function calculateConfidenceScore(
+  provider: Provider,
+  modelId: string,
+  taskType: TaskType,
+  learningData?: ModelLearningDB
+): number {
+  // Default confidence when no learning data is available
+  if (!learningData) {
+    return 0.5;
+  }
+
+  // Look up learning stats for this model + task type
+  const modelKey = `${provider}:${modelId}`;
+  const modelLearnings = learningData.learnings[modelKey];
+
+  if (!modelLearnings) {
+    return 0.5; // No data for this model
+  }
+
+  const learning = modelLearnings[taskType];
+
+  if (!learning) {
+    return 0.5; // No data for this task type
+  }
+
+  // Calculate confidence based on:
+  // 1. Number of runs (more runs = higher confidence)
+  // 2. Overall score (better performance = higher confidence)
+  // 3. Success rate (more reliable = higher confidence)
+
+  const { totalRuns, overallScore, successRate } = learning;
+
+  // Base confidence from overall score (0-100 → 0.5-0.85)
+  const scoreConfidence = 0.5 + (overallScore / 100) * 0.35;
+
+  // Bonus from success rate (0-1 → 0-0.1)
+  const reliabilityBonus = successRate * 0.1;
+
+  // Bonus from experience (more runs = higher confidence, max +0.05)
+  let experienceBonus = 0;
+  if (totalRuns >= 10) {
+    experienceBonus = 0.05;
+  } else if (totalRuns >= 5) {
+    experienceBonus = 0.03;
+  } else if (totalRuns >= 3) {
+    experienceBonus = 0.01;
+  }
+
+  // Combine all factors
+  const confidence = scoreConfidence + reliabilityBonus + experienceBonus;
+
+  // Clamp to [0.5, 1.0] range
+  return Math.min(1.0, Math.max(0.5, confidence));
+}
+
+// =============================================================================
 // PLAN GENERATION
 // =============================================================================
 
@@ -66,19 +141,21 @@ export { estimateCost };
  * @param prd - The Product Requirements Document
  * @param quotas - Current provider quotas (optional, for quota-aware model selection)
  * @param projectPath - Path to the project directory
+ * @param learningData - Learning database to influence model recommendations (optional)
  * @returns An optimized execution plan with model allocations and cost estimates
  */
 export function generateExecutionPlan(
   prd: PRD,
   quotas?: ProviderQuotas,
-  projectPath = ''
+  projectPath = '',
+  learningData?: ModelLearningDB
 ): ExecutionPlan {
   const generatedAt = new Date().toISOString();
   const stories: StoryAllocation[] = [];
 
   // Analyze each user story and assign models
   for (const story of prd.userStories) {
-    const allocation = createStoryAllocation(story, quotas);
+    const allocation = createStoryAllocation(story, quotas, learningData);
     stories.push(allocation);
   }
 
@@ -119,7 +196,11 @@ export function generateExecutionPlan(
 /**
  * Create a story allocation with model recommendation and cost estimates.
  */
-function createStoryAllocation(story: UserStory, quotas?: ProviderQuotas): StoryAllocation {
+function createStoryAllocation(
+  story: UserStory,
+  quotas?: ProviderQuotas,
+  learningData?: ModelLearningDB
+): StoryAllocation {
   // Detect task type from story content
   const taskType = detectTaskType(story);
 
@@ -145,6 +226,14 @@ function createStoryAllocation(story: UserStory, quotas?: ProviderQuotas): Story
     tokenEstimate.output
   );
 
+  // Calculate confidence based on learning data
+  const confidence = calculateConfidenceScore(
+    recommended.provider,
+    recommended.modelId,
+    taskType,
+    learningData
+  );
+
   return {
     storyId: story.id,
     title: story.title,
@@ -154,7 +243,7 @@ function createStoryAllocation(story: UserStory, quotas?: ProviderQuotas): Story
       provider: recommended.provider,
       modelId: recommended.modelId,
       reason: recommended.reason,
-      confidence: 0.8, // Default confidence, will be updated by learning system
+      confidence,
     },
     estimatedTokens,
     estimatedCost,

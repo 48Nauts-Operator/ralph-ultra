@@ -27,6 +27,7 @@ import { RalphService, type ComplexityWarning } from '../utils/ralph-service';
 import { QuotaDashboard } from './QuotaDashboard';
 import { VersionView } from './VersionView';
 import { ExecutionPlanView } from './ExecutionPlanView';
+import { CostDashboard } from './CostDashboard';
 
 interface WorkPaneProps {
   isFocused: boolean;
@@ -381,6 +382,10 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
         }
         if (input === '7') {
           setCurrentView('version');
+          return;
+        }
+        if (input === '8') {
+          setCurrentView('costs');
           return;
         }
 
@@ -1385,6 +1390,8 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           return renderHelp();
         case 'version':
           return <VersionView height={height - 4} isFocused={isFocused} />;
+        case 'costs':
+          return <CostDashboard />;
         default:
           return renderMonitor();
       }

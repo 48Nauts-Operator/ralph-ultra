@@ -12,3 +12,5 @@ export {
 export { generateExecutionPlan, TOKEN_ESTIMATES } from './execution-planner';
 export { detectTaskType } from './task-detector';
 export { getRecommendedModel } from './capability-matrix';
+export { CostTracker, costTracker, type StoryExecutionRecord } from './cost-tracker';
+export { LearningRecorder, learningRecorder } from './learning-recorder';

@@ -153,33 +153,33 @@
           "id": "AC-005-1",
           "text": "WorkPane imports CostDashboard component",
           "testCommand": "grep -q 'CostDashboard' src/components/WorkPane.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T14:16:20.510Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-005-2",
           "text": "WorkPaneView type includes 'costs' as a valid view option",
           "testCommand": "grep -q \"'costs'\\|costs\" src/types/index.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:16:20.510Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-005-3",
           "text": "App.tsx handles key '8' to switch to costs view",
           "testCommand": "grep -q \"'8'\" src/components/App.tsx && grep -q 'costs' src/components/App.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T14:16:20.510Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-005-4",
           "text": "ShortcutsBar shows key 8 for Costs view",
           "testCommand": "grep -q '8' src/components/ShortcutsBar.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T14:16:20.510Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "simple",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-006",
@@ -190,26 +190,26 @@
           "id": "AC-006-1",
           "text": "useCostTracker.tsx file exists in src/hooks/",
           "testCommand": "test -f src/hooks/useCostTracker.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T14:19:05.640Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-006-2",
           "text": "Hook exports useCostTracker that returns sessionCosts, historicalCosts, isTracking",
           "testCommand": "grep -q 'export.*useCostTracker' src/hooks/useCostTracker.tsx && grep -q 'sessionCosts' src/hooks/useCostTracker.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T14:19:05.640Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-006-3",
           "text": "Hook subscribes to cost-tracker events via event bus or direct subscription",
           "testCommand": "grep -q 'subscribe\\|useEffect\\|eventBus\\|EventBus' src/hooks/useCostTracker.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T14:19:05.640Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "simple",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-007",
@@ -220,40 +220,40 @@
           "id": "AC-007-1",
           "text": "learning-recorder.ts file exists in src/core/",
           "testCommand": "test -f src/core/learning-recorder.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:23:05.645Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-007-2",
           "text": "LearningRecorder class exported with recordRun, getModelStats, and getBestModelForTask methods",
           "testCommand": "grep -q 'export.*class LearningRecorder\\|export.*LearningRecorder' src/core/learning-recorder.ts && grep -q 'recordRun' src/core/learning-recorder.ts && grep -q 'getModelStats\\|getBestModel' src/core/learning-recorder.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:23:05.645Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-007-3",
           "text": "Uses ModelPerformanceRecord type from core/types.ts",
           "testCommand": "grep -q 'ModelPerformanceRecord' src/core/learning-recorder.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:23:05.645Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-007-4",
           "text": "Learning data persisted to ~/.config/ralph-ultra/learning.json",
           "testCommand": "grep -q 'learning.json' src/core/learning-recorder.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:23:05.645Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-007-5",
           "text": "Calculates efficiency, speed, and reliability scores per model+taskType combination",
           "testCommand": "grep -q 'efficiencyScore\\|speedScore\\|reliabilityScore' src/core/learning-recorder.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:23:05.645Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "complex",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-008",
@@ -264,26 +264,26 @@
           "id": "AC-008-1",
           "text": "RalphService imports and instantiates LearningRecorder",
           "testCommand": "grep -q 'LearningRecorder' src/utils/ralph-service.ts && grep -q 'learning-recorder' src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:26:07.273Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-2",
           "text": "recordRun called after each story completion with full performance data",
           "testCommand": "grep -q 'recordRun' src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:26:07.273Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-3",
           "text": "Performance data includes: storyId, taskType, modelId, duration, tokens, cost, success, acPassRate",
           "testCommand": "grep -q 'taskType\\|acPassRate\\|duration' src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:26:07.273Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-009",
@@ -294,26 +294,26 @@
           "id": "AC-009-1",
           "text": "execution-planner.ts imports LearningRecorder",
           "testCommand": "grep -q 'LearningRecorder\\|learning-recorder' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-2",
           "text": "generateExecutionPlan optionally accepts learning data to influence recommendations",
           "testCommand": "grep -q 'learning\\|Learning' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-3",
           "text": "Model confidence score reflects learning data when available (higher confidence for proven models)",
           "testCommand": "grep -q 'confidence' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-010",

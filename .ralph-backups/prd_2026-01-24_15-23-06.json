@@ -264,26 +264,26 @@
           "id": "AC-008-1",
           "text": "RalphService imports and instantiates LearningRecorder",
           "testCommand": "grep -q 'LearningRecorder' src/utils/ralph-service.ts && grep -q 'learning-recorder' src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:26:07.273Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-2",
           "text": "recordRun called after each story completion with full performance data",
           "testCommand": "grep -q 'recordRun' src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:26:07.273Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-3",
           "text": "Performance data includes: storyId, taskType, modelId, duration, tokens, cost, success, acPassRate",
           "testCommand": "grep -q 'taskType\\|acPassRate\\|duration' src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:26:07.273Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-009",
@@ -294,26 +294,26 @@
           "id": "AC-009-1",
           "text": "execution-planner.ts imports LearningRecorder",
           "testCommand": "grep -q 'LearningRecorder\\|learning-recorder' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-2",
           "text": "generateExecutionPlan optionally accepts learning data to influence recommendations",
           "testCommand": "grep -q 'learning\\|Learning' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-3",
           "text": "Model confidence score reflects learning data when available (higher confidence for proven models)",
           "testCommand": "grep -q 'confidence' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-010",

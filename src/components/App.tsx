@@ -642,6 +642,16 @@ export const App: React.FC = () => {
         updateTab(activeTabId, { workPaneView: 'version' });
       },
     },
+    {
+      id: 'view-costs',
+      label: 'View: Costs',
+      description: 'Show cost tracking dashboard',
+      shortcut: '8',
+      category: 'Views',
+      action: () => {
+        updateTab(activeTabId, { workPaneView: 'costs' });
+      },
+    },
     // Interface
     {
       id: 'help',
@@ -1306,6 +1316,19 @@ export const App: React.FC = () => {
       {
         key: '7',
         handler: () => updateTab(activeTabId, { workPaneView: 'version' }),
+        priority: KeyPriority.GLOBAL,
+        isActive:
+          !showWelcome &&
+          !showSettings &&
+          !showProjectPicker &&
+          !showCloseConfirm &&
+          !showComplexityWarning &&
+          !showCommandPalette &&
+          !activeTab.gotoState?.gotoMode,
+      },
+      {
+        key: '8',
+        handler: () => updateTab(activeTabId, { workPaneView: 'costs' }),
         priority: KeyPriority.GLOBAL,
         isActive:
           !showWelcome &&

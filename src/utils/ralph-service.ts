@@ -19,6 +19,10 @@ import { isTestableAC } from '../types';
 import { runStoryTestsAndSave, type ACTestResult } from './ac-runner';
 import { checkApiStatus, shouldWarnAboutStatus } from './status-check';
 import { loadSettings } from './config';
+import { CostTracker } from '../core/cost-tracker';
+import { LearningRecorder } from '../core/learning-recorder';
+import type { Provider, ExecutionPlan, TaskType } from '../core/types';
+import { generateExecutionPlan } from '../core/execution-planner';
 
 export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
 
@@ -107,10 +111,15 @@ export class RalphService {
   private progressFile: string;
   private executionProgress: ExecutionProgress;
   private debugMode: boolean = false;
+  private costTracker: CostTracker;
+  private learningRecorder: LearningRecorder;
+  private executionPlan: ExecutionPlan | null = null;
 
   constructor(projectPath: string) {
     this.projectPath = projectPath;
     this.tmuxSessionName = this.buildTmuxSessionName();
+    this.costTracker = new CostTracker();
+    this.learningRecorder = new LearningRecorder();
 
     const logsDir = join(projectPath, 'logs');
     if (!existsSync(logsDir)) {
@@ -604,6 +613,141 @@ Begin implementation now.`;
   }
 
   /**
+   * Load or generate execution plan for the current PRD.
+   * Caches the plan for subsequent calls.
+   */
+  private loadOrGenerateExecutionPlan(prd: PRD): ExecutionPlan | null {
+    if (this.executionPlan) {
+      return this.executionPlan;
+    }
+
+    try {
+      // Generate execution plan from PRD with learning data
+      const learningData = this.learningRecorder.getAllLearnings();
+      this.executionPlan = generateExecutionPlan(prd, undefined, this.projectPath, learningData);
+      this.log('INFO', `Execution plan generated with ${this.executionPlan.stories.length} stories`);
+      return this.executionPlan;
+    } catch (err) {
+      this.log('WARN', `Failed to generate execution plan: ${err}`);
+      return null;
+    }
+  }
+
+  /**
+   * Map model ID from execution plan to Claude CLI model flag value.
+   * Falls back to 'sonnet' if model is unknown or not supported.
+   */
+  private mapModelIdToCLIFlag(modelId: string): string {
+    // Map full model IDs to CLI model names
+    const modelMapping: Record<string, string> = {
+      'claude-opus-4-20250514': 'opus',
+      'claude-sonnet-4-20250514': 'sonnet',
+      'claude-3-5-haiku-20241022': 'haiku',
+      // Add common variants
+      'claude-opus-4': 'opus',
+      'claude-sonnet-4': 'sonnet',
+      'claude-haiku-3.5': 'haiku',
+    };
+
+    const cliModel = modelMapping[modelId];
+    if (cliModel) {
+      return cliModel;
+    }
+
+    // Try to detect from model ID string
+    if (modelId.includes('opus')) return 'opus';
+    if (modelId.includes('haiku')) return 'haiku';
+    if (modelId.includes('sonnet')) return 'sonnet';
+
+    // Default fallback
+    this.log('WARN', `Unknown model ID '${modelId}', falling back to 'sonnet'`);
+    return 'sonnet';
+  }
+
+  /**
+   * Map CLI name to provider and model ID for cost tracking
+   */
+  private mapCLIToProviderModel(cli: string): { provider: Provider; modelId: string } {
+    switch (cli) {
+      case 'claude':
+        return { provider: 'anthropic', modelId: 'claude-sonnet-4.5' };
+      case 'opencode':
+        return { provider: 'openai', modelId: 'gpt-4' };
+      case 'codex':
+        return { provider: 'openai', modelId: 'gpt-4-turbo' };
+      case 'gemini':
+        return { provider: 'gemini', modelId: 'gemini-pro' };
+      case 'aider':
+        // Aider can use different backends, default to GPT-4
+        return { provider: 'openai', modelId: 'gpt-4' };
+      case 'cody':
+        return { provider: 'anthropic', modelId: 'claude-2' };
+      default:
+        return { provider: 'local' as Provider, modelId: cli };
+    }
+  }
+
+  /**
+   * Extract token usage from CLI output log
+   * Looks for patterns like:
+   * - "Input tokens: 1234, Output tokens: 5678"
+   * - "Total tokens: 6912"
+   * - "tokens used: 6912"
+   * Returns { inputTokens, outputTokens } or { inputTokens: 0, outputTokens: 0 } if not found
+   */
+  private extractTokenUsage(logContent: string): { inputTokens: number; outputTokens: number } {
+    // Try to find input/output token counts
+    const inputMatch = logContent.match(/Input tokens?:?\s*(\d+)/i);
+    const outputMatch = logContent.match(/Output tokens?:?\s*(\d+)/i);
+
+    if (inputMatch && outputMatch) {
+      return {
+        inputTokens: parseInt(inputMatch[1] || '0', 10),
+        outputTokens: parseInt(outputMatch[1] || '0', 10),
+      };
+    }
+
+    // Try to find total tokens (assume 2:1 ratio output:input as rough estimate)
+    const totalMatch = logContent.match(/(?:Total|tokens used):?\s*(\d+)/i);
+    if (totalMatch) {
+      const total = parseInt(totalMatch[1] || '0', 10);
+      // Estimate: ~33% input, ~67% output (typical for code generation)
+      return {
+        inputTokens: Math.floor(total * 0.33),
+        outputTokens: Math.floor(total * 0.67),
+      };
+    }
+
+    // No token information found
+    return { inputTokens: 0, outputTokens: 0 };
+  }
+
+  /**
+   * Calculate cost based on provider and token usage
+   * Uses rough estimates for pricing per 1M tokens
+   */
+  private calculateCost(
+    provider: Provider,
+    inputTokens: number,
+    outputTokens: number,
+  ): number {
+    // Pricing per 1M tokens (USD) - approximate as of 2024
+    const pricing: Record<Provider, { input: number; output: number }> = {
+      anthropic: { input: 3.0, output: 15.0 }, // Claude Sonnet
+      openai: { input: 10.0, output: 30.0 }, // GPT-4
+      openrouter: { input: 5.0, output: 15.0 }, // Average
+      gemini: { input: 0.5, output: 1.5 }, // Gemini Pro
+      local: { input: 0, output: 0 }, // Free
+    };
+
+    const rates = pricing[provider] || pricing.local;
+    const inputCost = (inputTokens / 1_000_000) * rates.input;
+    const outputCost = (outputTokens / 1_000_000) * rates.output;
+
+    return inputCost + outputCost;
+  }
+
+  /**
    * Core complexity analysis implementation
    */
   private analyzeComplexity(story: UserStory): ComplexityWarning {
@@ -973,13 +1117,15 @@ Begin implementation now.`;
     return this.executionProgress;
   }
 
-  private buildTmuxCommand(cli: string, promptFile: string, logFile: string): string {
+  private buildTmuxCommand(cli: string, promptFile: string, logFile: string, modelFlag?: string): string {
     const catPrompt = `"$(cat '${promptFile}')"`;
     const signalDone = `; tmux wait-for -S "${this.tmuxSessionName}-done"`;
 
     switch (cli) {
       case 'claude':
-        return `${cli} --print --model sonnet --dangerously-skip-permissions ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
+        // Use provided model flag or fallback to 'sonnet'
+        const model = modelFlag || 'sonnet';
+        return `${cli} --print --model ${model} --dangerously-skip-permissions ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
       case 'opencode':
         return `${cli} run --title Ralph ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
       case 'codex':
@@ -1289,7 +1435,24 @@ Begin implementation now.`;
       execSync(`tmux new-session -d -s "${this.tmuxSessionName}" -c "${projectPath}"`);
 
       const promptFile = this.promptTempFile;
-      const cliCommand = this.buildTmuxCommand(cli, promptFile || '', this.sessionLogFile);
+
+      // Get recommended model from execution plan if available
+      let modelFlag: string | undefined;
+      if (cli === 'claude') {
+        const executionPlan = this.loadOrGenerateExecutionPlan(prd);
+        if (executionPlan) {
+          const storyAllocation = executionPlan.stories.find(s => s.storyId === story.id);
+          if (storyAllocation && storyAllocation.recommendedModel.provider === 'anthropic') {
+            modelFlag = this.mapModelIdToCLIFlag(storyAllocation.recommendedModel.modelId);
+            this.log('INFO', `Using model from execution plan: ${storyAllocation.recommendedModel.modelId} -> ${modelFlag}`);
+            this.outputCallback?.(`Model: ${modelFlag} (from execution plan)\n`, 'stdout');
+          } else {
+            this.log('INFO', `No execution plan model for story ${story.id}, using default`);
+          }
+        }
+      }
+
+      const cliCommand = this.buildTmuxCommand(cli, promptFile || '', this.sessionLogFile, modelFlag);
 
       this.log('INFO', `Creating tmux session: ${this.tmuxSessionName}`);
       this.log('INFO', `CLI command: ${cliCommand}`);
@@ -1303,6 +1466,12 @@ Begin implementation now.`;
       this.log('INFO', `Tmux session created with PID: ${this.tmuxPid}`);
       this.outputCallback?.(`Tmux session: ${this.tmuxSessionName}\n`, 'stdout');
       this.outputCallback?.(`Session PID: ${this.tmuxPid}\n`, 'stdout');
+
+      // Start cost tracking for this story
+      const { provider, modelId } = this.mapCLIToProviderModel(cli);
+      const estimatedCost = 0; // TODO: Get from execution plan when available
+      this.costTracker.startStory(story.id, modelId, provider, estimatedCost, retryCount);
+      this.log('INFO', `Cost tracking started: ${modelId} on ${provider}, retry ${retryCount}`);
 
       this.emitStatus({
         state: 'running',
@@ -1489,6 +1658,21 @@ Begin implementation now.`;
 
     const testResults = runStoryTestsAndSave(projectPath, story.id, onProgress);
 
+    // Extract token usage and end cost tracking
+    let sessionLogContent = '';
+    try {
+      if (existsSync(this.sessionLogFile)) {
+        sessionLogContent = readFileSync(this.sessionLogFile, 'utf-8');
+      }
+    } catch (err) {
+      this.log('WARN', `Failed to read session log for token extraction: ${err}`);
+    }
+
+    const { inputTokens, outputTokens } = this.extractTokenUsage(sessionLogContent);
+    const cli = this.detectAICLI() || 'claude';
+    const { provider } = this.mapCLIToProviderModel(cli);
+    const actualCost = this.calculateCost(provider, inputTokens, outputTokens);
+
     if (testResults) {
       const passedCount = testResults.results.filter(r => r.passes).length;
       const totalCount = testResults.results.length;
@@ -1496,6 +1680,60 @@ Begin implementation now.`;
       this.outputCallback?.(
         `\n─── Results: ${passedCount}/${totalCount} criteria passed ───\n`,
         'stdout',
+      );
+
+      // End cost tracking with actual results
+      const costRecord = this.costTracker.endStory(
+        story.id,
+        actualCost,
+        inputTokens,
+        outputTokens,
+        testResults.allPassed,
+      );
+
+      if (costRecord) {
+        this.log(
+          'INFO',
+          `Cost tracking completed: $${actualCost.toFixed(4)} (${inputTokens} in, ${outputTokens} out)`,
+        );
+      }
+
+      // Record performance data for learning
+      const prd = this.loadPRD();
+      const executionPlan = this.executionPlan || (prd ? this.loadOrGenerateExecutionPlan(prd) : null);
+      const storyAllocation = executionPlan?.stories.find(s => s.storyId === story.id);
+      const taskType: TaskType = storyAllocation?.taskType || 'unknown';
+      const { modelId } = this.mapCLIToProviderModel(cli);
+      const retryCount = this.storyRetryCount.get(story.id) || 0;
+      const durationMinutes = duration / (1000 * 60);
+      const acPassRate = passedCount / totalCount;
+
+      this.learningRecorder.recordRun({
+        project: prd?.project || basename(this.projectPath),
+        storyId: story.id,
+        storyTitle: story.title,
+        taskType,
+        complexity: story.complexity,
+        detectedCapabilities: storyAllocation?.recommendedModel
+          ? []
+          : [], // TODO: Add capability detection
+        provider,
+        modelId,
+        durationMinutes,
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        costUSD: actualCost,
+        success: testResults.allPassed,
+        retryCount,
+        acTotal: totalCount,
+        acPassed: passedCount,
+        acPassRate,
+      });
+
+      this.log(
+        'INFO',
+        `Learning recorded: ${story.id} (${taskType}, ${testResults.allPassed ? 'success' : 'failed'}, ${retryCount} retries)`,
       );
 
       if (testResults.allPassed) {

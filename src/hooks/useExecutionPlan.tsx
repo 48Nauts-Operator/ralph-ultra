@@ -4,6 +4,7 @@ import { join } from 'path';
 import type { PRD } from '../types';
 import type { ExecutionPlan } from '../core/types';
 import { generateExecutionPlan } from '../core/execution-planner';
+import { learningRecorder } from '../core/learning-recorder';
 import { useQuotas } from './useQuotas';
 
 /**
@@ -69,8 +70,9 @@ export function useExecutionPlan(projectPath: string) {
         return;
       }
 
-      // Generate execution plan with quota-aware model selection
-      const executionPlan = generateExecutionPlan(prd, quotas, projectPath);
+      // Generate execution plan with quota-aware model selection and learning data
+      const learningData = learningRecorder.getAllLearnings();
+      const executionPlan = generateExecutionPlan(prd, quotas, projectPath, learningData);
       setPlan(executionPlan);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate execution plan';

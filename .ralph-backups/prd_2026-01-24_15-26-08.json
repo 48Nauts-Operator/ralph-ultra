@@ -294,26 +294,26 @@
           "id": "AC-009-1",
           "text": "execution-planner.ts imports LearningRecorder",
           "testCommand": "grep -q 'LearningRecorder\\|learning-recorder' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-2",
           "text": "generateExecutionPlan optionally accepts learning data to influence recommendations",
           "testCommand": "grep -q 'learning\\|Learning' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-3",
           "text": "Model confidence score reflects learning data when available (higher confidence for proven models)",
           "testCommand": "grep -q 'confidence' src/core/execution-planner.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T14:29:47.202Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-010",

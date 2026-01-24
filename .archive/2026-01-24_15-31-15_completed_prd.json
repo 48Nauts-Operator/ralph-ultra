@@ -324,26 +324,26 @@
           "id": "AC-010-1",
           "text": "core/index.ts exports from cost-tracker",
           "testCommand": "grep -q 'cost-tracker' src/core/index.ts",
-          "passes": false,
-          "lastRun": null
+          "passes": true,
+          "lastRun": "2026-01-24T14:31:15.000Z"
         },
         {
           "id": "AC-010-2",
           "text": "core/index.ts exports from learning-recorder",
           "testCommand": "grep -q 'learning-recorder' src/core/index.ts",
-          "passes": false,
-          "lastRun": null
+          "passes": true,
+          "lastRun": "2026-01-24T14:31:15.000Z"
         },
         {
           "id": "AC-010-3",
           "text": "TypeScript compiles without errors",
           "testCommand": "cd /Volumes/DevHub_ext/factory/toolbox/ralph-ultra && bun run typecheck",
-          "passes": false,
-          "lastRun": null
+          "passes": true,
+          "lastRun": "2026-01-24T14:31:15.000Z"
         }
       ],
       "complexity": "simple",
-      "passes": false
+      "passes": true
     }
   ]
 }

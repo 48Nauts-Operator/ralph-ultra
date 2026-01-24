@@ -52,7 +52,7 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
         { key: 'g', description: 'Go to Story' },
       ],
       work: [
-        { key: '1-7', description: 'Views' },
+        { key: '1-8', description: 'Views' },
         { key: 'j/k', description: 'Scroll' },
         { key: '/', description: 'Search' },
       ],
