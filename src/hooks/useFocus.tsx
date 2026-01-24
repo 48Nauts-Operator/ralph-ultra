@@ -29,9 +29,10 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const cycleFocus = useCallback(() => {
     setFocusPane(prev => {
+      if (prev === 'projects') return 'sessions';
       if (prev === 'sessions') return 'work';
       if (prev === 'work') return 'tabs';
-      return 'sessions';
+      return 'projects';
     });
   }, []);
 

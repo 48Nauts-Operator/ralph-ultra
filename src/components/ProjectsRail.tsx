@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useTheme } from '@hooks/useTheme';
+import { getRecentProjects, clearRecentProjects, type RecentProject } from '@utils/config';
 import type { Project } from '../types';
 
 interface ProjectsRailProps {
@@ -14,6 +15,8 @@ interface ProjectsRailProps {
   activeProjectId: string | null;
   /** Callback when a project is selected */
   onSelectProject: (projectId: string) => void;
+  /** Callback when a recent project is selected */
+  onRecentSelect?: (path: string) => void;
   /** Whether this rail has focus for keyboard input */
   hasFocus: boolean;
 }
@@ -32,10 +35,25 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
   projects,
   activeProjectId,
   onSelectProject,
+  onRecentSelect,
   hasFocus,
 }) => {
   const { theme } = useTheme();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+  const [showRecent, setShowRecent] = useState(false);
+
+  // Load recent projects on mount and when focus changes
+  useEffect(() => {
+    const recent = getRecentProjects();
+    // Filter out currently open projects
+    const openPaths = new Set(projects.map(p => p.path));
+    const filtered = recent.filter(r => !openPaths.has(r.path));
+    setRecentProjects(filtered.slice(0, 5)); // Show max 5 recent projects
+  }, [projects, hasFocus]);
+
+  // Calculate total items (projects + recent)
+  const totalItems = projects.length + (showRecent ? recentProjects.length : 0);
 
   // Handle keyboard input when focused
   useInput(
@@ -48,16 +66,37 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
         return;
       }
 
+      // Toggle recent projects with 'r' key
+      if (input === 'r' && !collapsed) {
+        setShowRecent(prev => !prev);
+        return;
+      }
+
+      // Clear recent history with 'c' key when showing recent
+      if (input === 'c' && showRecent) {
+        clearRecentProjects();
+        setRecentProjects([]);
+        setShowRecent(false);
+        return;
+      }
+
       // Navigate with arrow keys
       if (key.upArrow) {
         setSelectedIndex(prev => Math.max(0, prev - 1));
       } else if (key.downArrow) {
-        setSelectedIndex(prev => Math.min(projects.length - 1, prev + 1));
+        setSelectedIndex(prev => Math.min(totalItems - 1, prev + 1));
       }
 
       // Select project with Enter
-      if (key.return && projects[selectedIndex]) {
-        onSelectProject(projects[selectedIndex].id);
+      if (key.return) {
+        if (selectedIndex < projects.length && projects[selectedIndex]) {
+          onSelectProject(projects[selectedIndex].id);
+        } else if (showRecent && onRecentSelect) {
+          const recentIndex = selectedIndex - projects.length;
+          if (recentProjects[recentIndex]) {
+            onRecentSelect(recentProjects[recentIndex].path);
+          }
+        }
       }
     },
     { isActive: hasFocus },
@@ -65,10 +104,10 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
 
   // Keep selected index in bounds
   useEffect(() => {
-    if (selectedIndex >= projects.length) {
-      setSelectedIndex(Math.max(0, projects.length - 1));
+    if (selectedIndex >= totalItems) {
+      setSelectedIndex(Math.max(0, totalItems - 1));
     }
-  }, [projects.length, selectedIndex]);
+  }, [totalItems, selectedIndex]);
 
   /**
    * Get the display icon for a project (first letter or custom icon)
@@ -83,6 +122,40 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
    */
   const getProjectColor = (project: Project): string => {
     return project.color || '#7FFFD4'; // Default to mint accent
+  };
+
+  /**
+   * Render a recent project item
+   */
+  const renderRecentProject = (recent: RecentProject, index: number) => {
+    const globalIndex = projects.length + index;
+    const isSelected = globalIndex === selectedIndex && hasFocus;
+    const icon = recent.icon || recent.name.charAt(0).toUpperCase();
+
+    if (collapsed) {
+      // Don't show recent in collapsed view
+      return null;
+    }
+
+    // Expanded view: icon + name
+    const displayName = recent.name.length > 8 ? recent.name.substring(0, 7) + '…' : recent.name;
+
+    return (
+      <Box key={recent.path} flexDirection="row" marginBottom={0}>
+        <Box
+          borderStyle={isSelected ? 'round' : 'single'}
+          borderColor={isSelected ? 'cyan' : 'gray'}
+          borderDimColor={!isSelected}
+          width={12}
+          paddingX={1}
+        >
+          <Text dimColor={!isSelected} color={isSelected ? theme.accent : undefined}>
+            {icon}
+          </Text>
+          <Text dimColor> {displayName}</Text>
+        </Box>
+      </Box>
+    );
   };
 
   /**
@@ -149,10 +222,33 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
         {projects.map((project, index) => renderProject(project, index))}
       </Box>
 
-      {/* Hint at bottom */}
-      {!collapsed && projects.length > 0 && (
-        <Box marginTop={1} paddingX={1}>
+      {/* Recent projects section */}
+      {!collapsed && recentProjects.length > 0 && (
+        <>
+          <Box marginTop={1} marginBottom={1} paddingX={1}>
+            <Text dimColor={!showRecent} color={showRecent ? theme.accent : undefined}>
+              Recent {showRecent ? '▼' : '▶'}
+            </Text>
+          </Box>
+
+          {showRecent && (
+            <Box flexDirection="column" gap={0}>
+              {recentProjects.map((recent, index) => renderRecentProject(recent, index))}
+            </Box>
+          )}
+        </>
+      )}
+
+      {/* Hints at bottom */}
+      {!collapsed && (
+        <Box marginTop={1} paddingX={1} flexDirection="column">
           <Text dimColor>[{' toggle'}</Text>
+          {recentProjects.length > 0 && (
+            <>
+              <Text dimColor>r{' recent'}</Text>
+              {showRecent && <Text dimColor>c{' clear'}</Text>}
+            </>
+          )}
         </Box>
       )}
     </Box>

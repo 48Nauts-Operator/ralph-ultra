@@ -6,6 +6,33 @@ import os from 'os';
 const CLAUDE_PROJECTS_DIR = join(os.homedir(), '.claude', 'projects');
 const CLAUDE_COST_PER_1K_INPUT = 0.003;
 const CLAUDE_COST_PER_1K_OUTPUT = 0.015;
+const ANTHROPIC_USAGE_API = 'https://api.anthropic.com/api/oauth/usage';
+
+export interface QuotaInfo {
+  fiveHour: {
+    utilization: number;
+    resetsAt: string | null;
+  };
+  sevenDay: {
+    utilization: number;
+    resetsAt: string | null;
+  };
+}
+
+export interface ContextBudget {
+  /** 5-hour utilization percentage */
+  fiveHourPercent: number;
+  /** 7-day utilization percentage */
+  sevenDayPercent: number;
+  /** Time until 5-hour reset */
+  fiveHourResetsAt: string | null;
+  /** Time until 7-day reset */
+  sevenDayResetsAt: string | null;
+  /** Whether approaching limit (>80%) */
+  approaching: boolean;
+  /** Whether at or exceeding limit (>95%) */
+  exceeded: boolean;
+}
 
 export interface SessionCost {
   cost: number;
@@ -24,6 +51,7 @@ export interface RalphProcess {
 export interface SessionInfo {
   model: string | null;
   cost: SessionCost;
+  contextBudget: ContextBudget;
   processes: RalphProcess[];
 }
 
@@ -122,6 +150,87 @@ export function getClaudeSessionCost(projectPath: string): SessionCost {
   };
 }
 
+function getOAuthToken(): string | null {
+  try {
+    const creds = execSync(
+      `security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || security find-generic-password -s "Claude Code" -w 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 5000 },
+    ).trim();
+
+    if (!creds) return null;
+    const parsed = JSON.parse(creds);
+    return parsed?.claudeAiOauth?.accessToken || null;
+  } catch {
+    return null;
+  }
+}
+
+let cachedQuota: { data: QuotaInfo; timestamp: number } | null = null;
+const QUOTA_CACHE_MS = 30000; // Cache for 30 seconds
+
+export function getQuotaInfo(): QuotaInfo | null {
+  // Return cached if fresh
+  if (cachedQuota && Date.now() - cachedQuota.timestamp < QUOTA_CACHE_MS) {
+    return cachedQuota.data;
+  }
+
+  const token = getOAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = execSync(
+      `curl -s -H "Authorization: Bearer ${token}" -H "anthropic-beta: oauth-2025-04-20" "${ANTHROPIC_USAGE_API}"`,
+      { encoding: 'utf-8', timeout: 10000 },
+    );
+
+    const data = JSON.parse(response);
+    const quota: QuotaInfo = {
+      fiveHour: {
+        utilization: data?.five_hour?.utilization ?? 0,
+        resetsAt: data?.five_hour?.resets_at ?? null,
+      },
+      sevenDay: {
+        utilization: data?.seven_day?.utilization ?? 0,
+        resetsAt: data?.seven_day?.resets_at ?? null,
+      },
+    };
+
+    cachedQuota = { data: quota, timestamp: Date.now() };
+    return quota;
+  } catch {
+    return null;
+  }
+}
+
+export function getContextBudget(): ContextBudget {
+  const quota = getQuotaInfo();
+
+  if (!quota) {
+    return {
+      fiveHourPercent: 0,
+      sevenDayPercent: 0,
+      fiveHourResetsAt: null,
+      sevenDayResetsAt: null,
+      approaching: false,
+      exceeded: false,
+    };
+  }
+
+  const fiveHour = quota.fiveHour.utilization;
+  const sevenDay = quota.sevenDay.utilization;
+  const approaching = fiveHour > 80 || sevenDay > 80;
+  const exceeded = fiveHour > 95 || sevenDay > 95;
+
+  return {
+    fiveHourPercent: Math.round(fiveHour * 10) / 10,
+    sevenDayPercent: Math.round(sevenDay * 10) / 10,
+    fiveHourResetsAt: quota.fiveHour.resetsAt,
+    sevenDayResetsAt: quota.sevenDay.resetsAt,
+    approaching,
+    exceeded,
+  };
+}
+
 export function getRalphProcesses(): RalphProcess[] {
   const processes: RalphProcess[] = [];
 
@@ -161,9 +270,14 @@ export function getRalphProcesses(): RalphProcess[] {
 }
 
 export function getSessionInfo(projectPath: string): SessionInfo {
+  const model = getClaudeModel(projectPath);
+  const cost = getClaudeSessionCost(projectPath);
+  const contextBudget = getContextBudget();
+
   return {
-    model: getClaudeModel(projectPath),
-    cost: getClaudeSessionCost(projectPath),
+    model,
+    cost,
+    contextBudget,
     processes: getRalphProcesses(),
   };
 }

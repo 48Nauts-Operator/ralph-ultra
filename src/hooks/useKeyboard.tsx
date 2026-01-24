@@ -162,6 +162,12 @@ export const KeyMatchers = {
   /** Match Enter/Return key */
   enter: (_input: string, key: Key) => key.return === true,
 
+  /** Match Return key (alias for enter) */
+  return: (_input: string, key: Key) => key.return === true,
+
+  /** Match Backspace/Delete key */
+  backspace: (_input: string, key: Key) => key.backspace === true || key.delete === true,
+
   /** Match up arrow key */
   upArrow: (_input: string, key: Key) => key.upArrow === true,
 

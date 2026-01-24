@@ -22,14 +22,6 @@ export const TabBar: React.FC<TabBarProps> = ({
 
   useInput(
     (input, key) => {
-      const num = parseInt(input, 10);
-      if (num >= 1 && num <= Math.min(tabs.length, 9)) {
-        const tab = tabs[num - 1];
-        if (tab) {
-          onSelectTab(tab.id);
-        }
-      }
-
       const currentIndex = tabs.findIndex(t => t.id === activeTabId);
 
       if ((key.leftArrow || input === 'h') && currentIndex > 0) {

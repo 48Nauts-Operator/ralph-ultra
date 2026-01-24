@@ -1,0 +1,159 @@
+{
+  "project": "ralph-ultra-v2.3.1-cli-selection",
+  "description": "Ralph Ultra v2.3.1 - CLI Selection: Allow users to choose their preferred AI CLI with settings UI, per-project overrides, and intelligent fallback chains",
+  "branchName": "ralph/v2.3.1-cli-selection",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Settings UI for CLI selection",
+      "description": "Add a CLI preference setting in the Settings panel that allows users to select their preferred AI CLI from a dropdown. The selected CLI should be persisted in settings.json and used as the default for all projects. Show which CLIs are currently installed/available on the system.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001-1",
+          "text": "Settings interface includes preferredCli field in Settings type",
+          "testCommand": "grep -q 'preferredCli' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T15:03:56.733Z"
+        },
+        {
+          "id": "AC-001-2",
+          "text": "SettingsPanel shows CLI selection dropdown or list",
+          "testCommand": "grep -q 'preferredCli\\|cliSelection\\|CLI' src/components/SettingsPanel.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T15:03:56.733Z"
+        },
+        {
+          "id": "AC-001-3",
+          "text": "Available CLIs are detected and displayed with install status",
+          "testCommand": "grep -q 'detectAvailableCLIs\\|getInstalledCLIs\\|availableCLIs' src/utils/ralph-service.ts || grep -q 'installedCLIs' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T15:03:56.733Z"
+        },
+        {
+          "id": "AC-001-4",
+          "text": "Selected CLI preference is saved to settings.json",
+          "testCommand": "grep -q 'preferredCli' src/utils/config.ts && grep -q 'saveSettings' src/components/SettingsPanel.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T15:03:56.733Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Per-project CLI override in prd.json",
+      "description": "Allow projects to specify their preferred CLI in the prd.json file using a 'cli' field. This overrides the global setting for that specific project. Useful when different projects require different AI capabilities (e.g., codex for OpenAI projects, claude for Anthropic projects).",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-002-1",
+          "text": "PRD type includes optional cli field",
+          "testCommand": "grep -q 'cli.*string' src/types/index.ts || grep -q 'cli?:' src/types/index.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T17:46:30.224Z"
+        },
+        {
+          "id": "AC-002-2",
+          "text": "RalphService reads cli from PRD when present",
+          "testCommand": "grep -q 'prd.cli\\|prd\\[.cli.\\]' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T17:46:30.224Z"
+        },
+        {
+          "id": "AC-002-3",
+          "text": "Project CLI override takes precedence over global setting",
+          "testCommand": "grep -q 'Priority 1.*PRD.*override' src/utils/ralph-service.ts && grep -q 'Priority 2.*global settings' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T17:46:30.224Z"
+        },
+        {
+          "id": "AC-002-4",
+          "text": "Current effective CLI is displayed in StatusBar or WorkPane",
+          "testCommand": "grep -q 'effectiveCli\\|activeCli\\|currentCli' src/components/StatusBar.tsx || grep -q 'Using CLI' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T17:46:30.224Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 2,
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "CLI fallback chain",
+      "description": "Implement a fallback chain so if the preferred CLI is not available, Ralph automatically falls back to the next available option. The chain order should be configurable. Display a notification when falling back to an alternative CLI.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-003-1",
+          "text": "Fallback chain logic exists in RalphService",
+          "testCommand": "grep -q 'fallback\\|fallbackChain\\|nextCLI\\|alternativeCLI' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T17:50:15.088Z"
+        },
+        {
+          "id": "AC-003-2",
+          "text": "Settings includes configurable fallback order",
+          "testCommand": "grep -q 'cliFallbackOrder\\|fallbackOrder\\|cliPriority' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T17:50:15.088Z"
+        },
+        {
+          "id": "AC-003-3",
+          "text": "Notification shown when falling back to alternative CLI",
+          "testCommand": "grep -q 'fallback\\|Falling back\\|alternative' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T17:50:15.088Z"
+        },
+        {
+          "id": "AC-003-4",
+          "text": "Fallback behavior is logged for debugging",
+          "testCommand": "grep -q 'fallback.*log\\|log.*fallback\\|Fallback' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T17:50:15.088Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 3,
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "CLI health check before execution",
+      "description": "Before starting a story, verify that the selected CLI is actually working (not just installed). Run a simple health check command. If the CLI fails the health check, trigger the fallback chain. Cache health check results for 5 minutes to avoid repeated checks.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-004-1",
+          "text": "Health check function exists for CLI validation",
+          "testCommand": "grep -q 'healthCheck\\|checkCLIHealth\\|validateCLI\\|testCLI' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T19:16:56.438Z"
+        },
+        {
+          "id": "AC-004-2",
+          "text": "Health check is called before story execution",
+          "testCommand": "grep 'checkCLIHealth' src/utils/ralph-service.ts | grep -qv 'private.*checkCLIHealth'",
+          "passes": true,
+          "lastRun": "2026-01-23T19:16:56.438Z"
+        },
+        {
+          "id": "AC-004-3",
+          "text": "Health check results are cached",
+          "testCommand": "grep -q 'healthCache\\|cliHealthCache\\|cachedHealth' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T19:16:56.438Z"
+        },
+        {
+          "id": "AC-004-4",
+          "text": "Failed health check triggers fallback",
+          "testCommand": "grep -q 'healthCheck.*fallback\\|fallback.*health\\|tryNextCLI' src/utils/ralph-service.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T19:16:56.438Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 4,
+      "passes": true
+    }
+  ]
+}

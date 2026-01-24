@@ -1,0 +1,303 @@
+{
+  "project": "ralph-ultra-phase2",
+  "description": "Phase 2: PRD Analyzer & Smart Model Allocator - Capability-based model selection",
+  "branchName": "ralph/phase2-model-allocator",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add TaskType and capability types to core types",
+      "description": "Extend src/core/types.ts with TaskType enum, capability types, and model capability matrix types needed for smart allocation",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001-1",
+          "text": "TaskType type exists with all 11 task types (frontend-ui, frontend-logic, backend-api, backend-logic, database, testing, documentation, refactoring, bugfix, devops, unknown)",
+          "testCommand": "grep -q 'frontend-ui' src/core/types.ts && grep -q 'backend-api' src/core/types.ts && grep -q 'testing' src/core/types.ts && grep -q 'documentation' src/core/types.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-001-2",
+          "text": "ModelCapability type exists defining model strengths (deep-reasoning, code-generation, structured-output, creative, prose, fast, cheap)",
+          "testCommand": "grep -q 'ModelCapability' src/core/types.ts && grep -q 'deep-reasoning\\|code-generation\\|structured-output' src/core/types.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-001-3",
+          "text": "StoryAllocation interface exists with storyId, taskType, recommendedModel, estimatedCost, alternativeModels",
+          "testCommand": "grep -q 'interface StoryAllocation' src/core/types.ts && grep -q 'recommendedModel' src/core/types.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-001-4",
+          "text": "ExecutionPlan interface exists with stories array, summary, and alternatives",
+          "testCommand": "grep -q 'interface ExecutionPlan' src/core/types.ts && grep -q 'estimatedCost' src/core/types.ts",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "simple",
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Create task type detector module",
+      "description": "Create src/core/task-detector.ts that analyzes story content (title, description, AC) and detects the TaskType using keyword matching",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-002-1",
+          "text": "task-detector.ts file exists in src/core/",
+          "testCommand": "test -f src/core/task-detector.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-002-2",
+          "text": "detectTaskType function exported that takes a UserStory and returns TaskType",
+          "testCommand": "grep -q 'export.*detectTaskType' src/core/task-detector.ts && grep -q 'UserStory' src/core/task-detector.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-002-3",
+          "text": "TASK_KEYWORDS constant maps keywords to task types (component/UI/style -> frontend-ui, test/spec/mock -> testing, etc.)",
+          "testCommand": "grep -q 'TASK_KEYWORDS' src/core/task-detector.ts && grep -q 'frontend-ui' src/core/task-detector.ts && grep -q 'testing' src/core/task-detector.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-002-4",
+          "text": "Detector analyzes title, description, and acceptance criteria text",
+          "testCommand": "grep -q 'title' src/core/task-detector.ts && grep -q 'description' src/core/task-detector.ts && grep -q 'acceptanceCriteria' src/core/task-detector.ts",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "medium",
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Create model capability matrix",
+      "description": "Create src/core/capability-matrix.ts with the model-to-capability mapping and task-to-model recommendations",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-003-1",
+          "text": "capability-matrix.ts file exists in src/core/",
+          "testCommand": "test -f src/core/capability-matrix.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-003-2",
+          "text": "MODEL_CAPABILITIES constant maps each model to its capabilities array",
+          "testCommand": "grep -q 'MODEL_CAPABILITIES' src/core/capability-matrix.ts && grep -q 'claude-opus' src/core/capability-matrix.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-003-3",
+          "text": "TASK_MODEL_MAPPING constant maps TaskType to primary and fallback models",
+          "testCommand": "grep -q 'TASK_MODEL_MAPPING' src/core/capability-matrix.ts && grep -q 'primary' src/core/capability-matrix.ts && grep -q 'fallback' src/core/capability-matrix.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-003-4",
+          "text": "getRecommendedModel function exported that takes TaskType and available quotas, returns best model",
+          "testCommand": "grep -q 'export.*getRecommendedModel' src/core/capability-matrix.ts",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "medium",
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Create execution plan generator",
+      "description": "Create src/core/execution-planner.ts that generates an ExecutionPlan from a PRD, assigning optimal models to each story",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-004-1",
+          "text": "execution-planner.ts file exists in src/core/",
+          "testCommand": "test -f src/core/execution-planner.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-004-2",
+          "text": "generateExecutionPlan function exported that takes PRD and quotas, returns ExecutionPlan",
+          "testCommand": "grep -q 'export.*generateExecutionPlan' src/core/execution-planner.ts && grep -q 'ExecutionPlan' src/core/execution-planner.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-004-3",
+          "text": "Plan includes cost estimation per story using TOKEN_ESTIMATES and MODEL_PRICING",
+          "testCommand": "grep -q 'TOKEN_ESTIMATES\\|estimatedCost' src/core/execution-planner.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-004-4",
+          "text": "Plan includes summary with totalStories, estimatedCost, modelsUsed",
+          "testCommand": "grep -q 'totalStories' src/core/execution-planner.ts && grep -q 'modelsUsed' src/core/execution-planner.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-004-5",
+          "text": "Plan includes alternatives comparison (allClaude vs mixedModels vs allLocal)",
+          "testCommand": "grep -q 'allClaude\\|alternatives' src/core/execution-planner.ts",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "complex",
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "Create useExecutionPlan hook",
+      "description": "Create src/hooks/useExecutionPlan.tsx React hook that loads PRD, generates execution plan, and provides refresh capability",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-005-1",
+          "text": "useExecutionPlan.tsx file exists in src/hooks/",
+          "testCommand": "test -f src/hooks/useExecutionPlan.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-005-2",
+          "text": "useExecutionPlan hook exported that takes projectPath and returns plan, loading, error, refresh",
+          "testCommand": "grep -q 'export.*useExecutionPlan' src/hooks/useExecutionPlan.tsx && grep -q 'projectPath' src/hooks/useExecutionPlan.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-005-3",
+          "text": "Hook integrates with useQuotas to get current quota data for model availability",
+          "testCommand": "grep -q 'useQuotas' src/hooks/useExecutionPlan.tsx",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "medium",
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Create ExecutionPlanView component",
+      "description": "Create src/components/ExecutionPlanView.tsx that displays the execution plan with story-to-model assignments and cost projections",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-006-1",
+          "text": "ExecutionPlanView.tsx file exists in src/components/",
+          "testCommand": "test -f src/components/ExecutionPlanView.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-006-2",
+          "text": "Component displays each story with its assigned model and estimated cost",
+          "testCommand": "grep -q 'storyId\\|recommendedModel' src/components/ExecutionPlanView.tsx && grep -q 'estimatedCost' src/components/ExecutionPlanView.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-006-3",
+          "text": "Component shows summary section with total cost and models used",
+          "testCommand": "grep -q 'summary\\|totalStories' src/components/ExecutionPlanView.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-006-4",
+          "text": "Component shows 'Can complete with current quotas' indicator",
+          "testCommand": "grep -q 'quota\\|complete\\|available' src/components/ExecutionPlanView.tsx",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "medium",
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Add Execution Plan view to WorkPane (key 5)",
+      "description": "Wire up ExecutionPlanView as a new view in WorkPane, accessible via key 5, replacing or alongside Tracing view",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-007-1",
+          "text": "WorkPane imports ExecutionPlanView component",
+          "testCommand": "grep -q 'ExecutionPlanView' src/components/WorkPane.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-007-2",
+          "text": "WorkPaneView type includes 'plan' as a valid view option",
+          "testCommand": "grep -q \"plan\" src/types/index.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-007-3",
+          "text": "App.tsx handles key '5' to switch to plan view",
+          "testCommand": "grep -q \"'5'\" src/components/App.tsx && grep -q 'plan' src/components/App.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-007-4",
+          "text": "ShortcutsBar shows key 5 for Plan view",
+          "testCommand": "grep -q '5' src/components/ShortcutsBar.tsx && grep -q -i 'plan' src/components/ShortcutsBar.tsx",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "simple",
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Export new modules from core index",
+      "description": "Update src/core/index.ts to export all new Phase 2 modules (task-detector, capability-matrix, execution-planner)",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-008-1",
+          "text": "core/index.ts exports from task-detector",
+          "testCommand": "grep -q 'task-detector' src/core/index.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-008-2",
+          "text": "core/index.ts exports from capability-matrix",
+          "testCommand": "grep -q 'capability-matrix' src/core/index.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-008-3",
+          "text": "core/index.ts exports from execution-planner",
+          "testCommand": "grep -q 'execution-planner' src/core/index.ts",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-008-4",
+          "text": "TypeScript compiles without errors",
+          "testCommand": "cd /Volumes/DevHub_ext/factory/toolbox/ralph-ultra && bun run typecheck",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "simple",
+      "passes": false
+    }
+  ]
+}

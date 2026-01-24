@@ -28,8 +28,12 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
     const globalShortcuts: ShortcutItem[] = [
       { key: 'Tab', description: 'Focus' },
       { key: 'r', description: 'Run' },
+      { key: 'R', description: 'Retry' },
       { key: 's', description: 'Stop' },
-      { key: 'n', description: 'New Tab' },
+      { key: 'd', description: 'Debug' },
+      { key: 'p', description: 'Recent' },
+      { key: 'Ctrl+L', description: 'Clear' },
+      { key: 'Ctrl+Shift+T', description: 'New Tab' },
       { key: 'e', description: 'Close' },
       { key: 't', description: 'Theme' },
       { key: '?', description: 'Help' },
@@ -37,14 +41,20 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
     ];
 
     const contextShortcuts: Record<FocusPane, ShortcutItem[]> = {
+      projects: [
+        { key: '[', description: 'Toggle' },
+        { key: 'r', description: 'Recent' },
+      ],
       tabs: [{ key: '1-5', description: 'Switch Tab' }],
       sessions: [
         { key: 'j/k', description: 'Navigate' },
         { key: 'Enter', description: 'View' },
+        { key: 'g', description: 'Go to Story' },
       ],
       work: [
-        { key: '1-5', description: 'Views' },
+        { key: '1-7', description: 'Views' },
         { key: 'j/k', description: 'Scroll' },
+        { key: '/', description: 'Search' },
       ],
     };
 
@@ -54,6 +64,12 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
     // Add Test shortcut only when in details view
     if (focusPane === 'work' && workPaneView === 'details') {
       currentContextShortcuts.push({ key: 'T', description: 'Test' });
+    }
+
+    // Add view shortcuts when focused on work pane
+    if (focusPane === 'work') {
+      currentContextShortcuts.push({ key: '4', description: 'Quota' });
+      currentContextShortcuts.push({ key: '5', description: 'Plan' });
     }
 
     const allShortcuts = [...currentContextShortcuts, ...globalShortcuts];
