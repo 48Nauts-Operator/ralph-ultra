@@ -16,7 +16,7 @@ interface ProjectsRailProps {
   /** Callback when a project is selected */
   onSelectProject: (projectId: string) => void;
   /** Callback when a recent project is selected */
-  onSelectRecentProject?: (path: string) => void;
+  onRecentSelect?: (path: string) => void;
   /** Whether this rail has focus for keyboard input */
   hasFocus: boolean;
 }
@@ -35,7 +35,7 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
   projects,
   activeProjectId,
   onSelectProject,
-  onSelectRecentProject,
+  onRecentSelect,
   hasFocus,
 }) => {
   const { theme } = useTheme();
@@ -91,10 +91,10 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
       if (key.return) {
         if (selectedIndex < projects.length && projects[selectedIndex]) {
           onSelectProject(projects[selectedIndex].id);
-        } else if (showRecent && onSelectRecentProject) {
+        } else if (showRecent && onRecentSelect) {
           const recentIndex = selectedIndex - projects.length;
           if (recentProjects[recentIndex]) {
-            onSelectRecentProject(recentProjects[recentIndex].path);
+            onRecentSelect(recentProjects[recentIndex].path);
           }
         }
       }
@@ -149,10 +149,7 @@ export const ProjectsRail: React.FC<ProjectsRailProps> = ({
           width={12}
           paddingX={1}
         >
-          <Text
-            dimColor={!isSelected}
-            color={isSelected ? theme.accent : undefined}
-          >
+          <Text dimColor={!isSelected} color={isSelected ? theme.accent : undefined}>
             {icon}
           </Text>
           <Text dimColor> {displayName}</Text>

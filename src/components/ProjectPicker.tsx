@@ -6,6 +6,7 @@ import type { Project } from '../types';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join, basename, dirname, resolve } from 'path';
 import { homedir } from 'os';
+import { getRecentProjects, clearRecentProjects, type RecentProject } from '../utils/config';
 
 export interface ProjectPickerProps {
   width: number;
@@ -16,7 +17,7 @@ export interface ProjectPickerProps {
   onCancel: () => void;
 }
 
-type Mode = 'input' | 'browse';
+type Mode = 'input' | 'browse' | 'recent';
 
 interface DirEntry {
   name: string;
@@ -78,23 +79,30 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
   onCancel,
 }) => {
   const { theme } = useTheme();
-  const [mode, setMode] = useState<Mode>('input');
+  const [mode, setMode] = useState<Mode>('recent');
   const [pathInput, setPathInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [browsePath, setBrowsePath] = useState(homedir());
   const [dirEntries, setDirEntries] = useState<DirEntry[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 
   useEffect(() => {
     if (mode === 'browse') {
       setDirEntries(listDirectory(browsePath));
       setSelectedIndex(0);
+    } else if (mode === 'recent') {
+      const recent = getRecentProjects().filter(
+        p => isValidProjectPath(p.path) && !openProjectIds.includes(p.path),
+      );
+      setRecentProjects(recent);
+      setSelectedIndex(0);
     }
-  }, [mode, browsePath]);
+  }, [mode, browsePath, openProjectIds]);
 
   const handleSubmitPath = () => {
     const expanded = expandPath(pathInput.trim());
-    
+
     if (!expanded) {
       setError('Please enter a path');
       return;
@@ -151,10 +159,34 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
     }
   };
 
+  const handleSelectRecentProject = () => {
+    const project = recentProjects[selectedIndex];
+    if (!project) return;
+
+    if (openProjectIds.includes(project.path)) {
+      setError('Project already open in another tab');
+      return;
+    }
+
+    const selectedProject: Project = {
+      id: `proj-${Date.now()}`,
+      name: project.name,
+      path: project.path,
+      color: project.color || '#7FFFD4',
+    };
+    onSelect(selectedProject);
+  };
+
+  const handleClearRecentProjects = () => {
+    clearRecentProjects();
+    setRecentProjects([]);
+    setError('Recent projects cleared');
+  };
+
   useInput(
     (input, key) => {
       if (key.escape) {
-        if (mode === 'browse') {
+        if (mode === 'browse' || mode === 'recent') {
           setMode('input');
         } else {
           onCancel();
@@ -164,10 +196,23 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
 
       if (mode === 'input') {
         if (key.tab) {
-          setMode('browse');
+          setMode('recent');
           setError(null);
         } else if (key.return) {
           handleSubmitPath();
+        }
+      } else if (mode === 'recent') {
+        if (key.upArrow || input === 'k') {
+          setSelectedIndex(prev => Math.max(0, prev - 1));
+        } else if (key.downArrow || input === 'j') {
+          setSelectedIndex(prev => Math.min(recentProjects.length - 1, prev + 1));
+        } else if (key.return) {
+          handleSelectRecentProject();
+        } else if (input === 'c') {
+          handleClearRecentProjects();
+        } else if (key.tab) {
+          setMode('browse');
+          setError(null);
         }
       } else if (mode === 'browse') {
         if (key.upArrow || input === 'k') {
@@ -222,12 +267,16 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
         </Box>
 
         <Box marginBottom={1}>
-          <Text color={mode === 'input' ? theme.accent : theme.muted} bold={mode === 'input'}>
-            [Tab] Enter Path
+          <Text color={mode === 'recent' ? theme.accent : theme.muted} bold={mode === 'recent'}>
+            [Tab] Recent
           </Text>
           <Text color={theme.muted}> | </Text>
           <Text color={mode === 'browse' ? theme.accent : theme.muted} bold={mode === 'browse'}>
             [Tab] Browse
+          </Text>
+          <Text color={theme.muted}> | </Text>
+          <Text color={mode === 'input' ? theme.accent : theme.muted} bold={mode === 'input'}>
+            [Tab] Path
           </Text>
         </Box>
 
@@ -256,9 +305,52 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
             <Box flexGrow={1} />
 
             <Box>
-              <Text color={theme.muted}>
-                Enter path to a project directory (with prd.json)
-              </Text>
+              <Text color={theme.muted}>Enter path to a project directory (with prd.json)</Text>
+            </Box>
+          </Box>
+        ) : mode === 'recent' ? (
+          <Box flexDirection="column" flexGrow={1}>
+            <Box marginBottom={1}>
+              <Text color={theme.accent} bold>Recent Projects</Text>
+            </Box>
+
+            {error && (
+              <Box marginBottom={1}>
+                <Text color={theme.error}>{error}</Text>
+              </Box>
+            )}
+
+            <Box flexDirection="column" height={listHeight} overflowY="hidden">
+              {recentProjects.length === 0 ? (
+                <Box paddingY={2}>
+                  <Text color={theme.muted}>No recent projects</Text>
+                </Box>
+              ) : (
+                recentProjects.slice(0, listHeight).map((project, index) => {
+                  const isSelected = index === selectedIndex;
+                  const relativeTime = new Date(project.lastAccessed).toLocaleDateString();
+                  return (
+                    <Box key={project.path} marginBottom={1}>
+                      <Box>
+                        <Text color={isSelected ? theme.accent : theme.foreground} bold={isSelected}>
+                          {isSelected ? '▶ ' : '  '}
+                          📦 {project.name}
+                        </Text>
+                      </Box>
+                      <Box marginLeft={4}>
+                        <Text color={theme.muted} dimColor>
+                          {project.path}
+                        </Text>
+                      </Box>
+                      <Box marginLeft={4}>
+                        <Text color={theme.muted} dimColor>
+                          Last opened: {relativeTime}
+                        </Text>
+                      </Box>
+                    </Box>
+                  );
+                })
+              )}
             </Box>
           </Box>
         ) : (
@@ -270,10 +362,7 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
 
             <Box flexDirection="column" height={listHeight} overflowY="hidden">
               <Box marginBottom={1}>
-                <Text
-                  color={theme.muted}
-                  dimColor
-                >
+                <Text color={theme.muted} dimColor>
                   {'  '}../ (parent directory)
                 </Text>
               </Box>
@@ -290,9 +379,7 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
                         {entry.hasPrd ? '📦 ' : '📁 '}
                         {entry.name}
                       </Text>
-                      {entry.hasPrd && (
-                        <Text color={theme.success}> (prd.json)</Text>
-                      )}
+                      {entry.hasPrd && <Text color={theme.success}> (prd.json)</Text>}
                     </Box>
                   );
                 })
@@ -304,7 +391,9 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
         <Box borderStyle="single" borderColor={theme.border} paddingX={1} marginTop={1}>
           <Text color={theme.muted}>
             {mode === 'input'
-              ? '⏎ Open  Tab Browse  Esc Cancel'
+              ? '⏎ Open  Tab Recent  Esc Cancel'
+              : mode === 'recent'
+              ? '⏎ Select  ↑↓ Navigate  c Clear  Tab Browse  Esc Back'
               : '⏎ Select  ←/h Up  ↑↓ Navigate  Tab Path  Esc Back'}
           </Text>
         </Box>

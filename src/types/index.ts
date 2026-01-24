@@ -61,6 +61,10 @@ export interface PRD {
   branchName: string;
   /** List of user stories */
   userStories: UserStory[];
+  /** Optional CLI override for this project (e.g., 'claude', 'codex', 'aider') */
+  cli?: string;
+  /** Optional CLI fallback order for this project */
+  cliFallbackOrder?: string[];
 }
 
 /**
@@ -71,7 +75,7 @@ export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
 /**
  * Work pane view types
  */
-export type WorkView = 'monitor' | 'status' | 'details' | 'help' | 'tracing';
+export type WorkView = 'monitor' | 'status' | 'details' | 'quota' | 'plan' | 'help' | 'version';
 
 /**
  * Complete state for a single tab/project
@@ -90,12 +94,15 @@ export interface TabState {
   workScrollOffset: number;
   tracingNodeIndex: number;
   availableCLI?: string | null;
+  isProjectCLIOverride?: boolean;
   lastRunDuration?: number | null;
   lastRunExitCode?: number | null;
   currentStory?: string | null;
   searchState?: SearchState;
+  gotoState?: GotoState;
   logFilter?: LogFilter;
   retryCount?: number;
+  debugMode?: boolean;
 }
 
 /**
@@ -133,6 +140,18 @@ export interface SearchState {
   totalMatches: number;
   /** Indices of matching lines */
   matchingLines: number[];
+}
+
+/**
+ * Goto state for jumping to specific stories
+ */
+export interface GotoState {
+  /** Whether goto mode is active */
+  gotoMode: boolean;
+  /** Current goto input (story number or ID) */
+  gotoInput: string;
+  /** Error message if goto fails */
+  gotoError: string | null;
 }
 
 /**

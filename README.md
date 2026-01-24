@@ -1,86 +1,79 @@
-# Ralph Ultra 2.0
+# Ralph Ultra 3.0
 
-> **The Most Secure Coding Agent** — Beautiful TUI with Remote Control & Real-Time Subagent Tracing
+> **Smart AI Agent Orchestrator** — TUI with Intelligent Model Selection, Quota Management & Cost Tracking
 
-[![Version](https://img.shields.io/badge/version-2.0.0--beta-orange.svg)](https://github.com/48Nauts-Operator/ralph-ultra/releases)
+[![Version](https://img.shields.io/badge/version-3.0.0--beta-orange.svg)](https://github.com/48Nauts-Operator/ralph-ultra/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Built with TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178C6.svg)](https://www.typescriptlang.org/)
 [![Powered by Bun](https://img.shields.io/badge/powered%20by-Bun-FBF0DF.svg)](https://bun.sh/)
 
-> **⚠️ BETA VERSION** — This is a beta release. Features are functional but may contain bugs. Feedback and issue reports are welcome!
+> **BETA VERSION** — Features are functional but may contain bugs. Feedback welcome!
 
-Ralph Ultra 2.0 is a **revolutionary terminal UI** that transforms how you monitor and control autonomous coding agents. Built with TypeScript, Bun, and Ink (React for terminals), it provides a premium developer experience with remote control via Tailscale and real-time subagent tracing.
+Ralph Ultra 3.0 is a **terminal UI for orchestrating autonomous coding agents** with intelligent model selection. It analyzes your PRD, recommends the optimal model for each task, tracks API quotas across providers, and estimates costs before execution.
 
 ---
 
-## ✨ Key Features
+## What's New in 3.0
 
-### 🎨 Beautiful Terminal UI
+### Smart Model Allocator
+
+- **Task Detection** — Analyzes each story to detect task type (frontend-ui, backend-api, testing, etc.)
+- **Capability Matching** — Maps task requirements to model strengths
+- **Cost Optimization** — Recommends cheapest capable model for each task
+- **Execution Plan** — View the full plan with cost estimates before running
+
+### Multi-Provider Quota Dashboard
+
+- **Anthropic** — Daily/weekly usage tracking from Claude session data
+- **OpenAI** — Subscription status and model availability
+- **OpenRouter** — Real-time credit balance
+- **Gemini** — Rate limit monitoring
+- **Local (LM Studio)** — Auto-discovers loaded models
+
+### Enhanced Views
+
+- **Plan View (key 5)** — Execution plan with model assignments and cost projections
+- **Quota View (key 4)** — Provider quotas with progress bars and model lists
+- **Version View (key 7)** — System info, CLI tools, and changelog browser
+
+---
+
+## Key Features
+
+### Beautiful Terminal UI
 
 - **Three-Pane Layout** — Projects rail, sessions/tasks pane, and dynamic work pane
-- **Collapsible Panels** — Maximize workspace with `[` key
-- **Multiple Views** — Monitor logs, view status, inspect stories, browse help, or trace agents
-- **Theme System** — Choose between Nano Dark (mint accents) and Nano Light themes
-- **Responsive Design** — Adapts to any terminal size (minimum 80x24)
+- **Multi-Tab Support** — Monitor multiple projects simultaneously
+- **Theme System** — Nano Dark and Nano Light themes
+- **Responsive Design** — Adapts to any terminal size
 
-### 🌐 Remote Control via Tailscale
+### PRD-Based Workflows
 
-- **Secure Access** — Monitor Ralph from anywhere via encrypted Tailscale connection
-- **Web-Based Client** — View and control from phone, tablet, or any browser
-- **Token Authentication** — Auto-generated secure tokens for each session
-- **Real-Time Sync** — Live log streaming and status updates
-- **Read/Write Modes** — View-only or full remote control
+- **Testable Acceptance Criteria** — Every AC has a shell command that verifies completion
+- **Auto-Verification** — Ralph runs tests after each story, retries on failure
+- **Progress Tracking** — Real-time status updates as stories complete
 
-### 🔍 Subagent Tracing
+### Remote Control via Tailscale
 
-- **Tree Visualization** — Real-time hierarchy of nested agent calls
-- **Status Tracking** — Running (yellow), complete (green), error (red)
-- **Performance Metrics** — Duration tracking for each agent
-- **Expandable Branches** — Drill down into any agent's execution
-- **Task Context** — See what each agent is working on
+- **Secure Access** — Monitor from anywhere via encrypted connection
+- **Web-Based Client** — View and control from any browser
+- **Token Authentication** — Secure tokens for each session
 
-### 💾 Session Persistence
+### Session Persistence
 
 - **Auto-Save** — State saved every 30 seconds
 - **Crash Recovery** — Resume exactly where you left off
-- **Scroll Positions** — All UI state preserved
-- **7-Day Retention** — Automatic cleanup of old sessions
 - **Multi-Project** — Independent sessions per project
-
-### 📑 Multi-Tab Support
-
-- **Up to 5 Tabs** — Monitor multiple Ralph instances simultaneously
-- **Independent State** — Each tab maintains its own state
-- **Quick Switching** — Ctrl+1/2/3... or Ctrl+Tab navigation
-- **Process Isolation** — Each tab runs its own RalphService
-- **Status Indicators** — At-a-glance view of all tabs
-
-### 🔔 Notification System
-
-- **Toast Notifications** — In-TUI toasts for important events
-- **Color-Coded** — Info (blue), success (green), warning (yellow), error (red)
-- **History** — View notification history in Status panel
-- **Sound Support** — Optional terminal bell notifications
-- **Auto-Dismiss** — Toasts fade after 5 seconds
-
-### ⌨️ Command Palette
-
-- **Quick Access** — Ctrl+P or `:` to open
-- **Fuzzy Search** — Find any command instantly
-- **Recent Commands** — Quick access to frequently used actions
-- **Category Organization** — Commands grouped by type
-- **Keyboard Shortcuts** — Full keyboard navigation
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - **Bun** — Runtime and package manager ([install](https://bun.sh))
-- **Node.js** — For npm compatibility (optional)
-- **Ralph Nano** — The execution engine ([install](https://github.com/48Nauts-Operator/ralph-nano))
-- **Tailscale** — For remote access (optional) ([install](https://tailscale.com))
+- **Claude CLI** or **Aider** — For AI code generation
+- **Tailscale** — For remote access (optional)
 
 ### Installation
 
@@ -100,88 +93,47 @@ bun run build
 ./dist/ralph-ultra
 ```
 
-### Configuration
-
-Ralph Ultra automatically detects Ralph Nano if it's in your PATH or project directory. You can also set the `RALPH_NANO_PATH` environment variable:
-
-```bash
-export RALPH_NANO_PATH="/path/to/ralph-nano/ralph.sh"
-```
-
 ---
 
-## 📝 Creating a PRD
+## Creating a PRD
 
-Ralph Ultra uses **PRD files** (`prd.json`) to define what work needs to be done. Each PRD contains user stories with **testable acceptance criteria**.
+Ralph uses PRD files (`prd.json`) with **testable acceptance criteria**.
 
-### Setup (One-Time)
-
-Copy the global AGENTS.md to your config directory:
-
-```bash
-# Create config directory
-mkdir -p ~/.config/opencode
-
-# Copy from ralph-ultra repo
-cp /path/to/ralph-ultra/AGENTS.md ~/.config/opencode/AGENTS.md
-```
-
-This file tells your AI assistant (Claude, OpenCode, etc.) how to create properly formatted PRDs.
-
-### Creating a PRD
-
-In your AI coding assistant, ask:
-
-```
-Create a PRD for [your project description]
-```
-
-**Example prompts:**
-
-- "Create a PRD for a todo app with user authentication"
-- "Write a PRD for adding dark mode to my React app"
-- "Make a prd.json for implementing a REST API"
-
-### What You Should Get
-
-The AI should generate a `prd.json` with this structure:
+### Example PRD
 
 ```json
 {
-  "project": "my-project",
-  "description": "Project description",
-  "branchName": "ralph/my-project",
+  "project": "my-feature",
+  "description": "Add user authentication",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Initialize Project",
-      "description": "Set up the project structure",
+      "title": "Login Page",
+      "description": "Create login page with email/password",
       "acceptanceCriteria": [
         {
           "id": "AC-001-1",
-          "text": "Package.json exists with dependencies",
-          "testCommand": "test -f package.json && grep -q 'dependencies' package.json",
+          "text": "Login component exists",
+          "testCommand": "test -f src/components/Login.tsx",
           "passes": false,
           "lastRun": null
         },
         {
           "id": "AC-001-2",
-          "text": "TypeScript configured",
-          "testCommand": "test -f tsconfig.json",
+          "text": "Form has email and password fields",
+          "testCommand": "grep -q 'type=\"email\"' src/components/Login.tsx && grep -q 'type=\"password\"' src/components/Login.tsx",
           "passes": false,
           "lastRun": null
         }
       ],
-      "complexity": "simple",
+      "complexity": "medium",
       "passes": false
     }
   ]
 }
 ```
 
-**Key requirement:** Every acceptance criterion MUST have a `testCommand` that exits 0 on success.
-
-### Common testCommand Patterns
+### testCommand Patterns
 
 | Check             | Command                                |
 | ----------------- | -------------------------------------- |
@@ -189,187 +141,99 @@ The AI should generate a `prd.json` with this structure:
 | Directory exists  | `test -d src/components`               |
 | Pattern in file   | `grep -q 'pattern' src/file.ts`        |
 | Multiple patterns | `grep -q 'a' f.ts && grep -q 'b' f.ts` |
-| Build passes      | `npm run build`                        |
-| Tests pass        | `npm test`                             |
-| Type check        | `npm run typecheck`                    |
-
-### Troubleshooting
-
-**Problem:** AI creates string arrays instead of testable criteria
-
-```json
-"acceptanceCriteria": ["User can log in", "Shows dashboard"]
-```
-
-**Solution:** Your `~/.config/opencode/AGENTS.md` is missing or outdated. Re-copy it from the ralph-ultra repo.
+| Build passes      | `bun run build`                        |
+| Tests pass        | `bun test`                             |
+| Type check        | `bun run typecheck`                    |
 
 ---
 
-**Problem:** testCommand fails but the work is done
+## Keyboard Shortcuts
 
-**Solution:** The testCommand may be too strict or checking the wrong path. Edit the `prd.json` to fix the testCommand, then re-run Ralph.
+### Navigation
 
----
+| Key               | Action                    |
+| ----------------- | ------------------------- |
+| `Tab`             | Cycle focus between panes |
+| `j/k` or `arrows` | Navigate within pane      |
+| `Enter`           | Activate selected item    |
+| `Esc`             | Close overlay/modal       |
 
-**Problem:** Ralph skips stories or marks wrong ones complete
+### Views
 
-**Solution:** Check that all `passes` fields are `false` in your `prd.json`. Ralph only works on stories where `passes: false`.
+| Key | View                       |
+| --- | -------------------------- |
+| `1` | Monitor (logs)             |
+| `2` | Status (system info)       |
+| `3` | Details (story info)       |
+| `4` | Quota (provider quotas)    |
+| `5` | Plan (execution plan)      |
+| `6` | Help (commands)            |
+| `7` | Version (system/changelog) |
 
----
+### Actions
 
-## 📖 Usage
+| Key             | Action                         |
+| --------------- | ------------------------------ |
+| `r`             | Run Ralph on current project   |
+| `s`             | Stop running process           |
+| `R`             | Refresh quotas (in Quota view) |
+| `t`             | Open theme settings            |
+| `?`             | Show help overlay              |
+| `q`             | Quit application               |
+| `:` or `Ctrl+P` | Open command palette           |
 
-### Basic Navigation
+### Tabs
 
-| Key     | Action                       |
-| ------- | ---------------------------- |
-| `Tab`   | Cycle focus between panes    |
-| `↑` `↓` | Navigate within focused pane |
-| `j` `k` | Vim-style navigation         |
-| `Enter` | Activate selected item       |
-| `Esc`   | Close overlay/modal          |
-
-### Global Shortcuts
-
-| Key             | Action                        |
-| --------------- | ----------------------------- |
-| `[`             | Toggle projects rail collapse |
-| `r`             | Run Ralph on current project  |
-| `s`             | Stop running Ralph process    |
-| `t`             | Open theme settings           |
-| `?`             | Show help overlay             |
-| `q`             | Quit application              |
-| `:` or `Ctrl+P` | Open command palette          |
-
-### View Switching
-
-| Key | Action                    |
-| --- | ------------------------- |
-| `1` | Monitor view (logs)       |
-| `2` | Status view (system info) |
-| `3` | Details view (story info) |
-| `4` | Help view (commands)      |
-| `5` | Tracing view (subagents)  |
-
-### Multi-Tab Navigation
-
-| Key             | Action                        |
-| --------------- | ----------------------------- |
-| `Ctrl+Shift+T`  | Open new tab / project picker |
-| `Ctrl+Shift+W`  | Close current tab             |
-| `Ctrl+Tab`      | Cycle through tabs            |
-| `Ctrl+1/2/3...` | Jump to specific tab          |
-
-### Remote Control
-
-| Key | Action                       |
-| --- | ---------------------------- |
-| `c` | Copy remote URL to clipboard |
+| Key             | Action               |
+| --------------- | -------------------- |
+| `Ctrl+Shift+T`  | Open new tab         |
+| `Ctrl+Shift+W`  | Close current tab    |
+| `Ctrl+Tab`      | Cycle through tabs   |
+| `Ctrl+1/2/3...` | Jump to specific tab |
 
 ---
 
-## 🎯 The Ralph Ecosystem
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│   Ralph Nano                         Ralph Ultra                │
-│   ──────────                         ─────────────              │
-│   The Engine                         The Cockpit                │
-│                                                                 │
-│   • Pure Bash                        • TypeScript + OpenTUI     │
-│   • Zero dependencies                • Beautiful TUI            │
-│   • Autonomous execution             • Remote control           │
-│   • Runs anywhere                    • Subagent tracing         │
-│                                      • Premium DX               │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-Ralph Ultra acts as the **cockpit** that controls and monitors Ralph Nano, the **engine** that does the actual work.
-
----
-
-## 🔒 Security
-
-Ralph Ultra is designed with security in mind:
-
-- **Localhost Binding** — WebSocket server only binds to 127.0.0.1
-- **Tailscale Encryption** — All remote traffic encrypted via WireGuard
-- **Token Authentication** — Secure tokens (32-byte random) for each session
-- **Connection Limits** — Maximum 3 concurrent remote connections
-- **Auth Timeout** — 5-second window to authenticate new connections
-- **No Exposure** — No ports exposed without Tailscale
-
----
-
-## 🎨 Themes
-
-Ralph Ultra includes two built-in themes:
-
-### Nano Dark (Default)
-
-- **Primary Accent**: Mint (#7FFFD4)
-- **Secondary Accent**: Dirty Orange (#CC5500)
-- **Background**: Dark terminal colors
-- **Best for**: Extended coding sessions
-
-### Nano Light
-
-- **Primary Accent**: Cyan (#00CED1)
-- **Secondary Accent**: Orange (#FF8C00)
-- **Background**: Light terminal colors
-- **Best for**: Daylight environments
-
-Toggle themes with `t` key or via Settings panel.
-
----
-
-## 📁 Project Structure
+## Architecture
 
 ```
 ralph-ultra/
 ├── src/
-│   ├── components/          # React Ink components
-│   │   ├── App.tsx          # Main application
-│   │   ├── StatusBar.tsx    # Top status bar
-│   │   ├── ShortcutsBar.tsx # Bottom shortcuts
-│   │   ├── ProjectsRail.tsx # Left projects panel
-│   │   ├── SessionsPane.tsx # Middle sessions/tasks
-│   │   ├── WorkPane.tsx     # Right work area
-│   │   ├── TracingPane.tsx  # Subagent tree view
-│   │   ├── TabBar.tsx       # Multi-tab navigation
-│   │   └── ...              # Other components
-│   ├── hooks/               # Custom React hooks
-│   │   ├── useTheme.tsx     # Theme management
-│   │   ├── useFocus.tsx     # Focus management
-│   │   ├── useKeyboard.tsx  # Keyboard handling
-│   │   ├── useTabs.tsx      # Tab management
-│   │   └── ...              # Other hooks
-│   ├── remote/              # Remote control modules
-│   │   ├── server.ts        # WebSocket server
-│   │   ├── http-server.ts   # HTTP server for client
-│   │   ├── tailscale.ts     # Tailscale integration
-│   │   └── client/          # Web-based remote client
-│   ├── themes/              # Theme definitions
-│   │   ├── nano-dark.ts     # Default dark theme
-│   │   └── nano-light.ts    # Light theme
-│   ├── utils/               # Utility modules
-│   │   ├── config.ts        # Configuration management
-│   │   ├── session.ts       # Session persistence
-│   │   ├── ralph-service.ts # Ralph Nano integration
-│   │   └── log-parser.ts    # Log parsing for tracing
-│   └── types/               # TypeScript type definitions
-├── prd.json                 # Project requirements document
-├── progress.txt             # Development progress log
-└── package.json             # Dependencies and scripts
+│   ├── components/       # React Ink components
+│   │   ├── App.tsx       # Main application
+│   │   ├── WorkPane.tsx  # Right work area (views)
+│   │   ├── QuotaDashboard.tsx    # Provider quota display
+│   │   ├── ExecutionPlanView.tsx # Plan visualization
+│   │   └── VersionView.tsx       # System info
+│   ├── core/             # Business logic
+│   │   ├── quota-manager.ts      # Multi-provider quota checking
+│   │   ├── task-detector.ts      # Story task type detection
+│   │   ├── capability-matrix.ts  # Model-to-task mapping
+│   │   ├── execution-planner.ts  # Plan generation
+│   │   ├── state-store.ts        # Global state management
+│   │   └── event-bus.ts          # Event pub/sub
+│   ├── hooks/            # React hooks
+│   │   ├── useQuotas.tsx         # Quota subscription
+│   │   ├── useExecutionPlan.tsx  # Plan generation hook
+│   │   └── useTabs.tsx           # Multi-tab management
+│   ├── themes/           # Theme definitions
+│   └── utils/            # Utility modules
 ```
 
 ---
 
-## 🛠️ Development
+## Supported Providers
 
-### Available Scripts
+| Provider       | Quota Type         | Detection                    |
+| -------------- | ------------------ | ---------------------------- |
+| **Anthropic**  | Daily/Weekly usage | Claude session file analysis |
+| **OpenAI**     | Subscription       | API key validation           |
+| **OpenRouter** | Credits            | `/api/v1/credits` endpoint   |
+| **Gemini**     | Rate limit         | API key validation           |
+| **Local**      | Unlimited          | LM Studio `/v1/models` API   |
+
+---
+
+## Development
 
 ```bash
 # Development mode with hot reload
@@ -381,110 +245,34 @@ bun run typecheck
 # Linting
 bun run lint
 
-# Code formatting
-bun run format
-
 # Production build
 bun run build
 ```
 
-### Contributing
+---
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+## Roadmap
+
+- [x] Phase 1: Quota Manager architecture
+- [x] Phase 2: Smart Model Allocator
+- [ ] Phase 3: Execute with Plan + Cost Tracking
+- [ ] Phase 4: Learning System (performance history)
+- [ ] Phase 5: Web Dashboard
 
 ---
 
-## 🐛 Troubleshooting
-
-### Ralph Ultra won't start
-
-```bash
-# Check Bun is installed
-bun --version
-
-# Reinstall dependencies
-rm -rf node_modules
-bun install
-
-# Check for conflicting processes
-lsof -i :7890  # WebSocket port
-lsof -i :7891  # HTTP server port
-```
-
-### Ralph Nano not found
-
-```bash
-# Set explicit path
-export RALPH_NANO_PATH="/path/to/ralph-nano/ralph.sh"
-
-# Or symlink to PATH
-ln -s /path/to/ralph-nano/ralph.sh /usr/local/bin/ralph.sh
-```
-
-### Remote access not working
-
-```bash
-# Check Tailscale is running
-tailscale status
-
-# Verify WebSocket server is listening
-lsof -i :7890
-
-# Test local connection first
-# (Open web browser to http://localhost:7891)
-```
-
-### Logs not streaming
-
-Check that `ralph-monitor.log` exists in your project directory and Ralph Nano is running.
-
----
-
-## 📋 Requirements
-
-- **Bun** ≥ 1.0.0
-- **Node.js** ≥ 18.0.0 (optional, for npm compatibility)
-- **Terminal** with Unicode and color support
-- **Minimum size**: 80 columns × 24 rows
-- **Ralph Nano** for execution
-
----
-
-## 🗺️ Roadmap
-
-Ralph Ultra 2.0 is feature-complete! Future enhancements may include:
-
-- [ ] GitHub Actions integration for CI/CD monitoring
-- [ ] VS Code extension for embedded TUI
-- [ ] Metrics dashboard with charts and graphs
-- [ ] Export logs to various formats (JSON, CSV, PDF)
-- [ ] Plugin system for custom views and commands
-- [ ] Docker image for containerized deployments
-
----
-
-## 📄 License
+## License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Credits
-
 **Built by 48Nauts** — Part of the Ralph ecosystem
 
-- **Ralph Ultra** — This project
-- **Ralph Nano** — Lightweight execution engine ([GitHub](https://github.com/48Nauts-Operator/ralph-nano))
-
-Special thanks to:
-
-- [Ink](https://github.com/vadimdemedes/ink) — React for CLIs
-- [Bun](https://bun.sh) — Fast all-in-one JavaScript runtime
-- [Tailscale](https://tailscale.com) — Secure remote access
-
----
+- [Ralph Ultra](https://github.com/48Nauts-Operator/ralph-ultra) — This project
+- [Ralph Nano](https://github.com/48Nauts-Operator/ralph-nano) — Lightweight execution engine
 
 <p align="center">
-  <strong>Ralph Ultra 2.0</strong> — The Most Secure Coding Agent<br>
-  <a href="https://github.com/48Nauts-Operator/ralph-ultra/releases">Download Latest Release →</a>
+  <strong>Ralph Ultra 3.0</strong> — Smart AI Agent Orchestrator<br>
+  <a href="https://github.com/48Nauts-Operator/ralph-ultra/releases">Download Latest Release</a>
 </p>

@@ -40,9 +40,12 @@ export interface RecentProject {
 export interface Settings {
   theme?: string;
   notificationSound?: boolean;
+  debugMode?: boolean;
   openProjects?: SavedProject[];
   activeProjectPath?: string;
   recentProjects?: RecentProject[];
+  preferredCli?: string;
+  cliFallbackOrder?: string[];
   [key: string]: unknown;
 }
 

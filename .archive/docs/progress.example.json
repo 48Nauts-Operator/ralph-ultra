@@ -1,0 +1,32 @@
+{
+  "startedAt": "2026-01-23T10:00:00.000Z",
+  "lastUpdated": "2026-01-23T10:45:30.000Z",
+  "stories": [
+    {
+      "storyId": "US-001",
+      "attempts": 1,
+      "lastAttempt": "2026-01-23T10:05:00.000Z",
+      "passed": true
+    },
+    {
+      "storyId": "US-002",
+      "attempts": 3,
+      "lastAttempt": "2026-01-23T10:25:30.000Z",
+      "passed": false,
+      "failureReasons": [
+        "3/5 criteria failed",
+        "2/5 criteria failed",
+        "1/5 criteria failed"
+      ]
+    },
+    {
+      "storyId": "US-003",
+      "attempts": 1,
+      "lastAttempt": "2026-01-23T10:45:30.000Z",
+      "passed": false,
+      "failureReasons": [
+        "4/7 criteria failed"
+      ]
+    }
+  ]
+}

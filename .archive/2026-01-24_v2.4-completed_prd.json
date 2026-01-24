@@ -1,0 +1,138 @@
+{
+  "project": "ralph-ultra-v2.4-workflow-polish",
+  "description": "Ralph Ultra v2.4 - Workflow Polish: Skip to story, recent projects list, session management, and improved status display",
+  "branchName": "ralph/v2.4-workflow-polish",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Skip to specific story",
+      "description": "Allow users to jump directly to any story in the PRD using a keyboard shortcut. When in the sessions pane with stories listed, pressing 'g' should prompt for a story number or ID, then jump directly to that story. Useful for debugging specific stories or resuming work.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001-1",
+          "text": "Pressing 'g' in sessions pane activates goto mode",
+          "testCommand": "grep -q \"input === 'g'\" src/components/SessionsPane.tsx || grep -q \"'g'.*goto\\|goto.*'g'\" src/components/SessionsPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T22:23:30.786Z"
+        },
+        {
+          "id": "AC-001-2",
+          "text": "User can type story number to jump to",
+          "testCommand": "grep -qi 'gotoStory\\|jumpToStory\\|selectStoryByIndex\\|gotoMode' src/components/SessionsPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T22:23:30.786Z"
+        },
+        {
+          "id": "AC-001-3",
+          "text": "Invalid story number shows error feedback",
+          "testCommand": "grep -qi 'invalid\\|not found\\|out of range' src/components/SessionsPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T22:23:30.786Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Recent projects list",
+      "description": "Track and display recently opened projects for quick access. Store the last 10 projects in settings. Show a recent projects section in the projects rail or as a separate overlay accessible via keyboard shortcut.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-002-1",
+          "text": "Recent projects are stored in settings",
+          "testCommand": "grep -q 'recentProjects' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T23:06:58.603Z"
+        },
+        {
+          "id": "AC-002-2",
+          "text": "Function to add project to recent list exists",
+          "testCommand": "grep -qi 'addRecentProject\\|addToRecentProject\\|updateRecentProject\\|pushRecentProject' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T23:06:58.603Z"
+        },
+        {
+          "id": "AC-002-3",
+          "text": "Recent projects displayed in UI",
+          "testCommand": "grep -qi 'recentProjects\\|recent.*project' src/components/ProjectsRail.tsx || grep -qi 'recentProjects' src/components/App.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T23:06:58.603Z"
+        },
+        {
+          "id": "AC-002-4",
+          "text": "Maximum 10 recent projects stored",
+          "testCommand": "grep -q '10\\|MAX_RECENT' src/utils/config.ts",
+          "passes": true,
+          "lastRun": "2026-01-23T23:06:58.603Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 2,
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Clear session command",
+      "description": "Add ability to clear/reset the current session state. This should reset scroll positions, clear log buffers, and optionally clear the PRD progress (with confirmation). Accessible via keyboard shortcut or command palette.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-003-1",
+          "text": "Clear session function exists",
+          "testCommand": "grep -qi 'clearSession\\|resetSession\\|clearState' src/utils/session.ts || grep -qi 'clearSession' src/components/App.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T23:12:13.535Z"
+        },
+        {
+          "id": "AC-003-2",
+          "text": "Keyboard shortcut or command triggers clear",
+          "testCommand": "grep -qi 'clear.*session\\|reset.*session' src/components/App.tsx || grep -qi 'clearSession' src/components/ShortcutsBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T23:12:13.535Z"
+        },
+        {
+          "id": "AC-003-3",
+          "text": "Confirmation required for destructive clear",
+          "testCommand": "grep -qi 'confirm\\|are you sure\\|warning.*clear' src/components/App.tsx || test -f src/components/ConfirmDialog.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T23:12:13.535Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 3,
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Claude API status in StatusBar",
+      "description": "Display the current Claude API status in the StatusBar. Show a colored indicator (green=operational, yellow=degraded, red=outage). Clicking or pressing a key should show more details. Status should be cached and refreshed every 5 minutes.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-004-1",
+          "text": "StatusBar imports and uses status-check module",
+          "testCommand": "grep -q 'status-check\\|checkApiStatus\\|ApiStatus' src/components/StatusBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T23:13:28.786Z"
+        },
+        {
+          "id": "AC-004-2",
+          "text": "Status indicator displayed with color",
+          "testCommand": "grep -qi 'operational\\|degraded\\|outage' src/components/StatusBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T23:13:28.786Z"
+        },
+        {
+          "id": "AC-004-3",
+          "text": "Status refreshes periodically",
+          "testCommand": "grep -qi 'setInterval\\|useEffect.*status\\|refreshStatus' src/components/StatusBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-23T23:13:28.786Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 4,
+      "passes": true
+    }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "project": "ralph-ultra-v3.0-quota-manager",
+  "description": "Ralph Ultra v3.0 - Quota Manager: Dashboard showing all provider quotas, model costs, and smart model selection based on task capabilities",
+  "branchName": "ralph/v3.0-quota-manager",
+  "cli": "claude",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Export core module from index",
+      "description": "Update src/core/index.ts to also export the quota-manager functions so they can be used by components",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001-1",
+          "text": "quota-manager is exported from core index",
+          "testCommand": "grep -q 'quota-manager' src/core/index.ts",
+          "passes": true,
+          "lastRun": "2026-01-24T01:13:33.737Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 1,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Create useQuotas hook",
+      "description": "Create a React hook at src/hooks/useQuotas.tsx that subscribes to quota updates from the core state store and provides refreshAllQuotas function. Should return { quotas, isLoading, error, refresh }.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-002-1",
+          "text": "useQuotas hook file exists",
+          "testCommand": "test -f src/hooks/useQuotas.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:15:12.200Z"
+        },
+        {
+          "id": "AC-002-2",
+          "text": "Hook exports useQuotas function",
+          "testCommand": "grep -q 'export.*useQuotas' src/hooks/useQuotas.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:15:12.200Z"
+        },
+        {
+          "id": "AC-002-3",
+          "text": "Hook uses refreshAllQuotas from core",
+          "testCommand": "grep -q 'refreshAllQuotas' src/hooks/useQuotas.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:15:12.200Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 2,
+      "passes": true
+    },
+    {
+      "id": "US-003",
+      "title": "Create QuotaDashboard component",
+      "description": "Create src/components/QuotaDashboard.tsx - a TUI component that displays all 6 provider quotas with visual progress bars, cost per model, and status indicators. Use Ink Box and Text components. Show provider name, quota bar (using Unicode blocks), percentage or credits remaining, and reset time if available.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-003-1",
+          "text": "QuotaDashboard component file exists",
+          "testCommand": "test -f src/components/QuotaDashboard.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:17:20.014Z"
+        },
+        {
+          "id": "AC-003-2",
+          "text": "Component uses useQuotas hook",
+          "testCommand": "grep -q 'useQuotas' src/components/QuotaDashboard.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:17:20.014Z"
+        },
+        {
+          "id": "AC-003-3",
+          "text": "Component displays provider quotas",
+          "testCommand": "grep -q 'anthropic\\|openai\\|gemini' src/components/QuotaDashboard.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:17:20.014Z"
+        },
+        {
+          "id": "AC-003-4",
+          "text": "Component uses theme colors",
+          "testCommand": "grep -q 'useTheme' src/components/QuotaDashboard.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:17:20.014Z"
+        }
+      ],
+      "complexity": "medium",
+      "priority": 3,
+      "passes": true
+    },
+    {
+      "id": "US-004",
+      "title": "Add Quota view to WorkPane",
+      "description": "Update src/components/WorkPane.tsx to add a new 'quota' view type. When view is 'quota', render the QuotaDashboard component. Update the WorkView type in src/types/index.ts to include 'quota'.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-004-1",
+          "text": "WorkView type includes quota",
+          "testCommand": "grep -q \"'quota'\" src/types/index.ts",
+          "passes": true,
+          "lastRun": "2026-01-24T01:19:25.133Z"
+        },
+        {
+          "id": "AC-004-2",
+          "text": "WorkPane imports QuotaDashboard",
+          "testCommand": "grep -q 'QuotaDashboard' src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:19:25.133Z"
+        },
+        {
+          "id": "AC-004-3",
+          "text": "WorkPane renders QuotaDashboard for quota view",
+          "testCommand": "grep -q \"quota.*QuotaDashboard\\|case.*quota\" src/components/WorkPane.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:19:25.133Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 4,
+      "passes": true
+    },
+    {
+      "id": "US-005",
+      "title": "Replace Help view with Quota view on key 4",
+      "description": "Update src/components/App.tsx to change the keyboard shortcut '4' from 'help' view to 'quota' view. Help should move to key '5' or be accessible via '?' key. Update ShortcutsBar.tsx to reflect the new mapping.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-005-1",
+          "text": "Key 4 triggers quota view in App.tsx",
+          "testCommand": "grep -q \"'4'.*quota\\|input.*4.*quota\" src/components/App.tsx",
+          "passes": false,
+          "lastRun": "2026-01-24T01:25:45.496Z"
+        },
+        {
+          "id": "AC-005-2",
+          "text": "ShortcutsBar shows Quota for key 4",
+          "testCommand": "grep -qi 'quota' src/components/ShortcutsBar.tsx",
+          "passes": true,
+          "lastRun": "2026-01-24T01:25:45.496Z"
+        }
+      ],
+      "complexity": "simple",
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Add refresh quota shortcut",
+      "description": "In QuotaDashboard or App.tsx, add keyboard shortcut 'R' (capital R or 'r' when in quota view) to trigger a quota refresh. Show a loading indicator while refreshing.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-006-1",
+          "text": "R key triggers refresh in quota context",
+          "testCommand": "grep -qi \"'r'.*refresh\\|'R'.*refresh\\|refresh.*quota\" src/components/QuotaDashboard.tsx || grep -qi \"'r'.*refresh\\|key.*r.*quota\" src/components/App.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-006-2",
+          "text": "Loading state is shown during refresh",
+          "testCommand": "grep -qi 'loading\\|isLoading\\|refreshing' src/components/QuotaDashboard.tsx",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "simple",
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Display model costs in QuotaDashboard",
+      "description": "Extend QuotaDashboard to show expandable model list under each provider with input/output cost per million tokens. Use tree-style indentation (like file tree).",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-007-1",
+          "text": "Models are displayed under providers",
+          "testCommand": "grep -qi 'model.*cost\\|inputCost\\|outputCost\\|per.*1M\\|costPer' src/components/QuotaDashboard.tsx",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-007-2",
+          "text": "Tree-style display with indentation",
+          "testCommand": "grep -q '├\\|└\\|│' src/components/QuotaDashboard.tsx || grep -qi 'marginLeft\\|paddingLeft\\|indent' src/components/QuotaDashboard.tsx",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "medium",
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Type check and build verification",
+      "description": "Ensure all new code passes type checking and the project builds successfully.",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-008-1",
+          "text": "TypeScript type check passes",
+          "testCommand": "cd /Volumes/DevHub_ext/factory/toolbox/ralph-ultra && bun run typecheck",
+          "passes": false,
+          "lastRun": null
+        },
+        {
+          "id": "AC-008-2",
+          "text": "Build completes successfully",
+          "testCommand": "cd /Volumes/DevHub_ext/factory/toolbox/ralph-ultra && bun run build",
+          "passes": false,
+          "lastRun": null
+        }
+      ],
+      "complexity": "simple",
+      "priority": 8,
+      "passes": false
+    }
+  ]
+}

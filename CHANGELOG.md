@@ -5,11 +5,77 @@ All notable changes to Ralph Ultra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-01-24
+
+### Added
+
+- **Quota Dashboard (View 4)** - Shows all provider quotas (Anthropic, OpenAI, OpenRouter, Gemini, Local)
+- **Version View (View 7)** - System info, CLI versions, dependencies, and changelog
+- **Git Branch in StatusBar** - Shows current branch for active project
+- **Smart Model Allocator** (Phase 2 - In Progress) - Capability-based model selection
+
+### Changed
+
+- **StatusBar Redesign** - Cleaner layout with grouped status indicators
+- **Removed Timer** - Eliminated flashing caused by 1-second updates (documented for future fix)
+- **View Keys 1-7** - Extended view switching to include Quota (4) and Version (7)
+
+### Fixed
+
+- View switching now properly syncs between App and WorkPane
+- Log watcher no longer causes unnecessary re-renders
+
+---
+
+## [2.4.0] - 2026-01-24
+
+### Added
+
+- **Skip to Story (g key)** - Jump directly to any story by number
+- **Recent Projects (p key)** - Quick access to last 10 projects
+- **Clear Session (Ctrl+L)** - Reset session state
+- **Claude API Status** - Real-time API health indicator in StatusBar
+
+---
+
+## [2.3.1] - 2026-01-23
+
+### Added
+
+- **CLI Selection** - Choose preferred CLI (Claude, Aider, Codex) in Settings
+- **Per-Project CLI Override** - Set `cli` field in prd.json to override global setting
+- **CLI Fallback Chain** - Auto-fallback when preferred CLI unavailable
+- **CLI Health Check** - Validates CLI before execution, caches for 5 minutes
+
+---
+
+## [2.2.0] - 2026-01-22
+
+### Added
+
+- **Search in Logs (/ key)** - Search within monitor logs with n/N navigation
+- **Log Filtering (f key)** - Filter by level: All, Errors, Warnings+Errors
+- **Testable Acceptance Criteria** - PRD format with testCommand for auto-verification
+- **AC Test Runner** - Automatically verifies story completion
+
+---
+
+## [2.1.0] - 2026-01-21
+
+### Added
+
+- **Pragmatic Programmer Integration** - DRY, ETC, Orthogonality principles in prompts
+- **Configurable Principles** - User-customizable ~/.config/ralph-ultra/principles.md
+- **Enhanced PRD Guidelines** - Tracer Bullet stories, small steps, testable criteria
+
+---
+
 ## [2.0.0] - 2026-01-20
 
 ### Added
 
 #### Core Features
+
 - **Beautiful Terminal UI** built with TypeScript, Bun, and Ink (React for terminals)
 - **Three-Pane Layout** with collapsible projects rail, sessions/tasks pane, and dynamic work pane
 - **Remote Control via Tailscale** with secure WebSocket server and web-based client
@@ -20,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Command Palette** with fuzzy search and recent commands tracking
 
 #### UI Components
+
 - `StatusBar` component showing branding, agent status, progress bar, and elapsed timer
 - `ShortcutsBar` component with context-aware keyboard shortcuts
 - `ProjectsRail` component with collapsible behavior and project navigation
@@ -36,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ConfirmDialog` component for confirmation prompts
 
 #### Hooks
+
 - `useTheme` hook with ThemeProvider for centralized theme management
 - `useFocus` hook with FocusProvider for pane focus management
 - `useKeyboard` hook with priority-based keyboard handler registration
@@ -45,12 +113,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `useNotifications` hook with NotificationProvider for toast management
 
 #### Themes
+
 - **Nano Dark** theme with mint (#7FFFD4) and dirty orange (#CC5500) accents
 - **Nano Light** theme with cyan and orange accents
 - Theme persistence to `~/.config/ralph-ultra/settings.json`
 - Live theme switching with `t` key
 
 #### Remote Control
+
 - WebSocket server on port 7890 with token-based authentication
 - HTTP server on port 7891 serving web-based remote client
 - Tailscale integration with auto-detection and MagicDNS support
@@ -60,6 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Copy remote URL to clipboard with `c` key
 
 #### Session Management
+
 - Session state saved to `~/.config/ralph-ultra/sessions/<project-hash>.json`
 - Auto-save every 30 seconds with state change detection
 - Crash detection and recovery with restore prompt
@@ -68,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic cleanup of sessions older than 7 days
 
 #### Integration
+
 - Ralph Nano backend integration via `RalphService` class
 - Real-time log streaming from `ralph-monitor.log`
 - Process lifecycle management (start/stop/restart)
@@ -75,6 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Path detection from `RALPH_NANO_PATH` environment variable
 
 #### Utilities
+
 - Configuration management in `~/.config/ralph-ultra/`
 - First-launch detection and welcome overlay
 - Log parsing for agent hierarchy extraction
@@ -82,6 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings persistence (theme, notification sound)
 
 #### Developer Experience
+
 - Strict TypeScript mode with >95% type coverage
 - Path aliases (@components, @hooks, @themes, @remote, @utils, @types)
 - ESLint flat config with zero warnings
@@ -90,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hot reload in development mode
 
 ### Changed
+
 - Complete rewrite from Bash to TypeScript
 - Replaced tmux-based UI with Ink (React for terminals)
 - Moved from single-project to multi-tab architecture
@@ -97,6 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling and user feedback
 
 ### Security
+
 - WebSocket server binds to localhost only (127.0.0.1)
 - Token-based authentication with 32-byte random tokens
 - Secure token storage with 0o600 file permissions
@@ -109,6 +185,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The original Bash implementation is preserved in the [`legacy` branch](https://github.com/48Nauts-Operator/ralph-ultra/tree/legacy).
 
 ### Legacy Features
+
 - Pure Bash implementation
 - tmux-based Terminal UI
 - Single project monitoring

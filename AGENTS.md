@@ -31,30 +31,36 @@ When creating PRDs for Ralph Ultra, follow these proven principles for better su
 ### 📐 Story Structure Principles
 
 #### 1. Tracer Bullet First
+
 The first user story should create a minimal end-to-end working skeleton:
 
 **✅ GOOD Example:**
+
 - US-001: Create basic API endpoint returning hardcoded data
 - US-002: Add database integration to API
 - US-003: Add authentication to API
 - US-004: Add caching layer
 
 **❌ BAD Example:**
+
 - US-001: Create complete API with auth, database, caching, and monitoring
 
 #### 2. DRY in User Stories
+
 Each story must have unique, non-overlapping scope:
 
 **✅ GOOD:** Each story adds one distinct capability
 **❌ BAD:** Multiple stories touching the same code
 
 #### 3. Orthogonal Stories
+
 Stories should be as independent as possible:
 
 **✅ GOOD:** Stories can be implemented in any order
 **❌ BAD:** Story B breaks if Story A isn't done first
 
 #### 4. Small Steps Principle
+
 Break features into small, verifiable increments:
 
 - **Simple** stories: 1-3 acceptance criteria
@@ -80,11 +86,11 @@ Break features into small, verifiable increments:
 
 ### 📊 Complexity Guidelines
 
-| Complexity | Scope | Files | Integration | Max ACs |
-|------------|-------|-------|-------------|---------|
-| Simple | Single feature, clear path | 1-2 | None | 3 |
-| Medium | Multi-file changes | 3-5 | Some | 5 |
-| Complex | Cross-cutting concerns | 6+ | Heavy | 8 |
+| Complexity | Scope                      | Files | Integration | Max ACs |
+| ---------- | -------------------------- | ----- | ----------- | ------- |
+| Simple     | Single feature, clear path | 1-2   | None        | 3       |
+| Medium     | Multi-file changes         | 3-5   | Some        | 5       |
+| Complex    | Cross-cutting concerns     | 6+    | Heavy       | 8       |
 
 Remember: **Each story should be completable in one AI session**.
 
@@ -157,6 +163,46 @@ Each acceptance criterion should have a `testCommand` that Ralph can execute to 
 # Multiple conditions
 "grep -q 'pattern1' file.ts && grep -q 'pattern2' file.ts"
 ```
+
+### testCommand Rules (CRITICAL)
+
+**BEFORE writing any testCommand, you MUST:**
+
+1. **Explore the codebase first** - Use grep/find to understand WHERE code actually lives
+2. **Specify exact file paths in AC text** - Never be vague about location
+3. **Test the command manually** - Run it yourself before adding to PRD
+
+**testCommand Anti-Patterns (WILL CAUSE FAILURES):**
+
+| Anti-Pattern                                       | Problem                               | Fix                                                       |
+| -------------------------------------------------- | ------------------------------------- | --------------------------------------------------------- |
+| `grep ... fileA \|\| grep ... fileB`               | Shell operator precedence issues      | Use parentheses: `(grep ... fileA) \|\| (grep ... fileB)` |
+| `grep ... && grep ... \|\| grep ...`               | Ambiguous logic                       | Split into separate ACs or use explicit grouping          |
+| Guessing file locations                            | Test checks wrong file                | Explore codebase FIRST, then write test                   |
+| AC text says "in component" but test checks "page" | Mismatch between description and test | AC text MUST specify exact file path                      |
+| Testing implementation details                     | Brittle tests break on refactor       | Test behavior/existence, not exact code                   |
+
+**testCommand Best Practices:**
+
+```bash
+# GOOD: Simple, single condition
+"test -f src/utils/csvExport.ts"
+"grep -q 'source' src/utils/csvExport.ts"
+
+# GOOD: Multiple conditions with explicit &&
+"grep -q 'VAR1' file.ts && grep -q 'VAR2' file.ts"
+
+# GOOD: Alternative files with proper grouping
+"(test -f docs/guide.md && grep -q 'pattern' docs/guide.md) || (test -f README.md && grep -q 'pattern' README.md)"
+
+# BAD: Ambiguous operator precedence
+"grep -q 'a' file1 && grep -q 'b' file1 || grep -q 'a' file2 && grep -q 'b' file2"
+
+# BAD: Guessing file location without checking
+"grep -q 'export' src/pages/Dashboard.tsx"  # Export logic might be in utils/!
+```
+
+**Golden Rule:** If the AC says "export functionality includes X", the testCommand MUST check the file where export logic actually lives - NOT where you assume it might be.
 
 ### Simple Acceptance Criteria (Legacy)
 

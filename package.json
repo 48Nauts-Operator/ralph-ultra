@@ -1,6 +1,6 @@
 {
   "name": "ralph-ultra",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Ralph Ultra 2.0 - The Most Secure Coding Agent",
   "type": "module",
   "main": "dist/index.js",

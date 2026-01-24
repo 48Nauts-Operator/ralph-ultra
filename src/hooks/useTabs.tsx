@@ -4,12 +4,13 @@ import { RalphService } from '../utils/ralph-service';
 import { parseAgentTree } from '../utils/log-parser';
 import type { AgentNode } from '../components/TracingPane';
 import { useNotifications } from './useNotifications';
-import { addToRecentProjects } from '../utils/config';
+import { addToRecentProjects, loadSettings } from '../utils/config';
 
 /**
  * Create a new tab for a project
  */
 function createNewTab(project: Project): TabState {
+  const settings = loadSettings();
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).substring(7)}`,
     project,
@@ -23,6 +24,7 @@ function createNewTab(project: Project): TabState {
     workScrollOffset: 0,
     tracingNodeIndex: 0,
     availableCLI: null,
+    isProjectCLIOverride: false,
     lastRunDuration: null,
     lastRunExitCode: null,
     currentStory: null,
@@ -33,9 +35,15 @@ function createNewTab(project: Project): TabState {
       totalMatches: 0,
       matchingLines: [],
     },
+    gotoState: {
+      gotoMode: false,
+      gotoInput: '',
+      gotoError: null,
+    },
     logFilter: {
       level: 'all',
     },
+    debugMode: settings.debugMode || false,
   };
 }
 
@@ -78,30 +86,33 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   /**
    * Open a new tab for a project
    */
-  const openTab = useCallback((project: Project) => {
-    // Track in recent projects
-    trackProjectAccess(project);
+  const openTab = useCallback(
+    (project: Project) => {
+      // Track in recent projects
+      trackProjectAccess(project);
 
-    setTabs(prev => {
-      // Check if already open
-      const existing = prev.find(t => t.project.id === project.id);
-      if (existing) {
-        setActiveTabId(existing.id);
-        // Still track access even when switching to existing tab
-        trackProjectAccess(existing.project);
-        return prev;
-      }
+      setTabs(prev => {
+        // Check if already open
+        const existing = prev.find(t => t.project.id === project.id);
+        if (existing) {
+          setActiveTabId(existing.id);
+          // Still track access even when switching to existing tab
+          trackProjectAccess(existing.project);
+          return prev;
+        }
 
-      // Limit to 5 tabs
-      if (prev.length >= 5) {
-        return prev;
-      }
+        // Limit to 5 tabs
+        if (prev.length >= 5) {
+          return prev;
+        }
 
-      const newTab = createNewTab(project);
-      setActiveTabId(newTab.id);
-      return [...prev, newTab];
-    });
-  }, [trackProjectAccess]);
+        const newTab = createNewTab(project);
+        setActiveTabId(newTab.id);
+        return [...prev, newTab];
+      });
+    },
+    [trackProjectAccess],
+  );
 
   /**
    * Close a tab
@@ -206,6 +217,11 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
 
         service = new RalphService(tab.project.path);
 
+        // Set initial debug mode from tab state
+        if (tab.debugMode) {
+          service.setDebugMode(true);
+        }
+
         service.onStatusChange(status => {
           // Check for story completion or error
           if (status.state === 'idle' && status.currentStory) {
@@ -214,7 +230,10 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
               notify('success', `Story ${status.currentStory} completed successfully!`);
             } else if (status.exitCode !== undefined && status.exitCode !== 0) {
               // Story failed with error
-              notify('error', `Story ${status.currentStory} failed with exit code ${status.exitCode}`);
+              notify(
+                'error',
+                `Story ${status.currentStory} failed with exit code ${status.exitCode}`,
+              );
             }
           } else if (status.error) {
             // Process error
@@ -234,6 +253,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
 
         updateTab(tabId, {
           availableCLI: service.getAvailableCLI(),
+          isProjectCLIOverride: service.isProjectCLIOverride(),
         });
 
         service.onOutput((line, type) => {
@@ -248,6 +268,12 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
             notify('error', `${storyId} failed acceptance criteria`);
           } else if (line.includes('🎉 PROJECT COMPLETE!')) {
             notify('success', '🎉 Project complete! All stories verified.');
+          } else if (line.includes('[OK] Claude is running')) {
+            notify('success', 'Claude session verified running');
+          } else if (line.includes('[WARN] No activity detected')) {
+            notify('warning', 'No Claude activity - may be stuck or quota limited');
+          } else if (line.includes('[ERROR]')) {
+            notify('error', line.replace('[ERROR]', '').trim());
           }
 
           setTabs(prev =>
@@ -283,6 +309,18 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   );
 
   /**
+   * Sync debug mode with RalphService when it changes
+   */
+  useEffect(() => {
+    tabs.forEach(tab => {
+      const service = ralphServices.get(tab.id);
+      if (service) {
+        service.setDebugMode(tab.debugMode || false);
+      }
+    });
+  }, [tabs, ralphServices]);
+
+  /**
    * Cleanup on unmount
    */
   useEffect(() => {
@@ -291,6 +329,15 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
       ralphServices.forEach(service => service.stop());
     };
   }, [ralphServices]);
+
+  const getLiveOutput = useCallback(
+    (tabId: string, maxLines: number = 15): string[] => {
+      const service = ralphServices.get(tabId);
+      if (!service) return [];
+      return service.getLiveOutput(maxLines);
+    },
+    [ralphServices],
+  );
 
   return {
     tabs,
@@ -304,5 +351,6 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
     updateTab,
     getRalphService,
     getAgentTree: (tabId: string) => agentTrees.get(tabId) || [],
+    getLiveOutput,
   };
 }

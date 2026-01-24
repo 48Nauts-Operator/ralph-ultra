@@ -5,21 +5,28 @@ import { join } from 'path';
 import { useTheme } from '@hooks/useTheme';
 import { useNotifications } from '@hooks/useNotifications';
 import { useSearch } from '@hooks/useSearch';
-import type { UserStory, AcceptanceCriterion, LogFilter, LogFilterLevel } from '@types';
+import { useQuotas } from '@hooks/useQuotas';
+import type {
+  UserStory,
+  AcceptanceCriterion,
+  LogFilter,
+  LogFilterLevel,
+  PRD,
+  WorkView,
+} from '@types';
 import { runStoryTestsAndSave, type ACTestResult } from '../utils/ac-runner';
 import type { TailscaleStatus } from '../remote/tailscale';
-import { TracingPane, type AgentNode } from './TracingPane';
+
 import {
   getSessionInfo,
   formatCost,
   formatTokens,
   type SessionInfo,
 } from '../utils/session-tracker';
-
-/**
- * View types for the work pane
- */
-export type WorkView = 'monitor' | 'status' | 'details' | 'help' | 'tracing';
+import { RalphService, type ComplexityWarning } from '../utils/ralph-service';
+import { QuotaDashboard } from './QuotaDashboard';
+import { VersionView } from './VersionView';
+import { ExecutionPlanView } from './ExecutionPlanView';
 
 interface WorkPaneProps {
   isFocused: boolean;
@@ -33,7 +40,7 @@ interface WorkPaneProps {
   processPid?: number | null;
   tailscaleStatus?: TailscaleStatus | null;
   remoteURL?: string | null;
-  agentTree?: AgentNode[];
+
   initialView?: WorkView;
   initialScrollOffset?: number;
   availableCLI?: string | null;
@@ -43,6 +50,7 @@ interface WorkPaneProps {
   retryCount?: number;
   logFilter?: LogFilter;
   allStoriesComplete?: boolean;
+  liveOutput?: string[];
 }
 
 /**
@@ -62,7 +70,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     processPid = null,
     tailscaleStatus = null,
     remoteURL = null,
-    agentTree = [],
+
     initialView = 'monitor',
     initialScrollOffset = 0,
     availableCLI = null,
@@ -72,16 +80,43 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     retryCount = 0,
     logFilter = { level: 'all' },
     allStoriesComplete = false,
+    liveOutput = [],
   }) => {
     const { theme } = useTheme();
     const { history: notificationHistory, notify } = useNotifications();
+    const { refresh: refreshQuotas } = useQuotas();
     const [currentView, setCurrentView] = useState<WorkView>(initialView);
     const [logContent, setLogContent] = useState<string[]>([]);
+
+    useEffect(() => {
+      setCurrentView(initialView);
+    }, [initialView]);
     const [scrollOffset, setScrollOffset] = useState(initialScrollOffset);
     const [isRunningTests, setIsRunningTests] = useState(false);
     const [testProgress, setTestProgress] = useState<{ current: number; total: number } | null>(
       null,
     );
+    const [complexityWarning, setComplexityWarning] = useState<ComplexityWarning | null>(null);
+    const [isSearchMode, setIsSearchMode] = useState(false);
+    const [searchInput, setSearchInput] = useState('');
+    const [isRefreshingQuota, setIsRefreshingQuota] = useState(false);
+
+    // Load PRD to check for CLI override
+    const getPRDCLI = (): string | null => {
+      try {
+        const prdPath = join(projectPath, 'prd.json');
+        if (existsSync(prdPath)) {
+          const content = readFileSync(prdPath, 'utf-8');
+          const prd: PRD = JSON.parse(content);
+          return prd.cli || null;
+        }
+      } catch {
+        // Ignore errors
+      }
+      return null;
+    };
+
+    const prdCLI = getPRDCLI();
 
     // Filter log lines based on current filter level
     const filterLogLines = (lines: string[]): string[] => {
@@ -171,19 +206,31 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     const [sessionInfo, setSessionInfo] = useState<SessionInfo>({
       model: null,
       cost: { cost: 0, tokens: { input: 0, output: 0 } },
+      contextBudget: {
+        fiveHourPercent: 0,
+        sevenDayPercent: 0,
+        fiveHourResetsAt: null,
+        sevenDayResetsAt: null,
+        approaching: false,
+        exceeded: false,
+      },
       processes: [],
     });
 
     // Update log content when logLines prop changes
     useEffect(() => {
       if (logLines.length > 0) {
-        setLogContent(logLines);
-        // Auto-scroll to bottom on new content
-        const contentHeight = logLines.length;
-        const visibleHeight = height - 3; // Subtract header and borders
-        if (contentHeight > visibleHeight) {
-          setScrollOffset(Math.max(0, contentHeight - visibleHeight));
-        }
+        setLogContent(prev => {
+          if (prev.length === logLines.length && prev.join('\n') === logLines.join('\n')) {
+            return prev;
+          }
+          const contentHeight = logLines.length;
+          const visibleHeight = height - 3;
+          if (contentHeight > visibleHeight) {
+            setScrollOffset(Math.max(0, contentHeight - visibleHeight));
+          }
+          return logLines;
+        });
       }
     }, [logLines, height]);
 
@@ -194,13 +241,21 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
         if (existsSync(logPath)) {
           const content = readFileSync(logPath, 'utf-8');
           const lines = content.split('\n').filter(line => line.trim());
-          setLogContent(lines);
-          // Auto-scroll to bottom on new content
-          setScrollOffset(Math.max(0, lines.length - (height - 3)));
+          setLogContent(prev => {
+            if (prev.length === lines.length && prev.join('\n') === lines.join('\n')) {
+              return prev;
+            }
+            return lines;
+          });
         }
       } catch {
         // Silently fail if log doesn't exist yet
-        setLogContent(['No log file found. Run Ralph to generate logs.']);
+        setLogContent(prev => {
+          if (prev.length === 1 && prev[0] === 'No log file found. Run Ralph to generate logs.') {
+            return prev;
+          }
+          return ['No log file found. Run Ralph to generate logs.'];
+        });
       }
     };
 
@@ -208,7 +263,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     useEffect(() => {
       loadLog();
 
-      const LOG_WATCH_INTERVAL_MS = 2000;
+      const LOG_WATCH_INTERVAL_MS = 5000;
       const logPath = join(projectPath, 'ralph-monitor.log');
       if (existsSync(logPath)) {
         watchFile(logPath, { interval: LOG_WATCH_INTERVAL_MS }, loadLog);
@@ -226,15 +281,79 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
       };
 
       updateSessionInfo();
-      const SESSION_POLL_INTERVAL_MS = 10000;
-      const interval = setInterval(updateSessionInfo, SESSION_POLL_INTERVAL_MS);
+      const interval = setInterval(updateSessionInfo, 60000);
 
       return () => clearInterval(interval);
     }, [projectPath]);
 
+    // Check story complexity when selected story changes
+    useEffect(() => {
+      if (selectedStory) {
+        const ralphService = new RalphService(projectPath);
+        const warning = ralphService.checkStoryComplexity(selectedStory);
+        setComplexityWarning(warning);
+        ralphService.dispose();
+      } else {
+        setComplexityWarning(null);
+      }
+    }, [selectedStory, projectPath]);
+
     // Handle keyboard input for view switching and scrolling
     useInput(
       (input, key) => {
+        // Search mode handling
+        if (isSearchMode) {
+          if (key.escape) {
+            setIsSearchMode(false);
+            setSearchInput('');
+            search.exitSearch();
+            return;
+          }
+          if (key.return) {
+            setIsSearchMode(false);
+            return;
+          }
+          if (key.backspace || key.delete) {
+            const newQuery = searchInput.slice(0, -1);
+            setSearchInput(newQuery);
+            search.updateSearchQuery(newQuery);
+            return;
+          }
+          if (input && input.length === 1 && !key.ctrl && !key.meta) {
+            const newQuery = searchInput + input;
+            setSearchInput(newQuery);
+            search.updateSearchQuery(newQuery);
+            return;
+          }
+          return;
+        }
+
+        // '/' to start search (only in monitor view)
+        if (input === '/' && currentView === 'monitor') {
+          setIsSearchMode(true);
+          setSearchInput('');
+          search.startSearch('');
+          return;
+        }
+
+        // 'n' for next match, 'N' for previous match
+        if (input === 'n' && search.searchState.totalMatches > 0) {
+          search.nextMatch();
+          const matchLine = search.currentMatchLineIndex;
+          if (matchLine !== undefined && matchLine >= 0) {
+            setScrollOffset(Math.max(0, matchLine - Math.floor((height - 3) / 2)));
+          }
+          return;
+        }
+        if (input === 'N' && search.searchState.totalMatches > 0) {
+          search.previousMatch();
+          const matchLine = search.currentMatchLineIndex;
+          if (matchLine !== undefined && matchLine >= 0) {
+            setScrollOffset(Math.max(0, matchLine - Math.floor((height - 3) / 2)));
+          }
+          return;
+        }
+
         // Number keys: jump to specific views
         if (input === '1') {
           setCurrentView('monitor');
@@ -249,22 +368,33 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           return;
         }
         if (input === '4') {
-          setCurrentView('help');
+          setCurrentView('quota');
           return;
         }
         if (input === '5') {
-          setCurrentView('tracing');
+          setCurrentView('plan');
+          return;
+        }
+        if (input === '6') {
+          setCurrentView('help');
+          return;
+        }
+        if (input === '7') {
+          setCurrentView('version');
           return;
         }
 
-        if (input === 'j' || key.downArrow) {
-          setScrollOffset(prev => {
-            const maxScroll = Math.max(0, getMaxScrollForView() - (height - 3));
-            return Math.min(prev + 1, maxScroll);
-          });
-        }
-        if (input === 'k' || key.upArrow) {
-          setScrollOffset(prev => Math.max(0, prev - 1));
+        // Skip scroll handling for version view - it has its own scroll handler
+        if (currentView !== 'version') {
+          if (input === 'j' || key.downArrow) {
+            setScrollOffset(prev => {
+              const maxScroll = Math.max(0, getMaxScrollForView() - (height - 3));
+              return Math.min(prev + 1, maxScroll);
+            });
+          }
+          if (input === 'k' || key.upArrow) {
+            setScrollOffset(prev => Math.max(0, prev - 1));
+          }
         }
 
         if (
@@ -304,6 +434,26 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
               }
             } else {
               notify('error', 'Failed to run tests');
+            }
+          }, 100);
+        }
+
+        // 'R' or 'r' to refresh quotas (only in quota view)
+        if ((input === 'r' || input === 'R') && currentView === 'quota' && !isRefreshingQuota) {
+          setIsRefreshingQuota(true);
+          notify('info', 'Refreshing quotas...');
+
+          // Use setTimeout to ensure UI updates before the async operation
+          setTimeout(async () => {
+            try {
+              await refreshQuotas(true); // Force refresh
+              notify('success', 'Quotas refreshed successfully');
+            } catch (error) {
+              const errorMessage =
+                error instanceof Error ? error.message : 'Failed to refresh quotas';
+              notify('error', errorMessage);
+            } finally {
+              setIsRefreshingQuota(false);
             }
           }, 100);
         }
@@ -444,7 +594,15 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
               l.includes('FAILED') ||
               l.includes('Moving') ||
               l.includes('completed') ||
-              l.includes('PROJECT')),
+              l.includes('PROJECT') ||
+              l.includes('[OK]') ||
+              l.includes('[WARN]') ||
+              l.includes('[ERROR]') ||
+              l.includes('[ERR]') ||
+              l.includes('[...]') ||
+              l.includes('Tmux session') ||
+              l.includes('Session PID') ||
+              l.includes('Claude')),
         )
         .slice(-6);
       data.recentActivity = activityLines.map(l => l.replace(/[═─]/g, '').trim()).filter(Boolean);
@@ -543,6 +701,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             <Box paddingX={1} gap={2}>
               <Text dimColor>
                 CLI:<Text color={theme.success}>{data.cli || '?'}</Text>
+                {prdCLI && data.cli === prdCLI && <Text color={theme.accent}>*</Text>}
               </Text>
               <Text dimColor>
                 Complexity:<Text color={theme.warning}>{data.complexity || '?'}</Text>
@@ -645,6 +804,78 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             </Box>
           </Box>
 
+          {liveOutput.length > 0 && (
+            <Box
+              borderStyle="single"
+              borderColor={theme.border}
+              flexDirection="column"
+              width={boxWidth}
+            >
+              <Box paddingX={1}>
+                <Text bold color={theme.accent}>
+                  Claude Output
+                </Text>
+                <Text dimColor> (live)</Text>
+              </Box>
+              <Box paddingX={1} paddingY={0} flexDirection="column" gap={0}>
+                {liveOutput.slice(-8).map((line, i) => {
+                  const maxLen = boxWidth - 4;
+                  const shortLine = line.length > maxLen ? line.slice(0, maxLen - 3) + '...' : line;
+                  return (
+                    <Text key={i} dimColor wrap="truncate">
+                      {shortLine}
+                    </Text>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+
+          {data.acResults.some(r => r?.passed === false) &&
+            selectedStory &&
+            data.currentStoryId === selectedStory.id && (
+              <Box
+                borderStyle="single"
+                borderColor={theme.error}
+                flexDirection="column"
+                width={boxWidth}
+              >
+                <Box paddingX={1}>
+                  <Text bold color={theme.error}>
+                    Failed Criteria
+                  </Text>
+                </Box>
+                <Box paddingX={1} flexDirection="column" gap={0}>
+                  {data.acResults.map((result, i) => {
+                    if (result?.passed !== false) return null;
+                    const ac = selectedStory.acceptanceCriteria[i];
+                    if (!ac) return null;
+                    const acText = typeof ac === 'string' ? ac : ac.text;
+                    const testCmd = typeof ac === 'string' ? null : ac.testCommand;
+                    const maxLen = boxWidth - 6;
+                    const shortText =
+                      acText.length > maxLen ? acText.slice(0, maxLen - 3) + '...' : acText;
+                    return (
+                      <Box key={i} flexDirection="column">
+                        <Text color={theme.error}>
+                          ✗ AC-{i + 1}: {shortText}
+                        </Text>
+                        {testCmd && (
+                          <Text dimColor>
+                            {' '}
+                            test:{' '}
+                            {testCmd.length > maxLen - 8
+                              ? testCmd.slice(0, maxLen - 11) + '...'
+                              : testCmd}
+                          </Text>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            )}
+
           <Box borderStyle="single" borderColor={theme.border} width={boxWidth} paddingX={1}>
             <Text dimColor>Progress: </Text>
             {(() => {
@@ -713,6 +944,9 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             <Text color={availableCLI ? theme.success : theme.error}>
               {availableCLI || 'Not found'}
             </Text>
+            {prdCLI && availableCLI === prdCLI && (
+              <Text color={theme.accent}> (project override)</Text>
+            )}
           </Text>
           <Text>
             <Text dimColor>Model: </Text>
@@ -737,10 +971,10 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           </Text>
           <Text> </Text>
           <Text bold color={theme.accent}>
-            Session Cost
+            Session Cost & Context
           </Text>
           <Text>
-            <Text dimColor>Total: </Text>
+            <Text dimColor>Total Cost: </Text>
             <Text color={theme.warning}>{formatCost(sessionInfo.cost.cost)}</Text>
           </Text>
           <Text>
@@ -750,6 +984,29 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
               {formatTokens(sessionInfo.cost.tokens.output)} out
             </Text>
           </Text>
+          <Text>
+            <Text dimColor>Context Quota (5h): </Text>
+            <Text
+              color={
+                sessionInfo.contextBudget.exceeded
+                  ? theme.error
+                  : sessionInfo.contextBudget.approaching
+                    ? theme.warning
+                    : theme.success
+              }
+            >
+              {Math.round(sessionInfo.contextBudget.fiveHourPercent)}%
+              {sessionInfo.contextBudget.exceeded && ' ⚠ EXCEEDED'}
+              {sessionInfo.contextBudget.approaching &&
+                !sessionInfo.contextBudget.exceeded &&
+                ' ⚠ HIGH'}
+            </Text>
+          </Text>
+          {sessionInfo.contextBudget.fiveHourResetsAt && (
+            <Text dimColor>
+              Resets: {new Date(sessionInfo.contextBudget.fiveHourResetsAt).toLocaleTimeString()}
+            </Text>
+          )}
           <Text> </Text>
           <Text bold color={theme.accent}>
             Running Processes ({processState === 'running' ? 1 : sessionInfo.processes.length})
@@ -913,6 +1170,39 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           <Text>{selectedStory.id}</Text>
         </Text>,
         <Text key="space1"> </Text>,
+      ];
+
+      // Add complexity warning box if story is too complex
+      if (complexityWarning?.isComplex) {
+        visibleContent.push(
+          <Box
+            key="complexity-warning"
+            flexDirection="column"
+            borderStyle="round"
+            borderColor={theme.warning}
+            paddingX={1}
+            paddingY={0}
+          >
+            <Text bold color={theme.warning}>
+              ⚠ Story May Be Too Complex
+            </Text>
+            <Text key="warning-space1"> </Text>
+            {complexityWarning.reasons.map((reason, idx) => (
+              <Text key={`reason-${idx}`} color={theme.warning}>
+                • {reason}
+              </Text>
+            ))}
+            <Text key="warning-space2"> </Text>
+            <Text dimColor wrap="wrap">
+              Story is too complex. Consider breaking this into smaller stories (breakDown into
+              subtasks) for better success rates.
+            </Text>
+          </Box>,
+          <Text key="space-after-warning"> </Text>,
+        );
+      }
+
+      visibleContent.push(
         <Text key="status">
           <Text dimColor>Status: </Text>
           <Text color={statusColor}>{statusText}</Text>
@@ -985,7 +1275,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             );
           })}
         </Box>,
-      ];
+      );
 
       return (
         <Box flexDirection="column" paddingX={1} overflowY="hidden">
@@ -1019,13 +1309,28 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             { key: '1', desc: 'Monitor (logs)' },
             { key: '2', desc: 'Status (system info)' },
             { key: '3', desc: 'Details (story)' },
-            { key: '4', desc: 'Help (this view)' },
-            { key: '5', desc: 'Tracing (agent tree)' },
+            { key: '4', desc: 'Quota (provider quotas)' },
+            { key: '5', desc: 'Plan (execution plan)' },
+            { key: '6', desc: 'Help (this view)' },
+            { key: '7', desc: 'Tracing (agent tree)' },
           ],
         },
         {
           title: 'Remote',
           items: [{ key: 'c', desc: 'Copy remote URL' }],
+        },
+        {
+          title: 'Search (Monitor view)',
+          items: [
+            { key: '/', desc: 'Start search' },
+            { key: 'n', desc: 'Next match' },
+            { key: 'N', desc: 'Previous match' },
+            { key: 'Esc', desc: 'Cancel search' },
+          ],
+        },
+        {
+          title: 'Quota View',
+          items: [{ key: 'R', desc: 'Refresh quotas' }],
         },
         {
           title: 'Interface',
@@ -1072,19 +1377,18 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           return renderStatus();
         case 'details':
           return renderDetails();
+        case 'quota':
+          return <QuotaDashboard width={width - 4} />;
+        case 'plan':
+          return <ExecutionPlanView projectPath={projectPath} height={height - 6} />;
         case 'help':
           return renderHelp();
-        case 'tracing':
-          return null; // TracingPane renders itself as a full component
+        case 'version':
+          return <VersionView height={height - 4} isFocused={isFocused} />;
+        default:
+          return renderMonitor();
       }
     };
-
-    // For tracing view, render TracingPane directly (it has its own border)
-    if (currentView === 'tracing') {
-      return (
-        <TracingPane isFocused={isFocused} height={height} width={width} agentTree={agentTree} />
-      );
-    }
 
     // Get filter display text
     const getFilterDisplay = () => {
@@ -1109,19 +1413,49 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
       >
         {/* Header showing current view */}
         <Box paddingX={1} borderStyle="single" borderColor={borderColor}>
-          <Text bold color={theme.accent}>
-            Work: {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
-          </Text>
-          {currentView === 'monitor' && logFilter && (
+          {isSearchMode ? (
             <>
-              <Text dimColor> | Filter: </Text>
-              <Text color={logFilter.level === 'all' ? theme.muted : theme.warning}>
-                {getFilterDisplay()}
+              <Text color={theme.accent}>/</Text>
+              <Text>{searchInput}</Text>
+              <Text color={theme.muted}>_</Text>
+              {search.searchState.totalMatches > 0 && (
+                <Text dimColor>
+                  {' '}
+                  [{search.searchState.currentMatchIndex + 1}/{search.searchState.totalMatches}]
+                </Text>
+              )}
+              {searchInput && search.searchState.totalMatches === 0 && (
+                <Text color={theme.error}> (no matches)</Text>
+              )}
+              <Text dimColor> [Enter to confirm, Esc to cancel]</Text>
+            </>
+          ) : (
+            <>
+              <Text bold color={theme.accent}>
+                Work: {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
               </Text>
-              <Text dimColor> [f]</Text>
+              {currentView === 'monitor' && logFilter && (
+                <>
+                  <Text dimColor> | Filter: </Text>
+                  <Text color={logFilter.level === 'all' ? theme.muted : theme.warning}>
+                    {getFilterDisplay()}
+                  </Text>
+                  <Text dimColor> [f]</Text>
+                </>
+              )}
+              {currentView === 'monitor' && search.searchState.searchQuery && !isSearchMode && (
+                <>
+                  <Text dimColor> | Search: </Text>
+                  <Text color={theme.accent}>{search.searchState.searchQuery}</Text>
+                  <Text dimColor>
+                    {' '}
+                    [{search.searchState.currentMatchIndex + 1}/{search.searchState.totalMatches}]
+                  </Text>
+                </>
+              )}
+              <Text dimColor> [1-5 to switch]</Text>
             </>
           )}
-          <Text dimColor> [1-5 to switch]</Text>
         </Box>
 
         {/* View content */}

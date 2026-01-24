@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useTheme } from '@hooks/useTheme.js';
 import { useNotifications } from '@hooks/useNotifications.js';
 import type { ThemeName } from '@themes/types.js';
 import { themes } from '@themes/index.js';
+import { RalphService } from '@utils/ralph-service.js';
+import { loadSettings, saveSettings } from '@utils/config.js';
 
 interface SettingsPanelProps {
   width: number;
@@ -19,12 +21,45 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
   const { soundEnabled, toggleSound } = useNotifications();
   const themeNames = Object.keys(themes) as ThemeName[];
 
+  // CLI detection state
+  const [availableCLIs, setAvailableCLIs] = useState<Array<{ name: string; installed: boolean }>>(
+    [],
+  );
+  const [preferredCli, setPreferredCli] = useState<string | undefined>();
+  const [cliFallbackOrder, setCliFallbackOrder] = useState<string[]>([]);
+
+  // Load CLI info on mount
+  useEffect(() => {
+    const clis = RalphService.detectAvailableCLIs();
+    setAvailableCLIs(clis);
+
+    const settings = loadSettings();
+    setPreferredCli(settings['preferredCli'] as string | undefined);
+    setCliFallbackOrder((settings['cliFallbackOrder'] as string[] | undefined) || []);
+  }, []);
+
+  const handleCliSelection = (cliName: string) => {
+    const settings = loadSettings();
+    settings['preferredCli'] = cliName;
+    saveSettings(settings);
+    setPreferredCli(cliName);
+  };
+
   useInput(
     (input, key) => {
       if (input === 'q' || key.escape) {
         onClose();
       } else if (input === 's') {
         toggleSound();
+      } else if (input === 'c') {
+        // Cycle through installed CLIs
+        const installedCLIs = availableCLIs.filter(cli => cli.installed);
+        if (installedCLIs.length > 0) {
+          const currentIndex = installedCLIs.findIndex(cli => cli.name === preferredCli);
+          const nextIndex = (currentIndex + 1) % installedCLIs.length;
+          const nextCli = installedCLIs[nextIndex];
+          if (nextCli) handleCliSelection(nextCli.name);
+        }
       } else if (input === '0') {
         // 0 = theme 10
         const selectedTheme = themeNames[9];
@@ -90,14 +125,18 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
 
         <Box flexDirection="row" marginBottom={1}>
           <Box flexDirection="column" width="50%">
-            <Text color={theme.foreground} bold>Themes (1-9, 0, -, =):</Text>
+            <Text color={theme.foreground} bold>
+              Themes (1-9, 0, -, =):
+            </Text>
             <Box flexDirection="column" marginTop={1}>
               {themeNames.slice(0, 6).map((name, index) => {
                 const isSelected = name === themeName;
                 const displayTheme = themes[name];
                 return (
                   <Box key={name}>
-                    <Text color={theme.accent} bold>{index + 1}</Text>
+                    <Text color={theme.accent} bold>
+                      {index + 1}
+                    </Text>
                     <Text color={theme.muted}>. </Text>
                     <Text color={isSelected ? theme.accent : theme.foreground} bold={isSelected}>
                       {displayTheme.name}
@@ -115,10 +154,13 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
                 const isSelected = name === themeName;
                 const displayTheme = themes[name];
                 const keyNum = index + 7;
-                const keyDisplay = keyNum <= 9 ? String(keyNum) : keyNum === 10 ? '0' : keyNum === 11 ? '-' : '=';
+                const keyDisplay =
+                  keyNum <= 9 ? String(keyNum) : keyNum === 10 ? '0' : keyNum === 11 ? '-' : '=';
                 return (
                   <Box key={name}>
-                    <Text color={theme.accent} bold>{keyDisplay}</Text>
+                    <Text color={theme.accent} bold>
+                      {keyDisplay}
+                    </Text>
                     <Text color={theme.muted}>. </Text>
                     <Text color={isSelected ? theme.accent : theme.foreground} bold={isSelected}>
                       {displayTheme.name}
@@ -133,9 +175,13 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
 
         <Box flexDirection="row" marginTop={1}>
           <Box flexDirection="column" width="50%">
-            <Text color={theme.foreground} bold>Sound:</Text>
+            <Text color={theme.foreground} bold>
+              Sound:
+            </Text>
             <Box marginTop={1}>
-              <Text color={theme.accent} bold>s</Text>
+              <Text color={theme.accent} bold>
+                s
+              </Text>
               <Text color={theme.muted}>. </Text>
               <Text color={soundEnabled ? theme.success : theme.muted}>
                 {soundEnabled ? '● ON' : '○ OFF'}
@@ -143,11 +189,75 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
             </Box>
           </Box>
           <Box flexDirection="column" width="50%">
-            <Text color={theme.foreground} bold>Preview:</Text>
+            <Text color={theme.foreground} bold>
+              Preview:
+            </Text>
             <Box marginTop={1} flexDirection="column">
               <Text color={theme.accent}>■ Accent </Text>
               <Text color={theme.accentSecondary}>■ Secondary </Text>
-              <Text><Text color={theme.success}>■</Text> <Text color={theme.warning}>■</Text> <Text color={theme.error}>■</Text> Status</Text>
+              <Text>
+                <Text color={theme.success}>■</Text> <Text color={theme.warning}>■</Text>{' '}
+                <Text color={theme.error}>■</Text> Status
+              </Text>
+            </Box>
+          </Box>
+        </Box>
+
+        <Box flexDirection="row" marginTop={1}>
+          <Box flexDirection="column" width="50%">
+            <Text color={theme.foreground} bold>
+              Preferred CLI (c):
+            </Text>
+            <Box marginTop={1} flexDirection="column">
+              {availableCLIs.map(cli => {
+                const isSelected = cli.name === preferredCli;
+                const isInstalled = cli.installed;
+                return (
+                  <Box key={cli.name}>
+                    <Text color={isInstalled ? theme.accent : theme.muted}>
+                      {isInstalled ? '●' : '○'}
+                    </Text>
+                    <Text color={theme.muted}> </Text>
+                    <Text
+                      color={
+                        isSelected ? theme.success : isInstalled ? theme.foreground : theme.muted
+                      }
+                      bold={isSelected}
+                    >
+                      {cli.name}
+                    </Text>
+                    {isSelected && <Text color={theme.success}> ✓</Text>}
+                    {!isInstalled && <Text color={theme.muted}> (not installed)</Text>}
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+          <Box flexDirection="column" width="50%">
+            <Text color={theme.foreground} bold>
+              Fallback Chain:
+            </Text>
+            <Box marginTop={1} flexDirection="column">
+              {cliFallbackOrder.length > 0 ? (
+                cliFallbackOrder.map((cli, index) => {
+                  const cliInfo = availableCLIs.find(c => c.name === cli);
+                  const isInstalled = cliInfo?.installed ?? false;
+                  return (
+                    <Box key={cli}>
+                      <Text color={theme.muted}>{index + 1}. </Text>
+                      <Text
+                        color={isInstalled ? theme.foreground : theme.muted}
+                        dimColor={!isInstalled}
+                      >
+                        {cli}
+                      </Text>
+                      {!isInstalled && <Text color={theme.muted}> ✗</Text>}
+                    </Box>
+                  );
+                })
+              ) : (
+                <Text color={theme.muted}>Auto-detect all</Text>
+              )}
             </Box>
           </Box>
         </Box>
@@ -159,6 +269,8 @@ export function SettingsPanel({ width, height, onClose }: SettingsPanelProps) {
           <Text color={theme.muted}> for theme, </Text>
           <Text color={theme.accent}>s</Text>
           <Text color={theme.muted}> for sound, </Text>
+          <Text color={theme.accent}>c</Text>
+          <Text color={theme.muted}> for CLI, </Text>
           <Text color={theme.accent}>q/ESC</Text>
           <Text color={theme.muted}> to close</Text>
         </Box>
