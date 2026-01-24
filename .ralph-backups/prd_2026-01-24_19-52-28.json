@@ -222,26 +222,26 @@
           "id": "AC-008-1",
           "text": "RalphService loadOrGenerateExecutionPlan uses mode from settings",
           "testCommand": "grep -q \"executionMode\\|mode\" src/utils/ralph-service.ts && grep -q \"loadSettings\\|settings\" src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:54:47.946Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-2",
           "text": "Log output shows which mode is being used for execution",
           "testCommand": "grep -q \"mode.*log\\|log.*mode\\|Mode:\" src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:54:47.946Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-3",
           "text": "Model selection respects the execution mode setting",
           "testCommand": "grep -q \"mode\" src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:54:47.946Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-009",
@@ -252,19 +252,19 @@
           "id": "AC-009-1",
           "text": "StatusBar displays current execution mode",
           "testCommand": "grep -q \"mode\\|Mode\" src/components/StatusBar.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:58:10.142Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-2",
           "text": "Mode indicator uses distinct colors/icons for each mode (e.g., $ for saver, rocket for fast)",
           "testCommand": "grep -q \"saver\\|fast\\|balanced\\|💰\\|🚀\\|⚖\" src/components/StatusBar.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:58:10.142Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "simple",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-010",

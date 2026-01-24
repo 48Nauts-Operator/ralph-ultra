@@ -43,6 +43,7 @@ import {
 } from '../utils/status-check';
 import { getSessionInfo, type SessionInfo } from '../utils/session-tracker';
 import type { Project, PRD } from '../types';
+import type { ExecutionMode } from '../core/types';
 import { readFileSync, watchFile, unwatchFile } from 'fs';
 import { join, basename } from 'path';
 
@@ -86,6 +87,7 @@ export const App: React.FC = () => {
   const [remoteURL, setRemoteURL] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<AnthropicStatus | null>(null);
   const [_sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>('balanced');
 
   const remoteServerRef = useRef<RalphRemoteServer | null>(null);
   const httpServerRef = useRef<RalphHttpServer | null>(null);
@@ -351,6 +353,12 @@ export const App: React.FC = () => {
     setShowWelcome(true);
     // Ensure principles file exists on every startup
     ensurePrinciplesFile();
+
+    // Load execution mode from settings
+    const settings = loadSettings();
+    if (settings.executionMode) {
+      setExecutionMode(settings.executionMode as ExecutionMode);
+    }
 
     const SPLASH_DURATION_MS = 2000;
     const timer = setTimeout(() => {
@@ -1460,6 +1468,7 @@ export const App: React.FC = () => {
         tailscaleStatus={tailscaleStatus}
         apiStatus={apiStatus}
         projectPath={activeTab.project.path}
+        executionMode={executionMode}
       />
 
       <TabBar

@@ -275,26 +275,26 @@
           "id": "AC-010-1",
           "text": "ExecutionMode type is exported from core/index.ts or types/index.ts",
           "testCommand": "grep -q \"ExecutionMode\" src/core/index.ts || grep -q \"ExecutionMode\" src/types/index.ts",
-          "passes": false,
-          "lastRun": null
+          "passes": true,
+          "lastRun": "2026-01-24T19:01:18.553Z"
         },
         {
           "id": "AC-010-2",
           "text": "TypeScript compiles without errors",
           "testCommand": "cd /Volumes/DevHub_ext/factory/toolbox/ralph-ultra && bun run typecheck",
-          "passes": false,
-          "lastRun": null
+          "passes": true,
+          "lastRun": "2026-01-24T19:01:18.553Z"
         },
         {
           "id": "AC-010-3",
           "text": "getCLIConfig and buildTmuxCommand use variables for model, not hardcoded strings",
           "testCommand": "grep -A 5 'case .claude.:' src/utils/ralph-service.ts | grep -q 'claudeModel\\|model\\|DEFAULT_MODEL'",
-          "passes": false,
-          "lastRun": null
+          "passes": true,
+          "lastRun": "2026-01-24T19:01:18.553Z"
         }
       ],
       "complexity": "simple",
-      "passes": false
+      "passes": true
     }
   ]
 }

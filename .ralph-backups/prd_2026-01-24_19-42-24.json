@@ -132,26 +132,26 @@
           "id": "AC-005-1",
           "text": "ExecutionPlanView displays current mode with visual indicator",
           "testCommand": "grep -q \"mode\\|Mode\" src/components/ExecutionPlanView.tsx && grep -q \"balanced\\|saver\\|fast\" src/components/ExecutionPlanView.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:46:11.447Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-005-2",
           "text": "Keyboard shortcut 'm' cycles through modes (balanced -> super-saver -> fast-delivery)",
           "testCommand": "grep -q \"'m'\\|key.*m\" src/components/ExecutionPlanView.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:46:11.447Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-005-3",
           "text": "Mode comparison section shows all three modes with their total cost and duration",
           "testCommand": "grep -q \"comparison\\|Comparison\\|superSaver\\|fastDelivery\" src/components/ExecutionPlanView.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:46:11.447Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-006",
@@ -162,26 +162,26 @@
           "id": "AC-006-1",
           "text": "useExecutionPlan accepts mode parameter",
           "testCommand": "grep -q \"useExecutionPlan.*mode\\|mode.*ExecutionMode\" src/hooks/useExecutionPlan.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:47:01.489Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-006-2",
           "text": "Hook returns setMode function to change execution mode",
           "testCommand": "grep -q \"setMode\" src/hooks/useExecutionPlan.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:47:01.489Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-006-3",
           "text": "Plan regenerates when mode changes (useEffect dependency)",
           "testCommand": "grep -q \"useEffect\" src/hooks/useExecutionPlan.tsx && grep -q \"mode\" src/hooks/useExecutionPlan.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:47:01.489Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "simple",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-007",
@@ -192,26 +192,26 @@
           "id": "AC-007-1",
           "text": "Settings interface includes executionMode field",
           "testCommand": "grep -q \"executionMode\" src/utils/config.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:52:26.619Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-007-2",
           "text": "loadSettings returns executionMode with 'balanced' as default",
           "testCommand": "grep -q \"executionMode.*balanced\\|balanced.*executionMode\" src/utils/config.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:52:26.619Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-007-3",
           "text": "saveSettings persists executionMode to settings.json",
           "testCommand": "grep -q \"executionMode\" src/utils/config.ts && test -f src/utils/config.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:52:26.619Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "simple",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-008",
@@ -222,26 +222,26 @@
           "id": "AC-008-1",
           "text": "RalphService loadOrGenerateExecutionPlan uses mode from settings",
           "testCommand": "grep -q \"executionMode\\|mode\" src/utils/ralph-service.ts && grep -q \"loadSettings\\|settings\" src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:54:47.946Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-2",
           "text": "Log output shows which mode is being used for execution",
           "testCommand": "grep -q \"mode.*log\\|log.*mode\\|Mode:\" src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:54:47.946Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-008-3",
           "text": "Model selection respects the execution mode setting",
           "testCommand": "grep -q \"mode\" src/utils/ralph-service.ts",
-          "passes": true,
-          "lastRun": "2026-01-24T18:54:47.946Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "medium",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-009",
@@ -252,19 +252,19 @@
           "id": "AC-009-1",
           "text": "StatusBar displays current execution mode",
           "testCommand": "grep -q \"mode\\|Mode\" src/components/StatusBar.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:58:10.142Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-2",
           "text": "Mode indicator uses distinct colors/icons for each mode (e.g., $ for saver, rocket for fast)",
           "testCommand": "grep -q \"saver\\|fast\\|balanced\\|💰\\|🚀\\|⚖\" src/components/StatusBar.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:58:10.142Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "simple",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-010",

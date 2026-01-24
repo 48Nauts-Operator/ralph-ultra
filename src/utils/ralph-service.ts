@@ -58,6 +58,8 @@ export interface ExecutionProgress {
 const MAX_RETRIES_PER_STORY = 3;
 const MAX_ITERATIONS = 10;
 const LOG_POLL_INTERVAL_MS = 500;
+const DEFAULT_MODEL = 'sonnet';
+const DEFAULT_CLAUDE_MODEL_ID = 'claude-sonnet-4-20250514';
 
 // Story complexity thresholds
 const MAX_DESCRIPTION_WORDS = 100;
@@ -331,7 +333,7 @@ export class RalphService {
       if (trimmed.match(/^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+\s+[^\s]+\s*(%|\$)\s*$/)) return false;
       // Claude command and wrapped fragments
       if (trimmed.includes('claude --print')) return false;
-      if (trimmed.includes('--model sonnet')) return false;
+      if (trimmed.includes('--model ')) return false;
       if (trimmed.includes('skip-permissions')) return false;
       if (trimmed.includes('ralph-prompt-')) return false;
       if (trimmed.includes('/var/folders/')) return false;
@@ -622,10 +624,14 @@ Begin implementation now.`;
     }
 
     try {
-      // Generate execution plan from PRD with learning data
+      // Load execution mode from settings
+      const settings = loadSettings();
+      const executionMode = settings.executionMode || 'balanced';
+
+      // Generate execution plan from PRD with learning data and execution mode
       const learningData = this.learningRecorder.getAllLearnings();
-      this.executionPlan = generateExecutionPlan(prd, undefined, this.projectPath, learningData);
-      this.log('INFO', `Execution plan generated with ${this.executionPlan.stories.length} stories`);
+      this.executionPlan = generateExecutionPlan(prd, undefined, this.projectPath, learningData, executionMode);
+      this.log('INFO', `Execution plan generated with ${this.executionPlan.stories.length} stories using ${executionMode} mode`);
       return this.executionPlan;
     } catch (err) {
       this.log('WARN', `Failed to generate execution plan: ${err}`);
@@ -635,7 +641,7 @@ Begin implementation now.`;
 
   /**
    * Map model ID from execution plan to Claude CLI model flag value.
-   * Falls back to 'sonnet' if model is unknown or not supported.
+   * Falls back to DEFAULT_MODEL if model is unknown or not supported.
    */
   private mapModelIdToCLIFlag(modelId: string): string {
     // Map full model IDs to CLI model names
@@ -660,8 +666,8 @@ Begin implementation now.`;
     if (modelId.includes('sonnet')) return 'sonnet';
 
     // Default fallback
-    this.log('WARN', `Unknown model ID '${modelId}', falling back to 'sonnet'`);
-    return 'sonnet';
+    this.log('WARN', `Unknown model ID '${modelId}', falling back to DEFAULT_MODEL`);
+    return DEFAULT_MODEL;
   }
 
   /**
@@ -670,7 +676,7 @@ Begin implementation now.`;
   private mapCLIToProviderModel(cli: string): { provider: Provider; modelId: string } {
     switch (cli) {
       case 'claude':
-        return { provider: 'anthropic', modelId: 'claude-sonnet-4.5' };
+        return { provider: 'anthropic', modelId: DEFAULT_CLAUDE_MODEL_ID };
       case 'opencode':
         return { provider: 'openai', modelId: 'gpt-4' };
       case 'codex':
@@ -1123,8 +1129,8 @@ Begin implementation now.`;
 
     switch (cli) {
       case 'claude':
-        // Use provided model flag or fallback to 'sonnet'
-        const model = modelFlag || 'sonnet';
+        // Use provided model flag or fallback to DEFAULT_MODEL
+        const model = modelFlag || DEFAULT_MODEL;
         return `${cli} --print --model ${model} --dangerously-skip-permissions ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
       case 'opencode':
         return `${cli} run --title Ralph ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
@@ -1144,6 +1150,7 @@ Begin implementation now.`;
   private getCLIConfig(
     cli: string,
     prompt: string,
+    model?: string,
   ): { args: string[]; useStdin: boolean; parseJson: boolean; shell: boolean } {
     // Write prompt to temp file to avoid arg length limits and escaping issues
     const promptFile = this.writePromptToFile(prompt);
@@ -1151,11 +1158,13 @@ Begin implementation now.`;
     switch (cli) {
       case 'claude':
         // Use shell to read from file, exactly like ralph-nano does
+        // Use provided model or fallback to DEFAULT_MODEL
+        const claudeModel = model || DEFAULT_MODEL;
         return {
           args: [
             '--print',
             '--model',
-            'sonnet',
+            claudeModel,
             '--dangerously-skip-permissions',
             `"$(cat ${promptFile})"`,
           ],
@@ -1444,7 +1453,10 @@ Begin implementation now.`;
           const storyAllocation = executionPlan.stories.find(s => s.storyId === story.id);
           if (storyAllocation && storyAllocation.recommendedModel.provider === 'anthropic') {
             modelFlag = this.mapModelIdToCLIFlag(storyAllocation.recommendedModel.modelId);
+            this.log('INFO', `Execution Mode: ${executionPlan.selectedMode}`);
             this.log('INFO', `Using model from execution plan: ${storyAllocation.recommendedModel.modelId} -> ${modelFlag}`);
+            this.log('INFO', `Model selection reason: ${storyAllocation.recommendedModel.reason}`);
+            this.outputCallback?.(`Mode: ${executionPlan.selectedMode}\n`, 'stdout');
             this.outputCallback?.(`Model: ${modelFlag} (from execution plan)\n`, 'stdout');
           } else {
             this.log('INFO', `No execution plan model for story ${story.id}, using default`);

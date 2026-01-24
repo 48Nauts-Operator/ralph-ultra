@@ -1,4 +1,5 @@
 export * from './types';
+export type { ExecutionMode, ExecutionModeConfig } from './types';
 export { ralphEvents } from './event-bus';
 export { ralphCommands } from './commands';
 export { store } from './state-store';

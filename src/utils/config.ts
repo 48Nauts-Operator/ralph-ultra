@@ -46,6 +46,7 @@ export interface Settings {
   recentProjects?: RecentProject[];
   preferredCli?: string;
   cliFallbackOrder?: string[];
+  executionMode?: 'balanced' | 'super-saver' | 'fast-delivery';
   [key: string]: unknown;
 }
 
@@ -89,19 +90,24 @@ export function getConfigDir(): string {
 
 /**
  * Load settings from file
- * @returns Settings object, or empty object if file doesn't exist
+ * @returns Settings object with defaults applied, or object with defaults if file doesn't exist
  */
 export function loadSettings(): Settings {
   ensureConfigDir();
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
       const content = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-      return JSON.parse(content);
+      const settings = JSON.parse(content);
+      // Ensure executionMode has a default value
+      if (!settings.executionMode) {
+        settings.executionMode = 'balanced';
+      }
+      return settings;
     }
   } catch (error) {
     console.error('Failed to load settings:', error);
   }
-  return {};
+  return { executionMode: 'balanced' };
 }
 
 /**

@@ -5,7 +5,7 @@
  * based on required capabilities and quota availability.
  */
 
-import type { TaskType, ModelCapability, Provider, ProviderQuota } from './types';
+import type { TaskType, ModelCapability, Provider, ProviderQuota, ExecutionMode } from './types';
 
 // =============================================================================
 // MODEL CAPABILITIES
@@ -112,21 +112,179 @@ export const TASK_MODEL_MAPPING: Record<
 };
 
 // =============================================================================
+// MODE-SPECIFIC MODEL MAPPINGS
+// =============================================================================
+
+/**
+ * SUPER SAVER mode: Prioritize cheapest models that can still handle the task.
+ * Uses haiku, gpt-4o-mini, gemini-flash, and local models.
+ */
+export const SUPER_SAVER_MAPPING: Record<
+  TaskType,
+  {
+    primary: { modelId: string; provider: Provider };
+    fallback: { modelId: string; provider: Provider };
+  }
+> = {
+  'complex-integration': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' }, // Complex tasks need quality
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'mathematical': {
+    primary: { modelId: 'o3-mini', provider: 'openai' }, // Math needs reasoning
+    fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+  },
+  'backend-api': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'backend-logic': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'frontend-ui': {
+    primary: { modelId: 'gemini-2.0-flash', provider: 'gemini' },
+    fallback: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+  },
+  'frontend-logic': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'database': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'testing': {
+    primary: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+  },
+  'documentation': {
+    primary: { modelId: 'gemini-2.0-flash', provider: 'gemini' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'refactoring': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'bugfix': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'devops': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'config': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+  'unknown': {
+    primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  },
+};
+
+/**
+ * FAST DELIVERY mode: Prioritize premium models for speed and quality.
+ * Uses opus, sonnet, gpt-4o for best results.
+ */
+export const FAST_DELIVERY_MAPPING: Record<
+  TaskType,
+  {
+    primary: { modelId: string; provider: Provider };
+    fallback: { modelId: string; provider: Provider };
+  }
+> = {
+  'complex-integration': {
+    primary: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+  },
+  'mathematical': {
+    primary: { modelId: 'o3-mini', provider: 'openai' },
+    fallback: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
+  },
+  'backend-api': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'backend-logic': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'frontend-ui': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'frontend-logic': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'database': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'testing': {
+    primary: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+  },
+  'documentation': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'refactoring': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'bugfix': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'devops': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'config': {
+    primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+  'unknown': {
+    primary: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
+    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+  },
+};
+
+// =============================================================================
 // RECOMMENDATION LOGIC
 // =============================================================================
 
 /**
- * Get recommended model for a task type based on available quotas.
+ * Get recommended model for a task type based on available quotas and execution mode.
  *
  * @param taskType - The type of task to perform
  * @param quotas - Current provider quotas (optional, for quota-aware selection)
+ * @param mode - Execution mode (optional, defaults to 'balanced')
  * @returns The best available model ID and provider
  */
 export function getRecommendedModel(
   taskType: TaskType,
-  quotas?: Record<Provider, ProviderQuota>
+  quotas?: Record<Provider, ProviderQuota>,
+  mode?: ExecutionMode
 ): { modelId: string; provider: Provider; reason: string } {
-  const mapping = TASK_MODEL_MAPPING[taskType];
+  // Select the appropriate mapping based on execution mode
+  let mapping: typeof TASK_MODEL_MAPPING[TaskType];
+
+  switch (mode) {
+    case 'super-saver':
+      mapping = SUPER_SAVER_MAPPING[taskType];
+      break;
+    case 'fast-delivery':
+      mapping = FAST_DELIVERY_MAPPING[taskType];
+      break;
+    case 'balanced':
+    default:
+      mapping = TASK_MODEL_MAPPING[taskType];
+      break;
+  }
 
   // If no quotas provided, return primary model
   if (!quotas) {

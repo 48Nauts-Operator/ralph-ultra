@@ -252,19 +252,19 @@
           "id": "AC-009-1",
           "text": "StatusBar displays current execution mode",
           "testCommand": "grep -q \"mode\\|Mode\" src/components/StatusBar.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:58:10.142Z"
+          "passes": false,
+          "lastRun": null
         },
         {
           "id": "AC-009-2",
           "text": "Mode indicator uses distinct colors/icons for each mode (e.g., $ for saver, rocket for fast)",
           "testCommand": "grep -q \"saver\\|fast\\|balanced\\|💰\\|🚀\\|⚖\" src/components/StatusBar.tsx",
-          "passes": true,
-          "lastRun": "2026-01-24T18:58:10.142Z"
+          "passes": false,
+          "lastRun": null
         }
       ],
       "complexity": "simple",
-      "passes": true
+      "passes": false
     },
     {
       "id": "US-010",

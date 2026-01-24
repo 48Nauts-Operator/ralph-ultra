@@ -1,0 +1,415 @@
+================================================================================
+RALPH ULTRA V3.0 - SETTINGS & EXECUTION MODE EXPLORATION
+Complete Codebase Analysis Summary
+================================================================================
+
+EXPLORATION COMPLETED: 2026-01-24
+
+Generated Documentation:
+1. SETTINGS_EXPLORATION_REPORT.md    (15 sections, comprehensive analysis)
+2. SETTINGS_ARCHITECTURE.md          (Detailed flow diagrams & flows)
+3. SETTINGS_QUICK_REFERENCE.md       (Quick lookup tables & examples)
+4. EXPLORATION_SUMMARY.txt           (This file)
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+1. SETTINGS MANAGEMENT LAYER
+   ✓ Location: ~/.config/ralph-ultra/settings.json
+   ✓ API: loadSettings() / saveSettings() in src/utils/config.ts
+   ✓ Type: Extensible Settings interface with known properties
+   ✓ Persistence: Automatic file I/O
+   
+   Stored Properties:
+   - theme (string)
+   - notificationSound (boolean)
+   - debugMode (boolean)
+   - preferredCli (string)
+   - cliFallbackOrder (string[])
+   - recentProjects (RecentProject[], max 10)
+   - openProjects (SavedProject[], unused)
+   - activeProjectPath (string, unused)
+
+2. EXECUTION MODE SYSTEM
+   ✓ Three modes: 'balanced', 'super-saver', 'fast-delivery'
+   ✓ Currently NOT persisted to disk (in-memory only)
+   ✓ Stored in React component state (useExecutionPlan hook)
+   ✓ Keyboard cycling: Press 'M' in ExecutionPlanView
+   ✓ Affects model selection for each story
+   ✓ Resets to 'balanced' on app restart
+
+3. MODEL SELECTION BY MODE
+   ✓ Three separate model mappings: TASK_MODEL_MAPPING, SUPER_SAVER_MAPPING, 
+     FAST_DELIVERY_MAPPING
+   ✓ 13 task types × 3 modes = 39 model recommendations
+   ✓ Quota-aware fallback: Primary → Fallback → Any available
+   ✓ Confidence scoring based on learning data
+   ✓ Alternative models suggested per story
+
+4. EXECUTION PLAN STRUCTURE
+   ✓ Contains: stories[], summary, comparisons, selectedMode
+   ✓ Comparisons show costs/timing for all 3 modes
+   ✓ Generated fresh each time with current mode
+   ✓ Includes quota warnings and sufficiency check
+   ✓ Supports cost estimation and duration forecasting
+
+5. CLI DETECTION PRIORITY
+   ✓ Priority 1: PRD-specific override (prd.json)
+   ✓ Priority 2: Global preference (settings.preferredCli)
+   ✓ Priority 3: PRD fallback chain (prd.json)
+   ✓ Priority 4: Global fallback chain (settings.cliFallbackOrder)
+   ✓ Priority 5: Auto-detect first available
+   ✓ Health checking before use
+
+6. COST TRACKING
+   ✓ CostTracker class manages per-story costs
+   ✓ Tracks: model, provider, tokens, actual cost, success
+   ✓ Pricing: Anthropic $3/$15, OpenAI $10/$30, others
+   ✓ Token estimates by complexity: simple/medium/complex
+   ✓ Duration estimates: 15m/30m/60m
+
+7. LEARNING SYSTEM
+   ✓ Records all executions in ModelLearningDB
+   ✓ Aggregates by model + task type
+   ✓ Calculates scores: efficiency, speed, reliability
+   ✓ Updates recommendations over time
+   ✓ Influences future plan generation
+
+8. PROJECT-LEVEL CONFIGURATION
+   ✓ PRD can override global settings
+   ✓ cli field for project-specific CLI
+   ✓ cliFallbackOrder for project-specific fallback
+   ✓ Overrides take precedence in detection chain
+
+================================================================================
+ARCHITECTURE PATTERNS
+================================================================================
+
+Settings Data Flow:
+  ~/.config/ralph-ultra/settings.json
+    ↓ (loadSettings/saveSettings)
+  SettingsPanel component ↔ RalphService.detectAICLI()
+    ↓
+  User configuration applied
+
+Execution Mode Data Flow:
+  ExecutionPlanView (keyboard input: 'M')
+    ↓ setMode(nextMode)
+  useExecutionPlan hook (currentMode state)
+    ↓ [currentMode dependency]
+  generateExecutionPlan(prd, quotas, mode)
+    ↓ Select mode-specific mapping
+  getRecommendedModel() per story
+    ↓
+  ExecutionPlan with updated costs/timing
+
+Key Architectural Points:
+- Settings are global and persistent
+- Execution mode is session-only (not persisted)
+- Mode affects entire plan, not individual stories
+- Learning data influences model selection
+- Quota awareness prevents impossible plans
+- CLI detection uses fallback chains
+
+================================================================================
+IMPLEMENTATION SUMMARY
+================================================================================
+
+Core Files:
+  /src/utils/config.ts                 - Settings API
+  /src/core/types.ts                   - Type definitions (ExecutionMode, etc.)
+  /src/core/execution-planner.ts       - Plan generation with mode
+  /src/core/capability-matrix.ts       - Model selection by mode (3 mappings)
+  /src/hooks/useExecutionPlan.tsx      - Mode state management
+  /src/components/ExecutionPlanView.tsx - Mode display & cycling
+  /src/components/SettingsPanel.tsx    - Settings UI
+  /src/utils/ralph-service.ts          - CLI detection & execution
+
+Storage Directories:
+  ~/.config/ralph-ultra/               - Global settings
+  <project>/.ralph-backups/            - PRD backups
+  <project>/logs/                      - Execution logs
+
+Type Definitions:
+  ExecutionMode = 'balanced' | 'super-saver' | 'fast-delivery'
+  Settings = { theme?, notificationSound?, debugMode?, ... }
+  ExecutionPlan = { projectPath, prdName, stories[], comparisons, ... }
+  TaskType = 13 different task categories
+  Provider = 'anthropic' | 'openai' | 'openrouter' | 'gemini' | 'local'
+
+================================================================================
+PERSISTENCE STATUS
+================================================================================
+
+PERSISTED (Saved to ~/.config/ralph-ultra/settings.json):
+✅ theme
+✅ notificationSound
+✅ debugMode
+✅ preferredCli
+✅ cliFallbackOrder
+✅ recentProjects (max 10, auto-managed)
+✅ Custom principles (separate file)
+✅ First launch flag
+
+NOT PERSISTED (In-Memory Only):
+❌ executionMode             (← MAIN GAP - resets on restart)
+❌ activeProjectPath         (stored but not used)
+❌ Session state
+❌ Execution history
+
+================================================================================
+KEYBOARD SHORTCUTS
+================================================================================
+
+SettingsPanel:
+  1-9        Select theme 1-9
+  0/-/=      Select theme 10-12
+  s          Toggle notification sound
+  c          Cycle preferred CLI
+  q/ESC      Close settings
+
+ExecutionPlanView:
+  ↑/k        Navigate up
+  ↓/j        Navigate down
+  M/m        Cycle execution mode (balanced → saver → fast)
+  R/r        Refresh plan
+
+================================================================================
+CURRENT LIMITATIONS
+================================================================================
+
+1. Execution Mode Not Persisted
+   - User's mode selection lost on app restart
+   - Always defaults to 'balanced'
+   - Recommendation: Add to settings.json with key 'executionMode'
+
+2. Active Project Not Utilized
+   - Settings.activeProjectPath exists but unused
+   - Could enable smart reopening on startup
+
+3. Cost History Not Persisted
+   - Cost data likely in-memory only
+   - Would benefit from historical tracking
+
+4. Mode Indicator Not In Status Bar
+   - Only visible in ExecutionPlanView
+   - Could be added to always-visible StatusBar
+
+5. Settings UI Limited
+   - SettingsPanel only shows theme, CLI, sound
+   - Could add execution mode selector
+   - Could add debug options
+
+================================================================================
+RECOMMENDATION OPPORTUNITIES
+================================================================================
+
+HIGH PRIORITY:
+1. Persist execution mode to settings.json
+   - Add executionMode?: ExecutionMode to Settings interface
+   - Load on app startup
+   - User experience: maintain preference across sessions
+
+2. Enhance mode visibility
+   - Add mode indicator to StatusBar
+   - Show current mode in project information
+   - Display mode-specific cost in quick view
+
+MEDIUM PRIORITY:
+3. Utilize activeProjectPath
+   - Remember last project for quick reopening
+   - Show in project picker UI
+
+4. Persist cost history
+   - Save CostTracker data to ~/.config/ralph-ultra/cost-history.json
+   - Enable cost trend analysis
+   - Track improvements over time
+
+LOW PRIORITY:
+5. Enhanced settings UI
+   - Add execution mode selector to SettingsPanel
+   - Add cost history viewer
+   - Add learning data statistics
+
+================================================================================
+CODE PATTERNS OBSERVED
+================================================================================
+
+Settings Management:
+✓ Directory auto-creation with error handling
+✓ Safe JSON parsing with fallback defaults
+✓ Extensible settings interface for future expansion
+✓ Silent error handling for non-critical operations
+
+State Management:
+✓ React hooks for UI state (useExecutionPlan)
+✓ Dependency arrays trigger plan regeneration
+✓ Clear separation between component state and persistent state
+
+Model Selection:
+✓ Task-type mapping pattern (13 task types)
+✓ Mode-aware selection with 3 separate mappings
+✓ Quota-aware fallback chains
+✓ Health checking before use
+
+CLI Detection:
+✓ Priority-based selection with clear fallback chain
+✓ Health verification before execution
+✓ Caching of health check results (5-min TTL)
+✓ Support for project-level overrides
+
+Cost Tracking:
+✓ Per-story cost calculation
+✓ Token-based pricing model
+✓ Provider-aware pricing tables
+✓ Complexity-based token estimation
+
+Learning System:
+✓ Aggregation by model + task type
+✓ Historical performance recording
+✓ Score-based recommendations
+✓ Confidence calculation from learning data
+
+================================================================================
+INTEGRATION POINTS
+================================================================================
+
+Settings → CLI Detection:
+  loadSettings() retrieves preferredCli and cliFallbackOrder
+  detectAICLI() uses these in priority selection
+
+Mode → Plan Generation:
+  currentMode passed to generateExecutionPlan()
+  Determines which model mapping to use
+  Affects all story allocations
+
+Plan → Execution:
+  recommendedModel.modelId mapped to CLI flag
+  mapModelIdToCLIFlag() converts model ID for CLI
+  Used when executing stories
+
+Learning → Future Plans:
+  learningRecorder records all executions
+  getAllLearnings() provides historical data
+  generateExecutionPlan uses learning data for confidence scores
+  Influences model recommendations over time
+
+Cost → Tracking & Reporting:
+  CostTracker manages per-story costs
+  costTracker.endStory() records actual results
+  Used for project cost summaries
+  Enables ROI analysis
+
+================================================================================
+FILES CREATED BY THIS EXPLORATION
+================================================================================
+
+1. SETTINGS_EXPLORATION_REPORT.md
+   - 15 comprehensive sections
+   - Complete architecture overview
+   - All configuration mechanisms
+   - Storage patterns and persistence
+   - File locations and structures
+
+2. SETTINGS_ARCHITECTURE.md
+   - Visual ASCII diagrams
+   - Data flow illustrations
+   - Component integration maps
+   - Lifecycle visualizations
+   - Priority and selection flows
+
+3. SETTINGS_QUICK_REFERENCE.md
+   - Tables and quick lookups
+   - File locations reference
+   - API function signatures
+   - Keyboard shortcuts
+   - Common operations
+   - Troubleshooting guide
+
+4. EXPLORATION_SUMMARY.txt
+   - This file
+   - Executive summary
+   - Key findings consolidated
+   - Implementation patterns
+   - Recommendations
+
+================================================================================
+USAGE EXAMPLES
+================================================================================
+
+Load Settings:
+  import { loadSettings } from '@utils/config';
+  const settings = loadSettings();
+  const cli = settings['preferredCli']; // 'claude'
+
+Add Recent Project:
+  import { addToRecentProjects } from '@utils/config';
+  addToRecentProjects({
+    path: '/Users/user/projects/myapp',
+    name: 'My App',
+    color: '#ff6b6b'
+  });
+
+Generate Plan with Mode:
+  const { plan } = useExecutionPlan('/Users/user/projects/myapp');
+  // plan shows costs for all 3 modes
+  // User can cycle with setMode('super-saver')
+
+Detect CLI with Fallback:
+  const ralph = new RalphService(projectPath);
+  const cli = ralph.detectAICLI();
+  // Returns first available: PRD override → Preferred → Fallback → Auto-detect
+
+================================================================================
+NEXT STEPS FOR IMPLEMENTATION
+================================================================================
+
+If enhancing settings system:
+
+1. Review SETTINGS_EXPLORATION_REPORT.md section 14 for recommendations
+2. Check SETTINGS_QUICK_REFERENCE.md section "Important Implementation Details"
+3. Examine SETTINGS_ARCHITECTURE.md for current data flows
+4. Key gap: Execution mode persistence (line 14.1 in report)
+5. Key enhancement: Mode visibility in UI (line 14.4 in report)
+
+For new developers:
+1. Start with SETTINGS_QUICK_REFERENCE.md for quick overview
+2. Read SETTINGS_EXPLORATION_REPORT.md for detailed understanding
+3. Reference SETTINGS_ARCHITECTURE.md for visual explanations
+4. Review source files in /src/utils/config.ts and /src/hooks/useExecutionPlan.tsx
+
+For debugging:
+1. Check ~/.config/ralph-ultra/settings.json for settings state
+2. Verify file exists: ls -la ~/.config/ralph-ultra/
+3. Review RalphService.detectAICLI() logs for CLI detection
+4. Check ExecutionPlanView for current mode display
+
+================================================================================
+CONCLUSION
+================================================================================
+
+Ralph Ultra v3.0 implements a well-structured settings and configuration system
+with clear separation between:
+
+- Global persistent settings (theme, CLI preference, recent projects)
+- Session-only state (execution mode, active view)
+- Project-level overrides (PRD configuration)
+- Machine learning insights (performance history, confidence scores)
+
+The main architectural gap is that execution mode is not persisted, creating an
+opportunity for enhancement. The learning system and quota awareness provide
+sophisticated decision-making capabilities.
+
+The codebase follows consistent patterns for:
+- Settings management (file I/O with fallbacks)
+- Model selection (task-type mappings with quota awareness)
+- State management (React hooks with dependency tracking)
+- CLI detection (priority-based selection with health checking)
+
+All source files are well-organized, properly typed, and documented with inline
+comments explaining the architectural decisions.
+
+================================================================================
+END OF EXPLORATION SUMMARY
+================================================================================

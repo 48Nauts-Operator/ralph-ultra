@@ -96,6 +96,18 @@ export interface TaskAnalysis {
 }
 
 // =============================================================================
+// EXECUTION MODES
+// =============================================================================
+
+export type ExecutionMode = 'balanced' | 'super-saver' | 'fast-delivery';
+
+export interface ExecutionModeConfig {
+  mode: ExecutionMode;
+  description: string;
+  modelStrategy: 'recommended' | 'cheapest' | 'fastest' | 'most-reliable';
+}
+
+// =============================================================================
 // EXECUTION PLAN
 // =============================================================================
 
@@ -131,6 +143,7 @@ export interface ExecutionPlan {
   projectPath: string;
   prdName: string;
   generatedAt: string;
+  selectedMode?: ExecutionMode;
 
   stories: StoryAllocation[];
 
@@ -148,6 +161,8 @@ export interface ExecutionPlan {
     allClaude: { cost: number; duration: number };
     allLocal: { cost: number; duration: number };
     optimized: { cost: number; duration: number }; // Current plan
+    superSaver: { cost: number; duration: number }; // Super Saver mode
+    fastDelivery: { cost: number; duration: number }; // Fast Delivery mode
   };
 }
 

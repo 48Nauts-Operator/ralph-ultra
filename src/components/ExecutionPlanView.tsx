@@ -2,7 +2,7 @@ import React, { memo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useTheme } from '@hooks/useTheme';
 import { useExecutionPlan } from '@hooks/useExecutionPlan';
-import type { StoryAllocation } from '../core/types';
+import type { StoryAllocation, ExecutionMode } from '../core/types';
 
 interface ExecutionPlanViewProps {
   /** Path to the project directory */
@@ -26,9 +26,22 @@ interface ExecutionPlanViewProps {
 export const ExecutionPlanView: React.FC<ExecutionPlanViewProps> = memo(
   ({ projectPath, height, isFocused = false }) => {
     const { theme } = useTheme();
-    const { plan, loading, error, refresh } = useExecutionPlan(projectPath);
+    const { plan, loading, error, refresh, currentMode, setMode } = useExecutionPlan(projectPath);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [scrollOffset, setScrollOffset] = useState(0);
+
+    /**
+     * Cycle through execution modes: balanced -> super-saver -> fast-delivery -> balanced
+     */
+    const cycleMode = () => {
+      const modes: ExecutionMode[] = ['balanced', 'super-saver', 'fast-delivery'];
+      const currentIndex = modes.indexOf(currentMode);
+      const nextIndex = (currentIndex + 1) % modes.length;
+      const nextMode = modes[nextIndex];
+      if (nextMode) {
+        setMode(nextMode);
+      }
+    };
 
     // Handle keyboard navigation
     useInput(
@@ -43,6 +56,9 @@ export const ExecutionPlanView: React.FC<ExecutionPlanViewProps> = memo(
         }
         if (input === 'r' || input === 'R') {
           refresh();
+        }
+        if (input === 'm' || input === 'M') {
+          cycleMode();
         }
       },
       { isActive: isFocused },
@@ -93,6 +109,54 @@ export const ExecutionPlanView: React.FC<ExecutionPlanViewProps> = memo(
           return theme.error;
         default:
           return theme.muted;
+      }
+    };
+
+    /**
+     * Get display label for execution mode
+     */
+    const getModeLabel = (mode: ExecutionMode): string => {
+      switch (mode) {
+        case 'balanced':
+          return 'Balanced';
+        case 'super-saver':
+          return 'Super Saver';
+        case 'fast-delivery':
+          return 'Fast Delivery';
+        default:
+          return 'Balanced';
+      }
+    };
+
+    /**
+     * Get color for execution mode
+     */
+    const getModeColor = (mode: ExecutionMode): string => {
+      switch (mode) {
+        case 'balanced':
+          return theme.accent;
+        case 'super-saver':
+          return theme.success;
+        case 'fast-delivery':
+          return theme.warning;
+        default:
+          return theme.accent;
+      }
+    };
+
+    /**
+     * Get mode icon/indicator
+     */
+    const getModeIcon = (mode: ExecutionMode): string => {
+      switch (mode) {
+        case 'balanced':
+          return '⚖';
+        case 'super-saver':
+          return '💰';
+        case 'fast-delivery':
+          return '⚡';
+        default:
+          return '⚖';
       }
     };
 
@@ -201,11 +265,83 @@ export const ExecutionPlanView: React.FC<ExecutionPlanViewProps> = memo(
 
     return (
       <Box flexDirection="column" height={height} paddingX={1}>
-        {/* Header */}
-        <Box marginBottom={1}>
+        {/* Header with mode indicator */}
+        <Box marginBottom={1} flexDirection="row" justifyContent="space-between">
           <Text bold color={theme.accent}>
             Execution Plan: {plan.prdName}
           </Text>
+          <Box>
+            <Text color={theme.muted}>Mode: </Text>
+            <Text color={getModeColor(currentMode)} bold>
+              {getModeIcon(currentMode)} {getModeLabel(currentMode)}
+            </Text>
+          </Box>
+        </Box>
+
+        {/* Mode Comparison section */}
+        <Box flexDirection="column" marginBottom={1} borderStyle="single" borderColor={theme.border}>
+          <Box paddingX={1}>
+            <Text bold color={theme.accentSecondary}>
+              Mode Comparison
+            </Text>
+          </Box>
+
+          {/* Balanced Mode */}
+          <Box paddingX={1} flexDirection="row">
+            <Box width="33%">
+              <Text color={currentMode === 'balanced' ? getModeColor('balanced') : theme.muted} bold={currentMode === 'balanced'}>
+                {currentMode === 'balanced' ? '▶ ' : '  '}⚖ Balanced
+              </Text>
+            </Box>
+            <Box width="33%">
+              <Text color={currentMode === 'balanced' ? theme.success : theme.muted}>
+                {formatCost(plan.comparisons.optimized.cost)}
+              </Text>
+            </Box>
+            <Box width="34%">
+              <Text color={currentMode === 'balanced' ? theme.foreground : theme.muted}>
+                {formatDuration(plan.comparisons.optimized.duration)}
+              </Text>
+            </Box>
+          </Box>
+
+          {/* Super Saver Mode */}
+          <Box paddingX={1} flexDirection="row">
+            <Box width="33%">
+              <Text color={currentMode === 'super-saver' ? getModeColor('super-saver') : theme.muted} bold={currentMode === 'super-saver'}>
+                {currentMode === 'super-saver' ? '▶ ' : '  '}💰 Super Saver
+              </Text>
+            </Box>
+            <Box width="33%">
+              <Text color={currentMode === 'super-saver' ? theme.success : theme.muted}>
+                {formatCost(plan.comparisons.superSaver.cost)}
+              </Text>
+            </Box>
+            <Box width="34%">
+              <Text color={currentMode === 'super-saver' ? theme.foreground : theme.muted}>
+                {formatDuration(plan.comparisons.superSaver.duration)}
+              </Text>
+            </Box>
+          </Box>
+
+          {/* Fast Delivery Mode */}
+          <Box paddingX={1} flexDirection="row">
+            <Box width="33%">
+              <Text color={currentMode === 'fast-delivery' ? getModeColor('fast-delivery') : theme.muted} bold={currentMode === 'fast-delivery'}>
+                {currentMode === 'fast-delivery' ? '▶ ' : '  '}⚡ Fast Delivery
+              </Text>
+            </Box>
+            <Box width="33%">
+              <Text color={currentMode === 'fast-delivery' ? theme.success : theme.muted}>
+                {formatCost(plan.comparisons.fastDelivery.cost)}
+              </Text>
+            </Box>
+            <Box width="34%">
+              <Text color={currentMode === 'fast-delivery' ? theme.foreground : theme.muted}>
+                {formatDuration(plan.comparisons.fastDelivery.duration)}
+              </Text>
+            </Box>
+          </Box>
         </Box>
 
         {/* Summary section */}
@@ -278,7 +414,7 @@ export const ExecutionPlanView: React.FC<ExecutionPlanViewProps> = memo(
           <Text color={theme.muted} dimColor>
             {plan.stories.length > visibleHeight &&
               `Showing ${scrollOffset + 1}-${Math.min(scrollOffset + visibleHeight, plan.stories.length)} of ${plan.stories.length} • `}
-            ↑/↓ navigate • r refresh
+            ↑/↓ navigate • m mode • r refresh
           </Text>
         </Box>
       </Box>

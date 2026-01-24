@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import { useTheme } from '@hooks/useTheme';
 import type { TailscaleStatus } from '../remote/tailscale';
 import type { AnthropicStatus, ApiStatus } from '@utils/status-check';
+import type { ExecutionMode } from '../core/types';
 import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join, dirname } from 'path';
@@ -14,6 +15,7 @@ interface StatusBarProps {
   tailscaleStatus?: TailscaleStatus | null;
   apiStatus?: AnthropicStatus | null;
   projectPath?: string;
+  executionMode?: ExecutionMode;
   width: number;
 }
 
@@ -62,6 +64,7 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
     tailscaleStatus = null,
     apiStatus = null,
     projectPath,
+    executionMode = 'balanced',
     width,
   }) => {
     const { theme } = useTheme();
@@ -121,9 +124,40 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
     const apiIcon = getApiStatusIcon();
     const apiColor = getApiStatusColor();
 
+    const getModeIcon = (): string => {
+      const icons: Record<ExecutionMode, string> = {
+        'super-saver': '💰',
+        'balanced': '⚖',
+        'fast-delivery': '🚀',
+      };
+      return icons[executionMode];
+    };
+
+    const getModeColor = () => {
+      const colors: Record<ExecutionMode, string> = {
+        'super-saver': theme.success, // Green for cost savings
+        'balanced': theme.accent, // Blue for balanced approach
+        'fast-delivery': theme.warning, // Yellow/orange for speed
+      };
+      return colors[executionMode];
+    };
+
+    const getModeLabel = (): string => {
+      const labels: Record<ExecutionMode, string> = {
+        'super-saver': 'saver',
+        'balanced': 'balanced',
+        'fast-delivery': 'fast',
+      };
+      return labels[executionMode];
+    };
+
+    const modeIcon = getModeIcon();
+    const modeColor = getModeColor();
+    const modeLabel = getModeLabel();
+
     const branchText = gitBranch ? `⎇ ${gitBranch}` : '';
 
-    const centerContent = `${progressText} [${apiIcon} ${tailscaleIcon} ${remoteIcon}${remoteConnections}]${branchText ? ` ${branchText}` : ''}`;
+    const centerContent = `${progressText} [${apiIcon} ${tailscaleIcon} ${remoteIcon}${remoteConnections}] ${modeIcon}${modeLabel}${branchText ? ` ${branchText}` : ''}`;
     const rightContent = APP_VERSION;
 
     const totalContent = centerContent.length + rightContent.length;
@@ -146,6 +180,11 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
           {remoteConnections}
         </Text>
         <Text dimColor>]</Text>
+        <Text> </Text>
+        <Text color={modeColor}>
+          {modeIcon}
+          {modeLabel}
+        </Text>
         {gitBranch && (
           <>
             <Text> </Text>

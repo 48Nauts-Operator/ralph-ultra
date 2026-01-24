@@ -13,6 +13,7 @@ import type {
   TaskType,
   Provider,
   ModelLearningDB,
+  ExecutionMode,
 } from './types';
 import { detectTaskType } from './task-detector';
 import { getRecommendedModel, TASK_MODEL_MAPPING } from './capability-matrix';
@@ -142,20 +143,22 @@ function calculateConfidenceScore(
  * @param quotas - Current provider quotas (optional, for quota-aware model selection)
  * @param projectPath - Path to the project directory
  * @param learningData - Learning database to influence model recommendations (optional)
+ * @param mode - Execution mode (defaults to 'balanced')
  * @returns An optimized execution plan with model allocations and cost estimates
  */
 export function generateExecutionPlan(
   prd: PRD,
   quotas?: ProviderQuotas,
   projectPath = '',
-  learningData?: ModelLearningDB
+  learningData?: ModelLearningDB,
+  mode: ExecutionMode = 'balanced'
 ): ExecutionPlan {
   const generatedAt = new Date().toISOString();
   const stories: StoryAllocation[] = [];
 
   // Analyze each user story and assign models
   for (const story of prd.userStories) {
-    const allocation = createStoryAllocation(story, quotas, learningData);
+    const allocation = createStoryAllocation(story, quotas, learningData, mode);
     stories.push(allocation);
   }
 
@@ -173,7 +176,7 @@ export function generateExecutionPlan(
     quotaWarnings: generateQuotaWarnings(stories, quotas),
   };
 
-  // Generate cost comparisons
+  // Generate cost comparisons for all three modes
   const comparisons = {
     allClaude: calculateAllClaudeStrategy(prd.userStories),
     allLocal: calculateAllLocalStrategy(prd.userStories),
@@ -181,12 +184,15 @@ export function generateExecutionPlan(
       cost: summary.estimatedTotalCost,
       duration: summary.estimatedTotalDuration,
     },
+    superSaver: calculateModeStrategy(prd.userStories, quotas, 'super-saver'),
+    fastDelivery: calculateModeStrategy(prd.userStories, quotas, 'fast-delivery'),
   };
 
   return {
     projectPath,
     prdName: prd.project,
     generatedAt,
+    selectedMode: mode,
     stories,
     summary,
     comparisons,
@@ -199,13 +205,14 @@ export function generateExecutionPlan(
 function createStoryAllocation(
   story: UserStory,
   quotas?: ProviderQuotas,
-  learningData?: ModelLearningDB
+  learningData?: ModelLearningDB,
+  mode: ExecutionMode = 'balanced'
 ): StoryAllocation {
   // Detect task type from story content
   const taskType = detectTaskType(story);
 
-  // Get recommended model based on task type and quotas
-  const recommended = getRecommendedModel(taskType, quotas);
+  // Get recommended model based on task type, quotas, and execution mode
+  const recommended = getRecommendedModel(taskType, quotas, mode);
 
   // Estimate tokens based on complexity
   const tokenEstimate = TOKEN_ESTIMATES[story.complexity];
@@ -428,4 +435,31 @@ function calculateAllLocalStrategy(stories: UserStory[]): { cost: number; durati
   }
 
   return { cost: 0, duration: totalDuration };
+}
+
+/**
+ * Calculate cost for a specific execution mode strategy.
+ */
+function calculateModeStrategy(
+  stories: UserStory[],
+  quotas: ProviderQuotas | undefined,
+  mode: ExecutionMode
+): { cost: number; duration: number } {
+  let totalCost = 0;
+  let totalDuration = 0;
+
+  for (const story of stories) {
+    const taskType = detectTaskType(story);
+    const tokenEstimate = TOKEN_ESTIMATES[story.complexity];
+
+    // Get model recommendation for this mode
+    const recommended = getRecommendedModel(taskType, quotas, mode);
+
+    // Calculate cost with the mode-specific model
+    const cost = estimateCost(recommended.modelId, tokenEstimate.input, tokenEstimate.output);
+    totalCost += cost;
+    totalDuration += tokenEstimate.durationMinutes;
+  }
+
+  return { cost: totalCost, duration: totalDuration };
 }
