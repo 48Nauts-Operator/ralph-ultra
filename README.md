@@ -9,6 +9,8 @@
 
 > **BETA VERSION** — Features are functional but may contain bugs. Feedback welcome!
 
+![Ralph Ultra v3.0 Dashboard](assets/screenshots/Ralph-Ultra_v3.0_Dashboard.png)
+
 Ralph Ultra 3.0 is a **terminal UI for orchestrating autonomous coding agents** with intelligent model selection. It analyzes your PRD, recommends the optimal model for each task, tracks API quotas across providers, and estimates costs before execution.
 
 ---
