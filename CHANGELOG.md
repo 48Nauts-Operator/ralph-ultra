@@ -5,6 +5,52 @@ All notable changes to Ralph Ultra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-02-13
+
+### Added
+
+- **Session Lifecycle Management** - Pause/resume support with Claude CLI session persistence
+  - `--session-id` and `--resume` flags for continuing interrupted work
+  - Session state tracking across restarts
+  - Automatic session recovery on external tmux detection
+- **Structured Output Parsing** - Enhanced output handling with `--output-format stream-json`
+  - Real-time agent activity tracking (thinking, tool usage, completion)
+  - Structured output line types for better parsing
+  - Per-acceptance-criteria pass/fail tracking
+- **Agent Activity Display** - Live visibility into what the agent is doing
+  - Shows current agent state (thinking, using tools, completing)
+  - Real-time activity updates in Monitor view
+  - Model name display in status bar
+- **Direct Project Launch** - `--project` CLI flag to launch specific project directly
+  - Bypasses project picker for faster workflow
+  - Useful for scripting and automation
+- **Architecture Documentation** - Comprehensive ARCHITECTURE.md (1010 lines)
+  - Complete system design and data flow
+  - TypeScript interfaces and types
+  - Execution lifecycle documentation
+  - Native macOS migration guide
+
+### Changed
+
+- **Output Line Structure** - Enhanced from `string[]` to `OutputLine[]` type
+  - Includes timestamp, type, and content
+  - Better filtering and display capabilities
+- **Notification Toast Width** - Wider toasts prevent error message truncation
+- **Initial Service State Sync** - Fixes race condition where external tmux sessions weren't detected
+- **Theme Color Palette** - Added `info` color to all theme definitions
+- **Cleanup Logic** - Service cleanup only on unmount, not on every state change
+  - Prevents accidental stops of running sessions
+  - Uses ref pattern for stable cleanup
+
+### Fixed
+
+- External tmux session detection race condition
+- Service state sync on initial load
+- Type safety improvements across service lifecycle
+- Memory leaks from service cleanup dependencies
+
+---
+
 ## [3.0.0] - 2026-01-24
 
 ### Added
