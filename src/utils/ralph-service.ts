@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { execSync } from 'child_process';
 import {
   existsSync,
@@ -92,9 +93,9 @@ function ensureRalphOpencodeConfig(projectPath: string): string {
   writeFileSync(configPath, JSON.stringify(config, null, 2));
   return configPath;
 }
-import type { PRD, UserStory } from '../types';
+import type { PRD, UserStory, AgentActivity, OutputLine } from '../types';
 import { isTestableAC } from '../types';
-import { runStoryTestsAndSave, type ACTestResult } from './ac-runner';
+import { runStoryTestsAndSave, markStoryPassedInPRD, type ACTestResult } from './ac-runner';
 import { checkApiStatus, shouldWarnAboutStatus } from './status-check';
 import { loadSettings } from './config';
 import { CostTracker } from '../core/cost-tracker';
@@ -102,7 +103,7 @@ import { LearningRecorder } from '../core/learning-recorder';
 import type { Provider, ExecutionPlan, TaskType } from '../core/types';
 import { generateExecutionPlan } from '../core/execution-planner';
 
-export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
+export type ProcessState = 'idle' | 'running' | 'stopping' | 'paused' | 'external';
 
 export interface RalphStatus {
   state: ProcessState;
@@ -125,6 +126,10 @@ export interface StoryProgress {
   lastAttempt: string;
   passed: boolean;
   failureReasons?: string[];
+  sessionId?: string;
+  paused?: boolean;
+  passingACs?: string[];
+  failingACs?: string[];
 }
 
 export interface ExecutionProgress {
@@ -149,6 +154,27 @@ const ANTHROPIC_MODELS = [
 // Story complexity thresholds
 const MAX_DESCRIPTION_WORDS = 100;
 const MAX_AC_COUNT = 7;
+// Model pricing: $ per million tokens (input, output)
+const MODEL_PRICING: Record<string, { inputPricePerM: number; outputPricePerM: number }> = {
+  'claude-sonnet': { inputPricePerM: 3.0, outputPricePerM: 15.0 },
+  'claude-opus': { inputPricePerM: 15.0, outputPricePerM: 75.0 },
+  'claude-haiku': { inputPricePerM: 0.8, outputPricePerM: 4.0 },
+};
+
+const DEFAULT_PRICING = MODEL_PRICING['claude-sonnet']!;
+
+function getModelPricing(modelId: string | null): {
+  inputPricePerM: number;
+  outputPricePerM: number;
+} {
+  if (!modelId) return DEFAULT_PRICING;
+  const lower = modelId.toLowerCase();
+  if (lower.includes('opus')) return MODEL_PRICING['claude-opus']!;
+  if (lower.includes('haiku')) return MODEL_PRICING['claude-haiku']!;
+  if (lower.includes('sonnet')) return MODEL_PRICING['claude-sonnet']!;
+  return DEFAULT_PRICING;
+}
+
 const COMPLEX_KEYWORDS = [
   'refactor entire',
   'migrate all',
@@ -218,6 +244,7 @@ export class RalphService {
   private state: ProcessState = 'idle';
   private startTime?: number;
   private currentStoryId?: string;
+  private lastStoryId?: string;
   private outputCallback?: (line: string, type: 'stdout' | 'stderr') => void;
   private statusCallback?: (status: RalphStatus) => void;
   private projectPath: string;
@@ -237,6 +264,19 @@ export class RalphService {
   private costTracker: CostTracker;
   private learningRecorder: LearningRecorder;
   private executionPlan: ExecutionPlan | null = null;
+  private currentSessionId?: string;
+  private currentModelName?: string;
+  private agentActivity: AgentActivity = this.createEmptyActivity();
+  private toolInputBuffer: string = '';
+  private currentBlockType: 'text' | 'tool_use' | null = null;
+  private recentOutputLines: string[] = [];
+  private structuredOutput: OutputLine[] = [];
+  private liveTextAccumulator: string = '';
+  private liveBlockType: 'text' | 'tool_use' | null = null;
+  private liveToolName: string | null = null;
+  private liveToolInputBuffer: string = '';
+  private hasSeenDeltas: boolean = false;
+  private stoppingTickCount: number = 0;
 
   constructor(projectPath: string) {
     this.projectPath = projectPath;
@@ -357,13 +397,51 @@ export class RalphService {
     }
   }
 
+  /**
+   * Reclaim an orphaned tmux session from a previous run.
+   * When an old session is still alive, the constructor sets state to 'external'
+   * before React callbacks are registered, leaving a mismatch. This helper kills
+   * the orphaned session and resets to 'idle' so the user's intent to start
+   * Ralph succeeds instead of throwing "Cannot start: process is external".
+   */
+  private reclaimExternalSession(): void {
+    if (this.state !== 'external') return;
+
+    this.log('INFO', `Reclaiming orphaned tmux session: ${this.tmuxSessionName}`);
+    this.outputCallback?.(
+      `[INFO] Found orphaned session "${this.tmuxSessionName}" — reclaiming...\n`,
+      'stdout',
+    );
+
+    this.killCurrentSession();
+    this.stopLogTailing();
+    this.state = 'idle';
+    this.tmuxPid = undefined;
+    this.emitStatus({ state: 'idle' });
+  }
+
   private startSessionMonitor(): void {
     this.sessionCheckInterval = setInterval(() => {
       if (this.state === 'running' || this.state === 'external') {
+        this.stoppingTickCount = 0;
         if (!this.checkTmuxSession()) {
           this.handleSessionEnded();
         }
-      } else {
+      } else if (this.state === 'stopping') {
+        this.stoppingTickCount++;
+        if (this.stoppingTickCount >= 3) {
+          this.log(
+            'WARN',
+            `State stuck in 'stopping' for ${this.stoppingTickCount} ticks — force-resetting to idle`,
+          );
+          this.stoppingTickCount = 0;
+          this.state = 'idle';
+          this.stopLogTailing();
+          this.emitStatus({ state: 'idle' });
+        }
+      } else if (this.state !== 'paused') {
+        this.stoppingTickCount = 0;
+        // Don't check for tmux sessions when paused (we intentionally killed it)
         this.checkTmuxSession();
       }
     }, 3000);
@@ -373,13 +451,46 @@ export class RalphService {
     this.log('INFO', `Session completed: ${this.tmuxSessionName}`);
     this.stopLogTailing();
 
-    if (this.currentStoryId && this.state === 'running') {
+    // Accept 'stopping'/'paused' states too — these indicate stop() was called
+    // (e.g. by a React cleanup race) but the session actually completed normally.
+    // Use lastStoryId as fallback since stop() clears currentStoryId.
+    const storyId = this.currentStoryId || this.lastStoryId;
+    if (
+      storyId &&
+      (this.state === 'running' || this.state === 'stopping' || this.state === 'paused')
+    ) {
       const duration = this.startTime ? Date.now() - this.startTime : 0;
+
+      // If session ended very quickly (< 10s), it may be a failed --resume
+      if (duration < 10_000 && this.currentSessionId) {
+        this.log(
+          'WARN',
+          `Session ended quickly (${duration}ms) - possible failed resume, clearing session ID`,
+        );
+        this.outputCallback?.(
+          `\n⚠ Session ended quickly - clearing saved session for fresh start\n`,
+          'stderr',
+        );
+        // Clear the session ID so next retry starts fresh
+        const existingProgress = this.executionProgress.stories.find(
+          s => s.storyId === storyId && s.sessionId === this.currentSessionId,
+        );
+        if (existingProgress) {
+          existingProgress.sessionId = undefined;
+          existingProgress.paused = false;
+          this.writeProgress();
+        }
+        this.currentSessionId = undefined;
+      }
+
       this.outputCallback?.(`\n═══ Session completed ═══\n`, 'stdout');
 
       const prd = this.loadPRD();
-      const story = prd?.userStories.find(s => s.id === this.currentStoryId);
+      const story = prd?.userStories.find(s => s.id === storyId);
       if (story) {
+        // Restore state to 'running' so verifyAndContinue works correctly
+        this.state = 'running';
+        this.currentStoryId = storyId;
         this.verifyAndContinue(story, this.projectPath, duration, 0);
       } else {
         this.state = 'idle';
@@ -387,6 +498,10 @@ export class RalphService {
         this.emitStatus({ state: 'idle', duration });
       }
     } else {
+      this.log(
+        'WARN',
+        `handleSessionEnded: skipped verification (state=${this.state}, storyId=${storyId || 'none'})`,
+      );
       this.state = 'idle';
       this.emitStatus({ state: 'idle' });
     }
@@ -429,51 +544,260 @@ export class RalphService {
     }, LOG_POLL_INTERVAL_MS);
   }
 
-  private captureTmuxPane(): string {
-    try {
-      return execSync(`tmux capture-pane -t "${this.tmuxSessionName}" -p 2>/dev/null`, {
-        encoding: 'utf-8',
-        timeout: 2000,
-      });
-    } catch {
-      return '';
+  /**
+   * Get recent structured output lines for live display.
+   * Returns last N OutputLines from the structured ring buffer.
+   */
+  public getLiveOutput(maxLines: number = 25): OutputLine[] {
+    return this.structuredOutput.slice(-maxLines);
+  }
+
+  /**
+   * Push a structured OutputLine into the ring buffer.
+   */
+  private pushOutputLine(line: OutputLine): void {
+    this.structuredOutput.push(line);
+    if (this.structuredOutput.length > 100) {
+      this.structuredOutput = this.structuredOutput.slice(-60);
     }
   }
 
   /**
-   * Get live Claude output from tmux pane.
-   * Returns last N lines of output, filtered to show meaningful content.
+   * Flush accumulated text into OutputLine entries (one per line).
    */
-  public getLiveOutput(maxLines: number = 15): string[] {
-    const paneContent = this.captureTmuxPane();
-    if (!paneContent) return [];
+  private flushTextAccumulator(): void {
+    if (!this.liveTextAccumulator) return;
+    const lines = this.liveTextAccumulator.split('\n');
+    let isFirst = true;
+    for (const line of lines) {
+      if (line.trim()) {
+        this.pushOutputLine({
+          type: 'text',
+          content: line,
+          isBlockStart: isFirst,
+          timestamp: Date.now(),
+        });
+        isFirst = false;
+      }
+    }
+    this.liveTextAccumulator = '';
+  }
 
-    const lines = paneContent.split('\n').filter(line => {
-      const trimmed = line.trim();
-      if (!trimmed) return false;
-      // Shell prompts
-      if (trimmed.match(/^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+\s+[^\s]+\s*(%|\$)\s*$/)) return false;
-      // Claude command and wrapped fragments
-      if (trimmed.includes('claude --print')) return false;
-      if (trimmed.includes('--model ')) return false;
-      if (trimmed.includes('skip-permissions')) return false;
-      if (trimmed.includes('ralph-prompt-')) return false;
-      if (trimmed.includes('/var/folders/')) return false;
-      if (trimmed.includes('tee -a')) return false;
-      if (trimmed.includes('ralph-session.log')) return false;
-      if (trimmed.startsWith('$(cat ')) return false;
-      if (trimmed.startsWith('-prompt-')) return false;
-      if (trimmed.match(/^[a-z0-9]+\.txt'\)"/)) return false;
-      return true;
-    });
+  /**
+   * Parse a stream-json log line and produce structured OutputLine entries.
+   * Called from tailSessionLog() alongside updateAgentActivity().
+   */
+  private updateLiveOutput(line: string): void {
+    const trimmed = line.trim();
+    if (!trimmed) return;
 
-    return lines.slice(-maxLines);
+    // Non-JSON — emit as system line
+    if (!trimmed.startsWith('{')) {
+      this.pushOutputLine({
+        type: 'system',
+        content: trimmed,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    try {
+      const obj = JSON.parse(trimmed);
+
+      switch (obj.type) {
+        case 'message_start': {
+          // New turn — reset delta tracking
+          this.hasSeenDeltas = false;
+          break;
+        }
+
+        case 'content_block_start': {
+          const block = obj.content_block;
+          if (block?.type === 'text') {
+            // Flush any prior text
+            this.flushTextAccumulator();
+            this.liveBlockType = 'text';
+          } else if (block?.type === 'tool_use') {
+            // Flush text before switching to tool
+            this.flushTextAccumulator();
+            this.liveBlockType = 'tool_use';
+            this.liveToolName = block.name || null;
+            this.liveToolInputBuffer = '';
+          }
+          break;
+        }
+
+        case 'content_block_delta': {
+          if (obj.delta?.type === 'text_delta' && this.liveBlockType === 'text') {
+            const text = obj.delta.text || '';
+            this.liveTextAccumulator += text;
+            this.hasSeenDeltas = true;
+
+            // Flush complete lines on newline
+            if (this.liveTextAccumulator.includes('\n')) {
+              const parts = this.liveTextAccumulator.split('\n');
+              // All parts except last are complete lines
+              const completeParts = parts.slice(0, -1);
+              let isFirst =
+                this.structuredOutput.length === 0 ||
+                this.structuredOutput[this.structuredOutput.length - 1]?.type !== 'text';
+              for (const part of completeParts) {
+                if (part.trim()) {
+                  this.pushOutputLine({
+                    type: 'text',
+                    content: part,
+                    isBlockStart: isFirst,
+                    timestamp: Date.now(),
+                  });
+                  isFirst = false;
+                }
+              }
+              this.liveTextAccumulator = parts[parts.length - 1] || '';
+            }
+          } else if (obj.delta?.type === 'input_json_delta' && this.liveBlockType === 'tool_use') {
+            this.liveToolInputBuffer += obj.delta.partial_json || '';
+          }
+          break;
+        }
+
+        case 'content_block_stop': {
+          if (this.liveBlockType === 'text') {
+            // Flush remaining text
+            this.flushTextAccumulator();
+          } else if (this.liveBlockType === 'tool_use' && this.liveToolName) {
+            const summary = this.extractToolInputSummary(
+              this.liveToolName,
+              this.liveToolInputBuffer,
+            );
+            this.pushOutputLine({
+              type: 'tool_start',
+              content: this.liveToolName,
+              toolName: this.liveToolName,
+              toolInput: summary,
+              isBlockStart: true,
+              timestamp: Date.now(),
+            });
+            this.liveToolName = null;
+            this.liveToolInputBuffer = '';
+          }
+          this.liveBlockType = null;
+          break;
+        }
+
+        case 'assistant': {
+          // Full assistant message (non-streaming fallback)
+          if (!this.hasSeenDeltas && Array.isArray(obj.message?.content)) {
+            for (const block of obj.message.content) {
+              if (block.type === 'text' && block.text) {
+                const lines = block.text.split('\n');
+                let isFirst = true;
+                for (const l of lines) {
+                  if (l.trim()) {
+                    this.pushOutputLine({
+                      type: 'text',
+                      content: l,
+                      isBlockStart: isFirst,
+                      timestamp: Date.now(),
+                    });
+                    isFirst = false;
+                  }
+                }
+              } else if (block.type === 'tool_use') {
+                const toolName = block.name || 'Tool';
+                const inputStr = block.input ? JSON.stringify(block.input) : '';
+                const summary = this.extractToolInputSummary(toolName, inputStr);
+                this.pushOutputLine({
+                  type: 'tool_start',
+                  content: toolName,
+                  toolName,
+                  toolInput: summary,
+                  isBlockStart: true,
+                  timestamp: Date.now(),
+                });
+              }
+            }
+          }
+          break;
+        }
+
+        case 'result': {
+          // Optionally emit result summary
+          if (obj.result && typeof obj.result === 'string') {
+            this.pushOutputLine({
+              type: 'result',
+              content: obj.result,
+              timestamp: Date.now(),
+            });
+          }
+          break;
+        }
+
+        // message_stop, ping, etc. — ignore
+        default:
+          break;
+      }
+    } catch {
+      // Malformed JSON — log and emit as system line so data loss is detectable
+      this.log('DEBUG', `Malformed JSON in live output: ${trimmed.slice(0, 120)}`);
+      this.pushOutputLine({
+        type: 'system',
+        content: trimmed,
+        timestamp: Date.now(),
+      });
+    }
   }
 
   private stopLogTailing(): void {
     if (this.logWatchInterval) {
       clearInterval(this.logWatchInterval);
       this.logWatchInterval = undefined;
+    }
+  }
+
+  /**
+   * Parse a stream-json line from Claude CLI output.
+   * Returns extracted text for display, or null if the line should be skipped.
+   */
+  private parseStreamJsonLine(line: string): string | null {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+
+    // Not JSON — return as-is (non-Claude output like shell messages)
+    if (!trimmed.startsWith('{')) return trimmed;
+
+    try {
+      const obj = JSON.parse(trimmed);
+
+      // assistant message with content blocks containing text
+      if (obj.type === 'assistant' && Array.isArray(obj.message?.content)) {
+        const texts: string[] = [];
+        for (const block of obj.message.content) {
+          if (block.type === 'text' && block.text) {
+            texts.push(block.text);
+          }
+        }
+        return texts.length > 0 ? texts.join('\n') : null;
+      }
+
+      // content_block_delta — streaming text chunk
+      if (
+        obj.type === 'content_block_delta' &&
+        obj.delta?.type === 'text_delta' &&
+        obj.delta?.text
+      ) {
+        return obj.delta.text;
+      }
+
+      // result — final output
+      if (obj.type === 'result' && obj.result) {
+        return typeof obj.result === 'string' ? obj.result : null;
+      }
+
+      // message_start, content_block_start, content_block_stop, message_stop, etc. — skip
+      return null;
+    } catch {
+      // Malformed JSON — return raw line
+      return trimmed;
     }
   }
 
@@ -494,8 +818,18 @@ export class RalphService {
 
       for (const line of lines) {
         if (line.trim()) {
-          const isError = line.includes('[ERROR]') || line.includes('[ERR]');
-          this.outputCallback?.(line, isError ? 'stderr' : 'stdout');
+          this.updateAgentActivity(line);
+          this.updateLiveOutput(line);
+          const parsed = this.parseStreamJsonLine(line);
+          if (parsed !== null) {
+            // Add to ring buffer (legacy, used by outputCallback for full log lines)
+            this.recentOutputLines.push(parsed);
+            if (this.recentOutputLines.length > 50) {
+              this.recentOutputLines = this.recentOutputLines.slice(-30);
+            }
+            const isError = parsed.includes('[ERROR]') || parsed.includes('[ERR]');
+            this.outputCallback?.(parsed, isError ? 'stderr' : 'stdout');
+          }
         }
       }
 
@@ -743,6 +1077,48 @@ ${acText}
 6. **Summarize**: When complete, describe what you implemented and any key decisions made
 
 Begin implementation now.`;
+  }
+
+  /**
+   * Build a resume prompt for a previously paused story.
+   * Includes AC status so Claude knows what still needs work.
+   */
+  private buildResumePrompt(story: UserStory, storyProgress: StoryProgress): string {
+    const passingACs = storyProgress.passingACs || [];
+    const failingACs = storyProgress.failingACs || [];
+
+    const passingText =
+      passingACs.length > 0 ? passingACs.map(ac => `- ${ac}`).join('\n') : '- (none yet)';
+    const failingText =
+      failingACs.length > 0 ? failingACs.map(ac => `- ${ac}`).join('\n') : '- (none identified)';
+
+    return `You were previously working on this user story and were interrupted.
+
+## Story: ${story.id} - ${story.title}
+${story.description}
+
+## Current Status
+**Passing:**
+${passingText}
+
+**Failing:**
+${failingText}
+
+Continue from where you left off. Focus on the remaining failing acceptance criteria.
+Do not redo work that already passes.`;
+  }
+
+  /**
+   * Get current AC status for a story (passing/failing AC IDs).
+   */
+  private getACStatus(story: UserStory): { passingACs: string[]; failingACs: string[] } {
+    if (!isTestableAC(story.acceptanceCriteria)) {
+      return { passingACs: [], failingACs: [] };
+    }
+    const criteria = story.acceptanceCriteria as import('../types').AcceptanceCriterion[];
+    const passingACs = criteria.filter(ac => ac.passes).map(ac => ac.id || ac.text);
+    const failingACs = criteria.filter(ac => !ac.passes).map(ac => ac.id || ac.text);
+    return { passingACs, failingACs };
   }
 
   /**
@@ -1186,6 +1562,11 @@ Begin implementation now.`;
       existingStory.attempts += 1;
       existingStory.lastAttempt = new Date().toISOString();
       existingStory.passed = passed;
+      // Preserve sessionId but clear paused flag when actively running
+      if (this.currentSessionId) {
+        existingStory.sessionId = this.currentSessionId;
+      }
+      existingStory.paused = false;
       if (failureReason && !passed) {
         if (!existingStory.failureReasons) {
           existingStory.failureReasons = [];
@@ -1202,6 +1583,7 @@ Begin implementation now.`;
         attempts: 1,
         lastAttempt: new Date().toISOString(),
         passed,
+        sessionId: this.currentSessionId,
       };
       if (failureReason && !passed) {
         newStory.failureReasons = [failureReason];
@@ -1266,14 +1648,22 @@ Begin implementation now.`;
     promptFile: string,
     logFile: string,
     modelFlag?: string,
+    options?: { sessionId?: string; isResume?: boolean },
   ): string {
     const catPrompt = `"$(cat '${promptFile}')"`;
     const signalDone = `; tmux wait-for -S "${this.tmuxSessionName}-done"`;
 
     switch (cli) {
-      case 'claude':
+      case 'claude': {
         const model = modelFlag || DEFAULT_MODEL;
-        return `${cli} --print --model ${model} --dangerously-skip-permissions ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
+        if (options?.isResume && options.sessionId) {
+          // Resume an existing session
+          return `${cli} --print --verbose --output-format stream-json --resume ${options.sessionId} --model ${model} --dangerously-skip-permissions ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
+        }
+        // New session with session ID for future resume
+        const sessionFlag = options?.sessionId ? ` --session-id ${options.sessionId}` : '';
+        return `${cli} --print --verbose --output-format stream-json${sessionFlag} --model ${model} --dangerously-skip-permissions ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
+      }
       case 'opencode':
         const opencodeModelArg = modelFlag ? `-m ${modelFlag}` : '';
         const opencodeConfigPath = ensureRalphOpencodeConfig(this.projectPath);
@@ -1365,7 +1755,9 @@ Begin implementation now.`;
     storyId: string,
     options?: { ignoreApiStatus?: boolean; ignoreComplexity?: boolean },
   ): Promise<void> {
-    if (this.state !== 'idle') {
+    this.reclaimExternalSession();
+
+    if (this.state !== 'idle' && this.state !== 'paused') {
       throw new Error(`Cannot start: process is ${this.state}`);
     }
 
@@ -1402,7 +1794,9 @@ Begin implementation now.`;
     projectPath: string,
     options?: { ignoreApiStatus?: boolean; ignoreComplexity?: boolean },
   ): Promise<void> {
-    if (this.state !== 'idle') {
+    this.reclaimExternalSession();
+
+    if (this.state !== 'idle' && this.state !== 'paused') {
       throw new Error(`Cannot start: process is ${this.state}`);
     }
 
@@ -1571,6 +1965,7 @@ Begin implementation now.`;
     this.state = 'running';
     this.startTime = Date.now();
     this.currentStoryId = story.id;
+    this.lastStoryId = story.id;
     const retryCount = this.storyRetryCount.get(story.id) || 0;
     this.emitStatus({
       state: 'running',
@@ -1579,7 +1974,29 @@ Begin implementation now.`;
       retryCount,
     });
 
-    const prompt = this.buildPrompt(story, prd);
+    // Check for existing paused session to resume
+    const existingProgress = this.executionProgress.stories.find(
+      s => s.storyId === story.id && s.paused && s.sessionId,
+    );
+    const isResume = !!existingProgress?.sessionId;
+    const sessionId = existingProgress?.sessionId || randomUUID();
+    this.currentSessionId = sessionId;
+
+    let prompt: string;
+    if (isResume && existingProgress) {
+      prompt = this.buildResumePrompt(story, existingProgress);
+      this.log('INFO', `Resuming session ${sessionId.substring(0, 8)}... for ${story.id}`);
+      this.outputCallback?.(
+        `Resuming previous session: ${sessionId.substring(0, 8)}...\n`,
+        'stdout',
+      );
+      // Clear paused state
+      existingProgress.paused = false;
+      this.writeProgress();
+    } else {
+      prompt = this.buildPrompt(story, prd);
+      this.log('INFO', `New session ${sessionId.substring(0, 8)}... for ${story.id}`);
+    }
     this.getCLIConfig(cli, prompt); // writes prompt to temp file
 
     // Track story attempt in progress
@@ -1598,6 +2015,11 @@ Begin implementation now.`;
     try {
       writeFileSync(this.sessionLogFile, '');
       this.lastLogPosition = 0;
+
+      // Reset agent activity tracking for new story
+      this.agentActivity = this.createEmptyActivity();
+      this.agentActivity.startedAt = Date.now();
+      this.agentActivity.metrics.model = this.currentModelName || null;
 
       try {
         execSync(`tmux has-session -t "${this.tmuxSessionName}" 2>/dev/null`);
@@ -1629,12 +2051,17 @@ Begin implementation now.`;
         this.log('INFO', `Reason: ${executionPlanModel.reason}`);
         this.outputCallback?.(`Model: ${modelFlag} (${executionPlanModel.reason})\n`, 'stdout');
       }
+      this.currentModelName = modelFlag || DEFAULT_MODEL;
 
       const cliCommand = this.buildTmuxCommand(
         cli,
         promptFile || '',
         this.sessionLogFile,
         modelFlag,
+        {
+          sessionId: cli === 'claude' ? sessionId : undefined,
+          isResume: cli === 'claude' ? isResume : false,
+        },
       );
 
       this.log('INFO', `Creating tmux session: ${this.tmuxSessionName}`);
@@ -1687,7 +2114,44 @@ Begin implementation now.`;
     this.log('INFO', `Stopping tmux session: ${this.tmuxSessionName}`);
     this.state = 'stopping';
     this.emitStatus({ state: 'stopping' });
-    this.outputCallback?.('\n─── Stopping process... ───\n', 'stdout');
+    this.outputCallback?.('\n─── Pausing process... ───\n', 'stdout');
+
+    // Save session ID and AC status before killing
+    const storyId = this.currentStoryId;
+    const sessionId = this.currentSessionId;
+
+    if (storyId && sessionId) {
+      // Get current AC status from PRD
+      const prd = this.loadPRD();
+      const story = prd?.userStories.find(s => s.id === storyId);
+      const acStatus = story ? this.getACStatus(story) : { passingACs: [], failingACs: [] };
+
+      // Update progress with pause state
+      const existingStory = this.executionProgress.stories.find(s => s.storyId === storyId);
+      if (existingStory) {
+        existingStory.sessionId = sessionId;
+        existingStory.paused = true;
+        existingStory.passingACs = acStatus.passingACs;
+        existingStory.failingACs = acStatus.failingACs;
+      } else {
+        this.executionProgress.stories.push({
+          storyId,
+          attempts: 0,
+          lastAttempt: new Date().toISOString(),
+          passed: false,
+          sessionId,
+          paused: true,
+          passingACs: acStatus.passingACs,
+          failingACs: acStatus.failingACs,
+        });
+      }
+      this.writeProgress();
+      this.log('INFO', `Session ${sessionId} saved for story ${storyId} (paused)`);
+      this.outputCallback?.(
+        `Session saved for resume: ${sessionId.substring(0, 8)}...\n`,
+        'stdout',
+      );
+    }
 
     try {
       execSync(`tmux kill-session -t "${this.tmuxSessionName}" 2>/dev/null`);
@@ -1697,11 +2161,13 @@ Begin implementation now.`;
     }
 
     this.stopLogTailing();
-    this.state = 'idle';
+    this.recentOutputLines = [];
+    this.state = 'paused';
+    const pausedStoryId = this.currentStoryId;
     this.currentStoryId = undefined;
     this.tmuxPid = undefined;
-    this.emitStatus({ state: 'idle' });
-    this.outputCallback?.('─── Process stopped ───\n', 'stdout');
+    this.emitStatus({ state: 'paused', currentStory: pausedStoryId });
+    this.outputCallback?.('─── Process paused (press r to resume) ───\n', 'stdout');
   }
 
   public getStatus(): RalphStatus {
@@ -1756,6 +2222,276 @@ Begin implementation now.`;
   }
 
   /**
+   * Get the current Claude Code session ID (if any).
+   */
+  public getCurrentSessionId(): string | null {
+    return this.currentSessionId ?? null;
+  }
+
+  /**
+   * Get the current model name being used (e.g., 'sonnet', 'opus', 'haiku').
+   */
+  public getCurrentModel(): string | null {
+    return this.currentModelName ?? null;
+  }
+
+  private createEmptyActivity(): AgentActivity {
+    return {
+      currentTool: null,
+      currentToolInput: null,
+      isThinking: false,
+      lastThinkingSnippet: null,
+      recentTools: [],
+      metrics: {
+        model: null,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        costUSD: 0,
+        toolCallCount: 0,
+      },
+      startedAt: null,
+    };
+  }
+
+  /**
+   * Extract a human-readable summary from (possibly incomplete) tool input JSON.
+   */
+  private extractToolInputSummary(toolName: string, rawBuffer: string): string {
+    const extractField = (field: string): string | null => {
+      // Try JSON parse first
+      try {
+        const obj = JSON.parse(rawBuffer);
+        if (obj[field]) return String(obj[field]);
+      } catch {
+        // Fall back to regex for partial JSON
+      }
+      const regex = new RegExp(`"${field}"\\s*:\\s*"([^"]*)`);
+      const match = rawBuffer.match(regex);
+      return match?.[1] || null;
+    };
+
+    switch (toolName) {
+      case 'Read':
+      case 'Edit':
+      case 'Write': {
+        const filePath = extractField('file_path');
+        if (filePath) {
+          // Show just the filename or last path component
+          const parts = filePath.split('/');
+          return parts.length > 2 ? `.../${parts.slice(-2).join('/')}` : filePath;
+        }
+        return '';
+      }
+      case 'Bash': {
+        const command = extractField('command');
+        if (command) {
+          return command.length > 60 ? command.slice(0, 57) + '...' : command;
+        }
+        return '';
+      }
+      case 'Glob': {
+        const pattern = extractField('pattern');
+        return pattern || '';
+      }
+      case 'Grep': {
+        const pattern = extractField('pattern');
+        const path = extractField('path');
+        if (pattern && path) return `${pattern} in ${path}`;
+        return pattern || '';
+      }
+      case 'Task': {
+        const desc = extractField('description');
+        return desc || '';
+      }
+      default: {
+        // Generic: try file_path, then command, then truncate raw
+        const fp = extractField('file_path');
+        if (fp) return fp;
+        const cmd = extractField('command');
+        if (cmd) return cmd.length > 60 ? cmd.slice(0, 57) + '...' : cmd;
+        return rawBuffer.length > 40 ? rawBuffer.slice(0, 37) + '...' : rawBuffer;
+      }
+    }
+  }
+
+  /**
+   * Process a single raw session log line and update the agentActivity struct.
+   * Handles all stream-json event types from Claude CLI.
+   */
+  private updateAgentActivity(line: string): void {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('{')) return;
+
+    try {
+      const obj = JSON.parse(trimmed);
+
+      switch (obj.type) {
+        case 'assistant': {
+          // Extract model from the message
+          if (obj.message?.model) {
+            this.agentActivity.metrics.model = obj.message.model;
+          }
+          // Track tool_use blocks from complete message events (non-streaming format)
+          if (Array.isArray(obj.message?.content)) {
+            for (const block of obj.message.content) {
+              if (block.type === 'tool_use') {
+                const toolName = block.name || 'Tool';
+                const inputStr = block.input ? JSON.stringify(block.input) : '';
+                const summary = this.extractToolInputSummary(toolName, inputStr);
+                this.agentActivity.recentTools.push({
+                  name: toolName,
+                  inputSummary: summary,
+                  startedAt: Date.now(),
+                });
+                if (this.agentActivity.recentTools.length > 10) {
+                  this.agentActivity.recentTools = this.agentActivity.recentTools.slice(-10);
+                }
+                this.agentActivity.metrics.toolCallCount++;
+                this.agentActivity.currentTool = toolName;
+                this.agentActivity.currentToolInput = summary;
+              } else if (block.type === 'text') {
+                this.agentActivity.isThinking = false;
+                this.agentActivity.currentTool = null;
+                this.agentActivity.currentToolInput = null;
+              }
+            }
+          }
+          break;
+        }
+
+        case 'content_block_start': {
+          const block = obj.content_block;
+          if (block?.type === 'tool_use') {
+            this.currentBlockType = 'tool_use';
+            this.agentActivity.currentTool = block.name || null;
+            this.agentActivity.currentToolInput = null;
+            this.agentActivity.isThinking = false;
+            this.toolInputBuffer = '';
+          } else if (block?.type === 'text') {
+            this.currentBlockType = 'text';
+            this.agentActivity.isThinking = true;
+            this.agentActivity.currentTool = null;
+            this.agentActivity.currentToolInput = null;
+          }
+          break;
+        }
+
+        case 'content_block_delta': {
+          if (obj.delta?.type === 'input_json_delta' && this.currentBlockType === 'tool_use') {
+            this.toolInputBuffer += obj.delta.partial_json || '';
+            // Extract summary from accumulated buffer
+            if (this.agentActivity.currentTool) {
+              this.agentActivity.currentToolInput = this.extractToolInputSummary(
+                this.agentActivity.currentTool,
+                this.toolInputBuffer,
+              );
+            }
+          } else if (obj.delta?.type === 'text_delta' && this.currentBlockType === 'text') {
+            const text = obj.delta.text || '';
+            if (text) {
+              // Keep last ~80 chars of thinking text
+              const current = this.agentActivity.lastThinkingSnippet || '';
+              const combined = current + text;
+              this.agentActivity.lastThinkingSnippet =
+                combined.length > 80 ? combined.slice(-80) : combined;
+            }
+          }
+          break;
+        }
+
+        case 'content_block_stop': {
+          if (this.currentBlockType === 'tool_use' && this.agentActivity.currentTool) {
+            // Push to recent tools
+            this.agentActivity.recentTools.push({
+              name: this.agentActivity.currentTool,
+              inputSummary: this.agentActivity.currentToolInput || '',
+              startedAt: Date.now(),
+            });
+            // Keep last 10
+            if (this.agentActivity.recentTools.length > 10) {
+              this.agentActivity.recentTools = this.agentActivity.recentTools.slice(-10);
+            }
+            this.agentActivity.metrics.toolCallCount++;
+            this.agentActivity.currentTool = null;
+            this.agentActivity.currentToolInput = null;
+          } else if (this.currentBlockType === 'text') {
+            this.agentActivity.isThinking = false;
+          }
+          this.currentBlockType = null;
+          this.toolInputBuffer = '';
+          break;
+        }
+
+        case 'result': {
+          // Extract usage metrics from result
+          if (obj.result && typeof obj.result === 'object') {
+            const usage = obj.result.usage;
+            if (usage) {
+              this.agentActivity.metrics.totalInputTokens += usage.input_tokens || 0;
+              this.agentActivity.metrics.totalOutputTokens += usage.output_tokens || 0;
+              this.agentActivity.metrics.cacheReadTokens += usage.cache_read_input_tokens || 0;
+              this.agentActivity.metrics.cacheCreationTokens +=
+                usage.cache_creation_input_tokens || 0;
+            }
+            // modelUsage has per-model breakdown — accumulate from it
+            const modelUsage = obj.result.modelUsage;
+            if (modelUsage && typeof modelUsage === 'object') {
+              for (const modelId of Object.keys(modelUsage)) {
+                const mu = modelUsage[modelId];
+                if (mu && typeof mu === 'object') {
+                  this.agentActivity.metrics.totalInputTokens +=
+                    mu.inputTokens || mu.input_tokens || 0;
+                  this.agentActivity.metrics.totalOutputTokens +=
+                    mu.outputTokens || mu.output_tokens || 0;
+                  this.agentActivity.metrics.cacheReadTokens +=
+                    mu.cacheReadInputTokens || mu.cache_read_input_tokens || 0;
+                  this.agentActivity.metrics.cacheCreationTokens +=
+                    mu.cacheCreationInputTokens || mu.cache_creation_input_tokens || 0;
+                }
+                // Set model from the first model key if not set
+                if (!this.agentActivity.metrics.model) {
+                  this.agentActivity.metrics.model = modelId;
+                }
+              }
+            }
+            // Calculate cost from accumulated tokens using model-specific pricing
+            const inTokens = this.agentActivity.metrics.totalInputTokens;
+            const outTokens = this.agentActivity.metrics.totalOutputTokens;
+            const { inputPricePerM, outputPricePerM } = getModelPricing(
+              this.agentActivity.metrics.model,
+            );
+            this.agentActivity.metrics.costUSD =
+              (inTokens / 1_000_000) * inputPricePerM + (outTokens / 1_000_000) * outputPricePerM;
+          }
+          break;
+        }
+      }
+    } catch {
+      // Malformed JSON — log for debugging, don't crash the activity tracker
+      this.log('DEBUG', `Malformed JSON in agent activity: ${trimmed.slice(0, 120)}`);
+    }
+  }
+
+  /**
+   * Get a snapshot of the current agent activity state.
+   */
+  public getAgentActivity(): AgentActivity {
+    return { ...this.agentActivity, metrics: { ...this.agentActivity.metrics } };
+  }
+
+  /**
+   * Check if a story has a paused session that can be resumed.
+   */
+  public hasPausedSession(storyId: string): boolean {
+    const progress = this.executionProgress.stories.find(
+      s => s.storyId === storyId && s.paused && s.sessionId,
+    );
+    return !!progress;
+  }
+
+  /**
    * Check if a story is too complex and should be broken down
    */
   public checkStoryComplexity(story: UserStory): ComplexityWarning {
@@ -1763,8 +2499,10 @@ Begin implementation now.`;
   }
 
   public retryCurrentStory(): void {
-    // Only retry if we're idle and have a failed story
-    if (this.state !== 'idle') {
+    this.reclaimExternalSession();
+
+    // Only retry if we're idle/paused and have a failed story
+    if (this.state !== 'idle' && this.state !== 'paused') {
       this.outputCallback?.('[ERROR] Cannot retry: Ralph is not idle\n', 'stderr');
       return;
     }
@@ -1841,6 +2579,24 @@ Begin implementation now.`;
 
     const testResults = runStoryTestsAndSave(projectPath, story.id, onProgress);
 
+    // Non-testable AC (plain strings): successful implementation is sufficient
+    if (
+      testResults &&
+      testResults.results.length === 0 &&
+      !isTestableAC(story.acceptanceCriteria)
+    ) {
+      this.log('INFO', `${story.id} has non-testable AC — marking as complete`);
+      this.outputCallback?.(
+        `\n─── No automated tests defined — marking as complete ───\n`,
+        'stdout',
+      );
+      const prdPath = join(projectPath, 'prd.json');
+      const { projectComplete, archivedPath } = markStoryPassedInPRD(prdPath, story.id);
+      testResults.allPassed = true;
+      testResults.projectComplete = projectComplete;
+      testResults.archivedPath = archivedPath;
+    }
+
     // Extract token usage and end cost tracking
     let sessionLogContent = '';
     try {
@@ -1860,10 +2616,12 @@ Begin implementation now.`;
       const passedCount = testResults.results.filter(r => r.passes).length;
       const totalCount = testResults.results.length;
 
-      this.outputCallback?.(
-        `\n─── Results: ${passedCount}/${totalCount} criteria passed ───\n`,
-        'stdout',
-      );
+      if (totalCount > 0) {
+        this.outputCallback?.(
+          `\n─── Results: ${passedCount}/${totalCount} criteria passed ───\n`,
+          'stdout',
+        );
+      }
 
       // End cost tracking with actual results
       const costRecord = this.costTracker.endStory(
@@ -1890,7 +2648,11 @@ Begin implementation now.`;
       const { modelId } = this.mapCLIToProviderModel(cli);
       const retryCount = this.storyRetryCount.get(story.id) || 0;
       const durationMinutes = duration / (1000 * 60);
-      const acPassRate = passedCount / totalCount;
+      // For non-testable AC, use story.acceptanceCriteria.length as the count
+      const acCount = story.acceptanceCriteria.length;
+      const effectiveTotal = totalCount > 0 ? totalCount : acCount;
+      const effectivePassed = totalCount > 0 ? passedCount : testResults.allPassed ? acCount : 0;
+      const acPassRate = effectiveTotal > 0 ? effectivePassed / effectiveTotal : 0;
 
       this.learningRecorder.recordRun({
         project: prd?.project || basename(this.projectPath),
@@ -1908,8 +2670,8 @@ Begin implementation now.`;
         costUSD: actualCost,
         success: testResults.allPassed,
         retryCount,
-        acTotal: totalCount,
-        acPassed: passedCount,
+        acTotal: effectiveTotal,
+        acPassed: effectivePassed,
         acPassRate,
       });
 
@@ -1921,11 +2683,13 @@ Begin implementation now.`;
       if (testResults.allPassed) {
         this.storyRetryCount.delete(story.id);
         this.storyIterationCount.delete(story.id);
+        this.currentSessionId = undefined;
+        this.lastStoryId = undefined;
 
         // Track successful story completion
         this.updateStoryProgress(story.id, true);
 
-        this.log('OK', `${story.id} VERIFIED - all ${totalCount} criteria pass`);
+        this.log('OK', `${story.id} VERIFIED - all ${effectiveTotal} criteria pass`);
         this.outputCallback?.(`✓ ${story.id} VERIFIED - all acceptance criteria pass!\n`, 'stdout');
 
         if (testResults.projectComplete) {
@@ -1942,8 +2706,8 @@ Begin implementation now.`;
             exitCode: exitCode ?? undefined,
             duration,
             storyPassed: true,
-            acTestsPassed: passedCount,
-            acTestsTotal: totalCount,
+            acTestsPassed: effectivePassed,
+            acTestsTotal: effectiveTotal,
           });
         } else {
           this.outputCallback?.(`\n─── Moving to next story... ───\n`, 'stdout');
@@ -1964,8 +2728,19 @@ Begin implementation now.`;
 
         const failureReason = `${totalCount - passedCount}/${totalCount} criteria failed`;
 
-        // Track failed story attempt
+        // Track failed story attempt and save AC status for resume
         this.updateStoryProgress(story.id, false, failureReason);
+
+        // Mark as paused with AC status so retry uses --resume
+        const acStatus = this.getACStatus(story);
+        const existingProgress = this.executionProgress.stories.find(s => s.storyId === story.id);
+        if (existingProgress && this.currentSessionId) {
+          existingProgress.sessionId = this.currentSessionId;
+          existingProgress.paused = true;
+          existingProgress.passingACs = acStatus.passingACs;
+          existingProgress.failingACs = acStatus.failingACs;
+          this.writeProgress();
+        }
 
         this.log(
           'FAIL',
@@ -1988,6 +2763,15 @@ Begin implementation now.`;
 
           this.storyRetryCount.delete(story.id);
           this.storyIterationCount.delete(story.id);
+          this.currentSessionId = undefined;
+          this.lastStoryId = undefined;
+          // Clear pause state for skipped story
+          const skippedProgress = this.executionProgress.stories.find(s => s.storyId === story.id);
+          if (skippedProgress) {
+            skippedProgress.paused = false;
+            skippedProgress.sessionId = undefined;
+            this.writeProgress();
+          }
           this.killCurrentSession();
           this.currentStoryId = undefined;
           this.state = 'idle';
