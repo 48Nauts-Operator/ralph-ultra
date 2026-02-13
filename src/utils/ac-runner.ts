@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, renameSync, copyFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import type { PRD, UserStory, AcceptanceCriterion } from '../types';
 import { isTestableAC } from '../types';
@@ -91,6 +91,18 @@ export function runAcceptanceCriteriaTests(
   };
 }
 
+/** Write via temp file + rename for atomic replacement (no truncation window). */
+function atomicWriteFileSync(filePath: string, content: string): void {
+  const tmpPath = join(dirname(filePath), `.prd-${process.pid}.tmp`);
+  writeFileSync(tmpPath, content, 'utf-8');
+  try {
+    renameSync(tmpPath, filePath);
+  } catch (err) {
+    try { unlinkSync(tmpPath); } catch { /* best-effort cleanup */ }
+    throw err;
+  }
+}
+
 function formatTimestamp(date: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
@@ -141,11 +153,35 @@ export function updatePRDWithResults(
 
   story.passes = story.acceptanceCriteria.every(ac => ac.passes);
 
-  writeFileSync(prdPath, JSON.stringify(prd, null, 2), 'utf-8');
-  
+  atomicWriteFileSync(prdPath, JSON.stringify(prd, null, 2));
+
   const archivedPath = archiveCompletedPRD(prdPath, prd);
-  
+
   return { prd, archivedPath };
+}
+
+export function markStoryPassedInPRD(
+  prdPath: string,
+  storyId: string,
+): { projectComplete: boolean; archivedPath: string | null } {
+  const content = readFileSync(prdPath, 'utf-8');
+  const prd: PRD = JSON.parse(content);
+  const story = prd.userStories.find(s => s.id === storyId);
+  if (!story) return { projectComplete: false, archivedPath: null };
+
+  story.passes = true;
+  // Also mark all individual ACs as passed so story-level and AC-level state agree
+  if (isTestableAC(story.acceptanceCriteria)) {
+    for (const ac of story.acceptanceCriteria) {
+      ac.passes = true;
+      ac.lastRun = ac.lastRun || new Date().toISOString();
+    }
+  }
+  atomicWriteFileSync(prdPath, JSON.stringify(prd, null, 2));
+
+  const archivedPath = archiveCompletedPRD(prdPath, prd);
+  const projectComplete = prd.userStories.every(s => s.passes);
+  return { projectComplete, archivedPath };
 }
 
 export interface ExtendedTestResults extends StoryTestResults {
