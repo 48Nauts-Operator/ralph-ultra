@@ -10,6 +10,7 @@ export const gruvbox: Theme = {
   error: '#fb4934',
   warning: '#fabd2f',
   success: '#b8bb26',
+  info: '#d3869b',
   border: '#3c3836',
   borderFocused: '#b8bb26',
 };

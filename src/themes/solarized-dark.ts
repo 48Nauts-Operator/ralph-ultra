@@ -10,6 +10,7 @@ export const solarizedDark: Theme = {
   error: '#dc322f',
   warning: '#b58900',
   success: '#859900',
+  info: '#6c71c4',
   border: '#073642',
   borderFocused: '#2aa198',
 };

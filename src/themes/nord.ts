@@ -10,6 +10,7 @@ export const nord: Theme = {
   error: '#bf616a',
   warning: '#ebcb8b',
   success: '#a3be8c',
+  info: '#b48ead',
   border: '#3b4252',
   borderFocused: '#88c0d0',
 };

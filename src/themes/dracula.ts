@@ -10,6 +10,7 @@ export const dracula: Theme = {
   error: '#ff5555',
   warning: '#ffb86c',
   success: '#50fa7b',
+  info: '#bd93f9',
   border: '#44475a',
   borderFocused: '#bd93f9',
 };

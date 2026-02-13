@@ -10,6 +10,7 @@ export const catppuccin: Theme = {
   error: '#f38ba8',
   warning: '#fab387',
   success: '#a6e3a1',
+  info: '#cba6f7',
   border: '#313244',
   borderFocused: '#cba6f7',
 };

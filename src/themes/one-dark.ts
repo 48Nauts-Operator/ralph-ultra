@@ -10,6 +10,7 @@ export const oneDark: Theme = {
   error: '#e06c75',
   warning: '#e5c07b',
   success: '#98c379',
+  info: '#c678dd',
   border: '#3e4451',
   borderFocused: '#61afef',
 };

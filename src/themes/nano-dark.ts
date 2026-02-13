@@ -13,6 +13,7 @@ export const nanoDark: Theme = {
   error: '#ff5555',
   warning: '#ffaa00',
   success: '#50fa7b',
+  info: '#bb9af7',
   border: '#444444',
   borderFocused: '#7FFFD4', // Mint for focused borders
 };

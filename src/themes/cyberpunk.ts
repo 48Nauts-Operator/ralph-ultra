@@ -10,6 +10,7 @@ export const cyberpunk: Theme = {
   error: '#ff0055',
   warning: '#ffff00',
   success: '#00ff9f',
+  info: '#bd93f9',
   border: '#1a1a1a',
   borderFocused: '#ff00ff',
 };

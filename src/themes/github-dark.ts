@@ -10,6 +10,7 @@ export const githubDark: Theme = {
   error: '#f85149',
   warning: '#d29922',
   success: '#3fb950',
+  info: '#bc8cff',
   border: '#30363d',
   borderFocused: '#58a6ff',
 };

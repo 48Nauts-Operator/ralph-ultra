@@ -10,6 +10,7 @@ export const tokyoNight: Theme = {
   error: '#f7768e',
   warning: '#e0af68',
   success: '#9ece6a',
+  info: '#bb9af7',
   border: '#292e42',
   borderFocused: '#7aa2f7',
 };

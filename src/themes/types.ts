@@ -11,6 +11,7 @@ export interface Theme {
   error: string;
   warning: string;
   success: string;
+  info: string;
   border: string;
   borderFocused: string;
 }

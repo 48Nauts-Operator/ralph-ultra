@@ -10,6 +10,7 @@ export const monokai: Theme = {
   error: '#f92672',
   warning: '#fd971f',
   success: '#a6e22e',
+  info: '#ae81ff',
   border: '#49483e',
   borderFocused: '#a6e22e',
 };

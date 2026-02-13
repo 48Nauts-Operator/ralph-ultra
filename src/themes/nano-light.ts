@@ -13,6 +13,7 @@ export const nanoLight: Theme = {
   error: '#d32f2f',
   warning: '#f57c00',
   success: '#388e3c',
+  info: '#8839ef',
   border: '#cccccc',
   borderFocused: '#00bfa5', // Darker mint for focused borders
 };
