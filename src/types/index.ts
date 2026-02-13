@@ -72,7 +72,7 @@ export interface PRD {
 /**
  * Process state for a Ralph instance
  */
-export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
+export type ProcessState = 'idle' | 'running' | 'stopping' | 'paused' | 'external';
 
 /**
  * Work pane view types
@@ -113,6 +113,7 @@ export interface TabState {
   logFilter?: LogFilter;
   retryCount?: number;
   debugMode?: boolean;
+  currentModel?: string | null;
 }
 
 /**
@@ -175,4 +176,44 @@ export type LogFilterLevel = 'all' | 'errors' | 'warnings_errors';
 export interface LogFilter {
   /** Current filter level */
   level: LogFilterLevel;
+}
+
+export interface ToolUseRecord {
+  name: string;
+  inputSummary: string;
+  startedAt: number;
+}
+
+export interface AgentActivityMetrics {
+  model: string | null;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUSD: number;
+  toolCallCount: number;
+}
+
+export interface AgentActivity {
+  currentTool: string | null;
+  currentToolInput: string | null;
+  isThinking: boolean;
+  lastThinkingSnippet: string | null;
+  recentTools: ToolUseRecord[];
+  metrics: AgentActivityMetrics;
+  startedAt: number | null;
+}
+
+/** Interval (ms) for fs.watchFile on prd.json — shared across all watchers. */
+export const PRD_WATCH_INTERVAL_MS = 5000;
+
+export type OutputLineType = 'text' | 'tool_start' | 'result' | 'system';
+
+export interface OutputLine {
+  type: OutputLineType;
+  content: string;
+  toolName?: string;
+  toolInput?: string;
+  isBlockStart?: boolean;
+  timestamp: number;
 }
