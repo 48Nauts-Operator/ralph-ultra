@@ -64,8 +64,8 @@ export function NotificationToast({ notifications, terminalWidth }: Notification
     return null;
   }
 
-  // Calculate toast width (30% of terminal or max 50 chars)
-  const toastWidth = Math.min(50, Math.floor(terminalWidth * 0.3));
+  // Calculate toast width (40% of terminal or max 70 chars)
+  const toastWidth = Math.min(70, Math.floor(terminalWidth * 0.4));
   // Position from right edge (leave 1 char margin)
   const rightMargin = 1;
   const leftPosition = terminalWidth - toastWidth - rightMargin;
