@@ -13,6 +13,8 @@ import type {
   LogFilterLevel,
   PRD,
   WorkView,
+  AgentActivity,
+  OutputLine,
 } from '@types';
 import { runStoryTestsAndSave, type ACTestResult } from '../utils/ac-runner';
 import type { TailscaleStatus } from '../remote/tailscale';
@@ -28,6 +30,11 @@ import { QuotaDashboard } from './QuotaDashboard';
 import { VersionView } from './VersionView';
 import { ExecutionPlanView } from './ExecutionPlanView';
 import { CostDashboard } from './CostDashboard';
+
+const VIEW_NUMBERS: Record<string, number> = {
+  monitor: 1, status: 2, details: 3, quota: 4,
+  plan: 5, help: 6, version: 7, costs: 8,
+};
 
 interface WorkPaneProps {
   isFocused: boolean;
@@ -51,7 +58,8 @@ interface WorkPaneProps {
   retryCount?: number;
   logFilter?: LogFilter;
   allStoriesComplete?: boolean;
-  liveOutput?: string[];
+  liveOutput?: OutputLine[];
+  agentActivity?: AgentActivity | null;
 }
 
 /**
@@ -82,6 +90,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     logFilter = { level: 'all' },
     allStoriesComplete = false,
     liveOutput = [],
+    agentActivity = null,
   }) => {
     const { theme } = useTheme();
     const { history: notificationHistory, notify } = useNotifications();
@@ -482,7 +491,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
       currentStoryTitle: string | null;
       complexity: string | null;
       cli: string | null;
-      phase: 'idle' | 'running' | 'verifying' | 'complete' | 'failed';
+      phase: 'idle' | 'running' | 'verifying' | 'complete' | 'failed' | 'paused';
       acResults: { id: string; passed: boolean | null }[];
       acPassed: number;
       acTotal: number;
@@ -492,6 +501,31 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
       recentActivity: string[];
       projectComplete: boolean;
     }
+
+    const isJsonOrCode = (l: string): boolean => {
+      const trimmed = l.trim();
+      if (!trimmed) return true;
+      // Allow lines starting with [ if they look like log prefixes: [INFO], [WARN], etc.
+      if (trimmed.startsWith('[') && /^\[[A-Z]+\]/.test(trimmed)) return false;
+      // Detect JSON fragments: lines with multiple "key": patterns (e.g. "agents":["Bash",...])
+      const jsonKeyCount = (l.match(/"[a-zA-Z_]+"\s*:/g) || []).length;
+      if (jsonKeyCount >= 2) return true;
+      return (
+        trimmed.startsWith('{') ||
+        trimmed.startsWith('[') ||
+        trimmed.startsWith('"') ||
+        l.includes('tool_use_id') ||
+        l.includes('"type":') ||
+        l.includes('"message":') ||
+        l.includes('"content":') ||
+        l.includes('"tool_use_result"') ||
+        l.includes('"tool_result"') ||
+        /^\s*[)}{\[\]];?\s*$/.test(l) ||
+        /^\s*(const|let|var|function|import|export|await|return|if|for|while)\s/.test(l) ||
+        /^\s*\d+[→\-]/.test(l) ||
+        l.includes('# Mark as')
+      );
+    };
 
     const parseMonitorData = (lines: string[]): ParsedMonitorData => {
       const data: ParsedMonitorData = {
@@ -573,19 +607,6 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
         }
       }
 
-      const isJsonOrCode = (l: string) =>
-        l.startsWith('{') ||
-        l.startsWith('[') ||
-        l.startsWith('"') ||
-        l.includes('tool_use_id') ||
-        l.includes('"type":') ||
-        l.includes('"message":') ||
-        l.includes('"content":') ||
-        /^\s*[)}{\[\]];?\s*$/.test(l) ||
-        /^\s*(const|let|var|function|import|export|await|return|if|for|while)\s/.test(l) ||
-        /^\s*\d+[→\-]/.test(l) ||
-        l.includes('# Mark as');
-
       const activityLines = lines
         .filter(
           l =>
@@ -602,9 +623,17 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
               l.includes('[WARN]') ||
               l.includes('[ERROR]') ||
               l.includes('[ERR]') ||
+              l.includes('[INFO]') ||
               l.includes('[...]') ||
+              l.includes('Implementing') ||
+              l.includes('Creating') ||
+              l.includes('Updating') ||
+              l.includes('Running') ||
+              l.includes('Testing') ||
               l.includes('Tmux session') ||
               l.includes('Session PID') ||
+              l.includes('Mode:') ||
+              l.includes('Model:') ||
               l.includes('Claude')),
         )
         .slice(-6);
@@ -618,6 +647,29 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
       const data = parseMonitorData(filteredLogContent);
       const boxWidth = Math.max(40, width - 4);
 
+      // When process is running, use props as fallback for data the parser hasn't extracted yet
+      if (processState === 'running' || processState === 'external') {
+        if (!data.currentStoryId && currentStory) {
+          data.currentStoryId = currentStory;
+        }
+        if (!data.cli && availableCLI) {
+          data.cli = availableCLI;
+        }
+        if (data.phase === 'idle') {
+          data.phase = 'running';
+        }
+      }
+
+      if (processState === 'paused' || processState === 'stopping') {
+        if (!data.currentStoryId && currentStory) {
+          data.currentStoryId = currentStory;
+        }
+        if (!data.cli && availableCLI) {
+          data.cli = availableCLI;
+        }
+        data.phase = 'paused';
+      }
+
       const phaseColor =
         data.phase === 'complete'
           ? theme.success
@@ -627,7 +679,9 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
               ? theme.warning
               : data.phase === 'running'
                 ? theme.accent
-                : theme.muted;
+                : data.phase === 'paused'
+                  ? theme.warning
+                  : theme.muted;
 
       const phaseText =
         data.phase === 'complete'
@@ -638,7 +692,9 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
               ? '⋯ VERIFY'
               : data.phase === 'running'
                 ? '▶ RUN'
-                : '○ IDLE';
+                : data.phase === 'paused'
+                  ? '⏸ PAUSED'
+                  : '○ IDLE';
 
       if (allStoriesComplete) {
         return (
@@ -807,32 +863,229 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             </Box>
           </Box>
 
-          {liveOutput.length > 0 && (
-            <Box
-              borderStyle="single"
-              borderColor={theme.border}
-              flexDirection="column"
-              width={boxWidth}
-            >
-              <Box paddingX={1}>
-                <Text bold color={theme.accent}>
-                  Claude Output
-                </Text>
-                <Text dimColor> (live)</Text>
-              </Box>
-              <Box paddingX={1} paddingY={0} flexDirection="column" gap={0}>
-                {liveOutput.slice(-8).map((line, i) => {
-                  const maxLen = boxWidth - 4;
-                  const shortLine = line.length > maxLen ? line.slice(0, maxLen - 3) + '...' : line;
+          {(processState === 'running' || processState === 'paused') && (() => {
+            // Determine if we have structured agent activity data
+            const hasActivity = agentActivity && (
+              agentActivity.metrics.toolCallCount > 0 ||
+              agentActivity.isThinking ||
+              agentActivity.currentTool
+            );
+
+            // Map tool names to dot colors matching Claude Code's visual language
+            const getToolDotColor = (toolName?: string): string => {
+              switch (toolName) {
+                case 'Write':
+                case 'Edit':
+                case 'NotebookEdit':
+                  return theme.warning;          // amber — file mutations
+                case 'Bash':
+                  return theme.accentSecondary;  // orange — shell commands
+                case 'Read':
+                case 'Glob':
+                case 'Grep':
+                case 'LSP':
+                  return theme.accent;           // mint/teal — read-only ops
+                case 'Task':
+                  return theme.info;             // purple — delegation
+                default:
+                  return theme.success;          // green — default/text
+              }
+            };
+
+            // Truncate text with ellipsis
+            const truncate = (text: string, maxLen: number): string =>
+              maxLen > 0 && text.length > maxLen ? text.slice(0, maxLen - 1) + '…' : text;
+
+            // Helper: render a single OutputLine
+            const renderOutputLine = (ol: OutputLine, i: number, lines: OutputLine[]): React.ReactNode => {
+              const maxContent = boxWidth - 6;
+              // Add spacing before tool_start and text block starts
+              const prev = i > 0 ? lines[i - 1] : undefined;
+              const needsSpacing = (ol.type === 'tool_start' && prev && prev.type !== 'tool_start')
+                || (ol.type === 'text' && ol.isBlockStart && prev && prev.type !== 'text');
+
+              switch (ol.type) {
+                case 'tool_start': {
+                  const dotColor = getToolDotColor(ol.toolName);
+                  const name = ol.toolName || ol.content;
+                  const maxInput = boxWidth - name.length - 8;
+                  const input = ol.toolInput ? truncate(ol.toolInput, maxInput) : '';
                   return (
-                    <Text key={i} dimColor wrap="truncate">
-                      {shortLine}
-                    </Text>
+                    <Box key={i} flexDirection="column">
+                      {needsSpacing && <Box height={1} />}
+                      <Box>
+                        <Text color={dotColor} bold>{'● '}</Text>
+                        <Text bold color={dotColor}>{name}</Text>
+                        {input ? <Text dimColor>{'  '}{input}</Text> : null}
+                      </Box>
+                    </Box>
                   );
-                })}
+                }
+                case 'text':
+                  if (ol.isBlockStart) {
+                    return (
+                      <Box key={i} flexDirection="column">
+                        {needsSpacing && <Box height={1} />}
+                        <Box width={boxWidth - 4}>
+                          <Text color={theme.success} bold>{'● '}</Text>
+                          <Text>{truncate(ol.content, maxContent)}</Text>
+                        </Box>
+                      </Box>
+                    );
+                  }
+                  return (
+                    <Box key={i} width={boxWidth - 4}>
+                      <Text>{'  '}</Text>
+                      <Text>{truncate(ol.content, maxContent)}</Text>
+                    </Box>
+                  );
+                case 'system':
+                  return (
+                    <Box key={i} width={boxWidth - 4}>
+                      <Text dimColor>{'  '}{truncate(ol.content, maxContent)}</Text>
+                    </Box>
+                  );
+                case 'result':
+                  return (
+                    <Box key={i} width={boxWidth - 4}>
+                      <Text dimColor>{'  '}{truncate(ol.content, maxContent)}</Text>
+                    </Box>
+                  );
+                default:
+                  return null;
+              }
+            };
+
+            // Compact Agent Activity metrics strip (always visible when data available)
+            const activityStrip = hasActivity && agentActivity ? (() => {
+              const elapsed = agentActivity.startedAt
+                ? Math.floor((Date.now() - agentActivity.startedAt) / 1000)
+                : 0;
+              const elapsedStr = elapsed > 0 ? `${elapsed}s` : '';
+
+              let actionIcon = '⏳';
+              let actionText = 'Waiting...';
+              let actionColor = theme.muted;
+              if (agentActivity.currentTool) {
+                actionIcon = '▶';
+                actionText = agentActivity.currentTool;
+                actionColor = theme.accent;
+              } else if (agentActivity.isThinking) {
+                actionIcon = '💭';
+                actionText = 'Thinking...';
+                actionColor = theme.warning;
+              }
+
+              const inTok = formatTokens(agentActivity.metrics.totalInputTokens);
+              const outTok = formatTokens(agentActivity.metrics.totalOutputTokens);
+              const cost = formatCost(agentActivity.metrics.costUSD);
+              const toolCount = agentActivity.metrics.toolCallCount;
+              const modelName = agentActivity.metrics.model || 'unknown';
+              const shortModel = modelName.includes('sonnet') ? 'sonnet'
+                : modelName.includes('opus') ? 'opus'
+                : modelName.includes('haiku') ? 'haiku'
+                : modelName.length > 20 ? modelName.slice(0, 17) + '...' : modelName;
+
+              const inputSummary = agentActivity.currentToolInput
+                ? (agentActivity.currentToolInput.length > boxWidth - 30
+                    ? agentActivity.currentToolInput.slice(0, boxWidth - 33) + '...'
+                    : agentActivity.currentToolInput)
+                : agentActivity.isThinking && agentActivity.lastThinkingSnippet
+                  ? (agentActivity.lastThinkingSnippet.length > boxWidth - 30
+                      ? agentActivity.lastThinkingSnippet.slice(0, boxWidth - 33) + '...'
+                      : agentActivity.lastThinkingSnippet)
+                  : '';
+
+              return (
+                <Box
+                  borderStyle="single"
+                  borderColor={theme.accent}
+                  flexDirection="column"
+                  width={boxWidth}
+                >
+                  <Box paddingX={1} justifyContent="space-between">
+                    <Text bold color={theme.accent}>Agent Activity</Text>
+                    {elapsedStr && <Text dimColor>({elapsedStr})</Text>}
+                  </Box>
+                  <Box paddingX={1}>
+                    <Text color={actionColor} bold>{actionIcon} {actionText}</Text>
+                    {inputSummary ? <Text dimColor>{'  '}{inputSummary}</Text> : null}
+                  </Box>
+                  <Box paddingX={1} gap={2}>
+                    <Text color={theme.muted}>{shortModel}</Text>
+                    <Text dimColor>{inTok}in {outTok}out</Text>
+                    <Text color={theme.warning}>{cost}</Text>
+                    <Text dimColor>{toolCount}↹</Text>
+                  </Box>
+                </Box>
+              );
+            })() : null;
+
+            // Calculate available rows for CLI Output lines
+            const WORKPANE_CHROME = 5;  // outer border(2) + header bar with border(3)
+            const STORY_ROWS = 5;       // border(2) + 3 content rows
+            const AC_ROWS = 4;          // border(2) + header(1) + icons(1)
+            const activityLines = Math.max(1, Math.min(6, data.recentActivity.length));
+            const ACTIVITY_ROWS = 4 + activityLines;  // border(2) + header(1) + paddingY top(1) + lines
+            const AGENT_ROWS = hasActivity ? 5 : 0;   // border(2) + 3 content rows
+            const failedACs = data.acResults.filter(r => r?.passed === false);
+            const showFailed = failedACs.length > 0 && selectedStory && data.currentStoryId === selectedStory.id;
+            const FAILED_ROWS = showFailed ? 3 + failedACs.length : 0;
+            const PROGRESS_ROWS = 3;    // border(2) + 1 content
+            const CLI_CHROME = 3;       // border(2) + header(1)
+
+            const fixedRows = STORY_ROWS + AC_ROWS + ACTIVITY_ROWS + AGENT_ROWS + FAILED_ROWS + PROGRESS_ROWS;
+            const availableOutputLines = Math.max(3, (height - WORKPANE_CHROME) - fixedRows - CLI_CHROME);
+
+            // CLI Output panel with structured rendering
+            const cliOutputPanel = liveOutput.length > 0 ? (
+              <Box
+                borderStyle="single"
+                borderColor={theme.border}
+                flexDirection="column"
+                width={boxWidth}
+                height={availableOutputLines + CLI_CHROME}
+              >
+                <Box paddingX={1}>
+                  <Text bold color={theme.accent}>CLI Output</Text>
+                  <Text dimColor> (live)</Text>
+                </Box>
+                <Box paddingX={1} paddingY={0} flexDirection="column" gap={0}>
+                  {(() => {
+                    const visible = liveOutput.slice(-availableOutputLines);
+                    return visible.map((ol, i) => renderOutputLine(ol, i, visible));
+                  })()}
+                </Box>
               </Box>
-            </Box>
-          )}
+            ) : null;
+
+            // If we have either strip or output, show them
+            if (activityStrip || cliOutputPanel) {
+              return (
+                <>
+                  {activityStrip}
+                  {cliOutputPanel}
+                </>
+              );
+            }
+
+            // No output yet — show starting message
+            return (
+              <Box
+                borderStyle="single"
+                borderColor={theme.border}
+                flexDirection="column"
+                width={boxWidth}
+              >
+                <Box paddingX={1}>
+                  <Text bold color={theme.accent}>Agent Activity</Text>
+                </Box>
+                <Box paddingX={1}>
+                  <Text color={theme.muted}>Claude is starting...</Text>
+                </Box>
+              </Box>
+            );
+          })()}
 
           {data.acResults.some(r => r?.passed === false) &&
             selectedStory &&
@@ -1294,14 +1547,15 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           title: 'Navigation',
           items: [
             { key: 'Tab', desc: 'Cycle focus between panes' },
-            { key: 'j/k or ↑↓', desc: 'Navigate within pane' },
-            { key: '[', desc: 'Toggle projects rail' },
+            { key: 'j/k or ↑↓', desc: 'Navigate / scroll' },
+            { key: 'g', desc: 'Go to story by number (sessions pane)' },
           ],
         },
         {
           title: 'Actions',
           items: [
             { key: 'r', desc: 'Run Ralph on current project' },
+            { key: 'R', desc: 'Retry current story' },
             { key: 's', desc: 'Stop running Ralph' },
             { key: 'q', desc: 'Quit application' },
           ],
@@ -1315,12 +1569,9 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             { key: '4', desc: 'Quota (provider quotas)' },
             { key: '5', desc: 'Plan (execution plan)' },
             { key: '6', desc: 'Help (this view)' },
-            { key: '7', desc: 'Tracing (agent tree)' },
+            { key: '7', desc: 'Version (system info)' },
+            { key: '8', desc: 'Costs (cost tracking)' },
           ],
-        },
-        {
-          title: 'Remote',
-          items: [{ key: 'c', desc: 'Copy remote URL' }],
         },
         {
           title: 'Search (Monitor view)',
@@ -1328,18 +1579,37 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
             { key: '/', desc: 'Start search' },
             { key: 'n', desc: 'Next match' },
             { key: 'N', desc: 'Previous match' },
+            { key: 'f', desc: 'Cycle log filter (all/errors/warnings)' },
             { key: 'Esc', desc: 'Cancel search' },
           ],
         },
         {
-          title: 'Quota View',
-          items: [{ key: 'R', desc: 'Refresh quotas' }],
+          title: 'Details View',
+          items: [{ key: 'T', desc: 'Run acceptance tests' }],
+        },
+        {
+          title: 'Execution Plan',
+          items: [
+            { key: 'm / M', desc: 'Cycle execution mode' },
+            { key: 'r / R', desc: 'Refresh plan' },
+          ],
+        },
+        {
+          title: 'Tabs',
+          items: [
+            { key: 'Ctrl+Shift+T', desc: 'Open new tab' },
+            { key: 'e', desc: 'Close current tab' },
+          ],
         },
         {
           title: 'Interface',
           items: [
             { key: '?', desc: 'Welcome overlay' },
             { key: 't', desc: 'Theme settings' },
+            { key: 'd', desc: 'Toggle debug mode' },
+            { key: ': / Ctrl+P', desc: 'Command palette' },
+            { key: 'Ctrl+L', desc: 'Clear session' },
+            { key: 'c', desc: 'Copy remote URL' },
           ],
         },
       ];
@@ -1437,7 +1707,11 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
           ) : (
             <>
               <Text bold color={theme.accent}>
-                Work: {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
+                Work: {(() => {
+                  const num = VIEW_NUMBERS[currentView] ?? '?';
+                  const label = currentView.charAt(0).toUpperCase() + currentView.slice(1);
+                  return `[${num}] ${label}`;
+                })()}
               </Text>
               {currentView === 'monitor' && logFilter && (
                 <>
@@ -1458,7 +1732,7 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
                   </Text>
                 </>
               )}
-              <Text dimColor> [1-5 to switch]</Text>
+              <Text dimColor> [1-8 to switch]</Text>
             </>
           )}
         </Box>

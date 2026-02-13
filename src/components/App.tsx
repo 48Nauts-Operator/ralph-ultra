@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Text, useStdout, useApp } from 'ink';
 
 import { SessionsPane } from './SessionsPane';
@@ -42,7 +42,8 @@ import {
   type AnthropicStatus,
 } from '../utils/status-check';
 import { getSessionInfo, type SessionInfo } from '../utils/session-tracker';
-import type { Project, PRD } from '../types';
+import type { Project, PRD, AgentActivity, OutputLine } from '../types';
+import { PRD_WATCH_INTERVAL_MS } from '../types';
 import type { ExecutionMode } from '../core/types';
 import { readFileSync, watchFile, unwatchFile } from 'fs';
 import { join, basename } from 'path';
@@ -54,7 +55,11 @@ import { join, basename } from 'path';
  * - Work pane (right): flexible width, min 40 chars
  * - Tab bar (below status bar when multiple projects open)
  */
-export const App: React.FC = () => {
+interface AppProps {
+  initialProjectPath?: string;
+}
+
+export const App: React.FC<AppProps> = ({ initialProjectPath }) => {
   const { theme } = useTheme();
   const { stdout } = useStdout();
   const { exit } = useApp();
@@ -93,6 +98,18 @@ export const App: React.FC = () => {
   const httpServerRef = useRef<RalphHttpServer | null>(null);
 
   const getInitialProjects = (): Project[] => {
+    // CLI --project flag takes highest priority
+    if (initialProjectPath) {
+      return [
+        {
+          id: 'proj-initial',
+          name: basename(initialProjectPath),
+          path: initialProjectPath,
+          color: '#7FFFD4',
+        },
+      ];
+    }
+
     const settings = loadSettings();
     const savedProjects = settings.openProjects;
 
@@ -105,15 +122,8 @@ export const App: React.FC = () => {
       }));
     }
 
-    const currentPath = process.cwd();
-    return [
-      {
-        id: 'proj-initial',
-        name: basename(currentPath),
-        path: currentPath,
-        color: '#7FFFD4',
-      },
-    ];
+    // No project specified and no saved projects — start empty
+    return [];
   };
 
   const {
@@ -128,9 +138,21 @@ export const App: React.FC = () => {
     updateTab,
     getRalphService,
     getLiveOutput,
+    getAgentActivity,
   } = useTabs(getInitialProjects());
 
-  const [liveOutput, setLiveOutput] = useState<string[]>([]);
+  const [liveOutput, setLiveOutput] = useState<OutputLine[]>([]);
+  const [agentActivity, setAgentActivity] = useState<AgentActivity | null>(null);
+
+  // Compute paused story IDs from tab state
+  const pausedStoryIds = useMemo(() => {
+    if (!activeTab) return new Set<string>();
+    const ids = new Set<string>();
+    if (activeTab.processState === 'paused' && activeTab.currentStory) {
+      ids.add(activeTab.currentStory);
+    }
+    return ids;
+  }, [activeTab?.processState, activeTab?.currentStory]);
 
   useEffect(() => {
     const projectsToSave: SavedProject[] = tabs.map(tab => ({
@@ -141,20 +163,21 @@ export const App: React.FC = () => {
 
     const settings = loadSettings();
     settings.openProjects = projectsToSave;
-    settings.activeProjectPath = activeTab.project.path;
+    settings.activeProjectPath = activeTab?.project.path ?? '';
     saveSettings(settings);
-  }, [tabs, activeTab.project.path]);
+  }, [tabs, activeTab]);
 
   useMultiTabSession(tabs, activeTabId, false, focusPane);
 
   const handleStorySelect = useCallback(
     (story: import('../types').UserStory | null) => {
+      if (!activeTab) return;
       updateTab(activeTabId, {
         selectedStory: story,
         selectedStoryId: story?.id || null,
       });
     },
-    [activeTabId, updateTab],
+    [activeTab, activeTabId, updateTab],
   );
 
   const handleClearSession = useCallback(() => {
@@ -174,18 +197,24 @@ export const App: React.FC = () => {
   }, [activeTabId, updateTab, notify]);
 
   // Track previous process state for notifications
-  const prevProcessStateRef = useRef<typeof activeTab.processState>(activeTab.processState);
+  const prevProcessStateRef = useRef<string>(activeTab?.processState ?? 'idle');
   const prevPassCountRef = useRef<number>(-1);
-  const prevProjectPathRef = useRef<string>(activeTab.project.path);
+  const prevProjectPathRef = useRef<string>(activeTab?.project.path ?? '');
   const [prd, setPrd] = useState<PRD | null>(null);
 
   // Load and watch PRD file for story completion notifications
   useEffect(() => {
+    if (!activeTab) return;
+
     const loadPRD = () => {
       try {
         const prdPath = join(activeTab.project.path, 'prd.json');
         const content = readFileSync(prdPath, 'utf-8');
         const data = JSON.parse(content) as PRD;
+        if (!Array.isArray(data.userStories)) {
+          setPrd(null);
+          return;
+        }
         // Only update if content actually changed (reduces flicker)
         setPrd(prev => {
           if (!prev) return data;
@@ -204,18 +233,17 @@ export const App: React.FC = () => {
 
     loadPRD();
 
-    const PRD_WATCH_INTERVAL_MS = 30000;
     const prdPath = join(activeTab.project.path, 'prd.json');
     watchFile(prdPath, { interval: PRD_WATCH_INTERVAL_MS }, loadPRD);
 
     return () => {
       unwatchFile(prdPath, loadPRD);
     };
-  }, [activeTab.project.path]);
+  }, [activeTab]);
 
   // Trigger notification on story completion
   useEffect(() => {
-    if (!prd) return;
+    if (!prd || !activeTab) return;
 
     const passCount = prd.userStories.filter(s => s.passes).length;
     const totalCount = prd.userStories.length;
@@ -249,7 +277,7 @@ export const App: React.FC = () => {
     }
 
     prevPassCountRef.current = passCount;
-  }, [prd, notify, activeTab.project.path]);
+  }, [prd, notify, activeTab]);
 
   // Check API status on startup
   useEffect(() => {
@@ -282,6 +310,8 @@ export const App: React.FC = () => {
 
   // Update session info (tokens, cost, context budget) periodically
   useEffect(() => {
+    if (!activeTab) return;
+
     const updateSessionInfo = () => {
       if (activeTab?.project?.path) {
         const info = getSessionInfo(activeTab.project.path);
@@ -324,21 +354,32 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [activeTab?.project?.path, activeTab?.processState, notify]);
 
-  // Poll for live Claude output when process is running
+  // Poll for live Claude output and agent activity when process is running
   useEffect(() => {
-    if (activeTab.processState !== 'running') {
+    if (!activeTab) return;
+    if (activeTab.processState !== 'running' && activeTab.processState !== 'paused') {
       setLiveOutput([]);
+      setAgentActivity(null);
       return;
     }
 
-    const POLL_INTERVAL_MS = 3000;
+    if (activeTab.processState === 'paused') {
+      return; // Keep existing data, don't poll
+    }
+
+    const POLL_INTERVAL_MS = 2000;
     const pollOutput = () => {
-      const output = getLiveOutput(activeTabId, 12);
+      // Poll agent activity (structured data from stream-json parsing)
+      const activity = getAgentActivity(activeTabId);
+      setAgentActivity(activity);
+
+      // Also poll live output (structured OutputLine[])
+      const output = getLiveOutput(activeTabId, 25);
       setLiveOutput(prev => {
-        // Only update if output actually changed
-        if (prev.length !== output.length || prev.join('') !== output.join('')) {
-          return output;
-        }
+        if (prev.length !== output.length) return output;
+        const prevLast = prev[prev.length - 1]?.timestamp;
+        const outLast = output[output.length - 1]?.timestamp;
+        if (prevLast !== outLast) return output;
         return prev;
       });
     };
@@ -346,7 +387,7 @@ export const App: React.FC = () => {
     pollOutput();
     const interval = setInterval(pollOutput, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [activeTab.processState, activeTabId, getLiveOutput]);
+  }, [activeTab, activeTabId, getLiveOutput, getAgentActivity]);
 
   // Always show welcome splash on startup
   useEffect(() => {
@@ -372,6 +413,7 @@ export const App: React.FC = () => {
 
   // Trigger notifications on process state changes
   useEffect(() => {
+    if (!activeTab) return;
     const prevState = prevProcessStateRef.current;
     const currentState = activeTab.processState;
 
@@ -385,6 +427,11 @@ export const App: React.FC = () => {
       notify('success', `Ralph completed for ${activeTab.project.name}`);
     }
 
+    // Process paused (only on actual transition, not on tab switch)
+    if (prevState !== 'paused' && currentState === 'paused') {
+      notify('info', `Ralph paused for ${activeTab.project.name} (press r to resume)`);
+    }
+
     // Process stopped
     if (prevState === 'running' && currentState === 'stopping') {
       notify('warning', `Stopping Ralph for ${activeTab.project.name}...`);
@@ -396,7 +443,7 @@ export const App: React.FC = () => {
     }
 
     prevProcessStateRef.current = currentState;
-  }, [activeTab.processState, activeTab.processError, activeTab.project.name, notify]);
+  }, [activeTab?.processState, activeTab?.processError, activeTab?.project.name, notify]);
 
   // Handle terminal resize
   useEffect(() => {
@@ -447,12 +494,12 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!remoteServerRef.current) return;
+    if (!remoteServerRef.current || !activeTab) return;
 
     remoteServerRef.current.onCommand(command => {
       switch (command.action) {
         case 'run':
-          if (activeTab.processState === 'idle') {
+          if (activeTab.processState === 'idle' || activeTab.processState === 'paused') {
             const ignoreApiStatus = process.env['RALPH_IGNORE_API_STATUS'] === 'true';
             const ignoreComplexity = process.env['RALPH_IGNORE_COMPLEXITY'] === 'true';
             getRalphService(activeTabId)
@@ -513,7 +560,8 @@ export const App: React.FC = () => {
       shortcut: 'r',
       category: 'Actions',
       action: async () => {
-        if (activeTab.processState === 'idle') {
+        if (!activeTab) return;
+        if (activeTab.processState === 'idle' || activeTab.processState === 'paused') {
           // Check for complexity warning before running
           const prdPath = join(activeTab.project.path, 'prd.json');
           try {
@@ -558,7 +606,7 @@ export const App: React.FC = () => {
       shortcut: 's',
       category: 'Actions',
       action: () => {
-        if (activeTab.processState === 'running') {
+        if (activeTab?.processState === 'running' || activeTab?.processState === 'external') {
           getRalphService(activeTabId).stop();
         }
       },
@@ -684,6 +732,7 @@ export const App: React.FC = () => {
       shortcut: 'd',
       category: 'Interface',
       action: () => {
+        if (!activeTab) return;
         const currentDebugMode = activeTab.debugMode || false;
         const newDebugMode = !currentDebugMode;
 
@@ -714,13 +763,12 @@ export const App: React.FC = () => {
       shortcut: 'e',
       category: 'Tabs',
       action: () => {
-        if (tabs.length > 1) {
-          if (activeTab.processState === 'running') {
-            setTabToClose(activeTabId);
-            setShowCloseConfirm(true);
-          } else {
-            closeTab(activeTabId);
-          }
+        if (!activeTab) return;
+        if (activeTab.processState === 'running') {
+          setTabToClose(activeTabId);
+          setShowCloseConfirm(true);
+        } else {
+          closeTab(activeTabId);
         }
       },
     },
@@ -753,6 +801,7 @@ export const App: React.FC = () => {
       shortcut: 'f',
       category: 'Logs',
       action: () => {
+        if (!activeTab) return;
         const currentLevel = activeTab.logFilter?.level || 'all';
         const levels: Array<import('../types').LogFilterLevel> = [
           'all',
@@ -779,6 +828,8 @@ export const App: React.FC = () => {
 
   // Register global keyboard shortcuts
   useEffect(() => {
+    if (!activeTab) return;
+
     const handlers = [
       // Overlays (highest priority)
       {
@@ -814,7 +865,7 @@ export const App: React.FC = () => {
       {
         key: 'r',
         handler: async () => {
-          if (activeTab.processState !== 'idle') return;
+          if (activeTab.processState !== 'idle' && activeTab.processState !== 'paused') return;
 
           // Check for complexity warning before running
           const prdPath = join(activeTab.project.path, 'prd.json');
@@ -847,8 +898,8 @@ export const App: React.FC = () => {
               ignoreApiStatus,
               ignoreComplexity,
             });
-          } catch {
-            // Error handled by service callbacks
+          } catch (err) {
+            notify('error', `Failed to start Ralph: ${err instanceof Error ? err.message : String(err)}`);
           }
         },
         priority: KeyPriority.GLOBAL,
@@ -856,7 +907,8 @@ export const App: React.FC = () => {
       {
         key: 'R',
         handler: () => {
-          if (activeTab.processState !== 'idle') return;
+          if (!activeTab) return;
+          if (activeTab.processState !== 'idle' && activeTab.processState !== 'paused') return;
           getRalphService(activeTabId).retryCurrentStory();
         },
         priority: KeyPriority.GLOBAL,
@@ -864,7 +916,7 @@ export const App: React.FC = () => {
       {
         key: 's',
         handler: () => {
-          if (activeTab.processState === 'running') {
+          if (activeTab.processState === 'running' || activeTab.processState === 'external') {
             getRalphService(activeTabId).stop();
           }
         },
@@ -1363,13 +1415,12 @@ export const App: React.FC = () => {
             (key.name === 'w' || key.name === 'W' || input.toLowerCase() === 'w'),
           ),
         handler: () => {
-          if (tabs.length > 1) {
-            if (activeTab.processState === 'running') {
-              setTabToClose(activeTabId);
-              setShowCloseConfirm(true);
-            } else {
-              closeTab(activeTabId);
-            }
+          if (!activeTab) return;
+          if (activeTab.processState === 'running') {
+            setTabToClose(activeTabId);
+            setShowCloseConfirm(true);
+          } else {
+            closeTab(activeTabId);
           }
         },
         priority: KeyPriority.GLOBAL,
@@ -1448,6 +1499,21 @@ export const App: React.FC = () => {
     );
   }
 
+  // No projects open — show fullscreen project picker
+  if (!activeTab) {
+    return (
+      <ProjectPicker
+        width={dimensions.columns}
+        height={dimensions.rows}
+        projects={[]}
+        openProjectIds={[]}
+        onSelect={project => {
+          openTab(project);
+        }}
+      />
+    );
+  }
+
   const sessionsWidth = Math.max(30, Math.floor(dimensions.columns * 0.4));
   const workWidth = Math.max(40, dimensions.columns - sessionsWidth);
   const contentHeight = dimensions.rows - 3;
@@ -1469,6 +1535,8 @@ export const App: React.FC = () => {
         apiStatus={apiStatus}
         projectPath={activeTab.project.path}
         executionMode={executionMode}
+        currentCLI={activeTab.availableCLI}
+        currentModel={activeTab.currentModel}
       />
 
       <TabBar
@@ -1509,6 +1577,7 @@ export const App: React.FC = () => {
           initialScrollIndex={activeTab.sessionsScrollIndex}
           initialSelectedStoryId={activeTab.selectedStoryId}
           gotoState={activeTab.gotoState}
+          pausedStoryIds={pausedStoryIds}
         />
 
         <WorkPane
@@ -1533,6 +1602,7 @@ export const App: React.FC = () => {
           logFilter={activeTab.logFilter}
           allStoriesComplete={prd ? prd.userStories.every(s => s.passes) : false}
           liveOutput={liveOutput}
+          agentActivity={agentActivity}
         />
       </Box>
 
@@ -1541,6 +1611,7 @@ export const App: React.FC = () => {
         width={dimensions.columns}
         focusPane={focusPane}
         workPaneView={activeTab.workPaneView}
+        isPaused={activeTab.processState === 'paused'}
       />
 
       {/* Welcome/Help Overlay */}

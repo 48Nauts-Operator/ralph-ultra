@@ -15,6 +15,8 @@ interface ShortcutsBarProps {
   focusPane?: FocusPane;
   /** Current work pane view (for conditional shortcuts) */
   workPaneView?: string;
+  /** Whether the current story is paused (changes Run -> Resume) */
+  isPaused?: boolean;
 }
 
 /**
@@ -22,16 +24,16 @@ interface ShortcutsBarProps {
  * Single-line bar at the bottom of the screen showing available commands
  */
 export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
-  ({ width, focusPane = 'sessions', workPaneView }) => {
+  ({ width, focusPane = 'sessions', workPaneView, isPaused = false }) => {
     const { theme } = useTheme();
 
     const globalShortcuts: ShortcutItem[] = [
       { key: 'Tab', description: 'Focus' },
-      { key: 'r', description: 'Run' },
+      { key: 'r', description: isPaused ? 'Resume' : 'Run' },
       { key: 'R', description: 'Retry' },
       { key: 's', description: 'Stop' },
       { key: 'd', description: 'Debug' },
-      { key: 'p', description: 'Recent' },
+      { key: ':', description: 'Palette' },
       { key: 'Ctrl+L', description: 'Clear' },
       { key: 'Ctrl+Shift+T', description: 'New Tab' },
       { key: 'e', description: 'Close' },
@@ -43,9 +45,8 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
     const contextShortcuts: Record<FocusPane, ShortcutItem[]> = {
       projects: [
         { key: '[', description: 'Toggle' },
-        { key: 'r', description: 'Recent' },
       ],
-      tabs: [{ key: '1-5', description: 'Switch Tab' }],
+      tabs: [],
       sessions: [
         { key: 'j/k', description: 'Navigate' },
         { key: 'Enter', description: 'View' },
@@ -55,21 +56,16 @@ export const ShortcutsBar: React.FC<ShortcutsBarProps> = memo(
         { key: '1-8', description: 'Views' },
         { key: 'j/k', description: 'Scroll' },
         { key: '/', description: 'Search' },
+        { key: 'f', description: 'Filter' },
       ],
     };
 
     // Combine global and context shortcuts
-    const currentContextShortcuts = contextShortcuts[focusPane] || [];
+    const currentContextShortcuts = [...(contextShortcuts[focusPane] || [])];
 
     // Add Test shortcut only when in details view
     if (focusPane === 'work' && workPaneView === 'details') {
       currentContextShortcuts.push({ key: 'T', description: 'Test' });
-    }
-
-    // Add view shortcuts when focused on work pane
-    if (focusPane === 'work') {
-      currentContextShortcuts.push({ key: '4', description: 'Quota' });
-      currentContextShortcuts.push({ key: '5', description: 'Plan' });
     }
 
     const allShortcuts = [...currentContextShortcuts, ...globalShortcuts];

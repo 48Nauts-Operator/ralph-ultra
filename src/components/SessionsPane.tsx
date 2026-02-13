@@ -4,7 +4,7 @@ import { readFileSync, watchFile, unwatchFile } from 'fs';
 import { join } from 'path';
 import { useTheme } from '@hooks/useTheme';
 import type { PRD, UserStory, Complexity, AcceptanceCriterion, GotoState } from '@types';
-import { isTestableAC } from '@types';
+import { isTestableAC, PRD_WATCH_INTERVAL_MS } from '@types';
 
 interface SessionsPaneProps {
   isFocused: boolean;
@@ -16,6 +16,7 @@ interface SessionsPaneProps {
   initialScrollIndex?: number;
   initialSelectedStoryId?: string | null;
   gotoState?: GotoState;
+  pausedStoryIds?: Set<string>;
 }
 
 /**
@@ -33,11 +34,11 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(
     initialScrollIndex = 0,
     initialSelectedStoryId = null,
     gotoState,
+    pausedStoryIds,
   }) => {
     const { theme } = useTheme();
     const [prd, setPrd] = useState<PRD | null>(null);
     const [selectedIndex, setSelectedIndex] = useState(initialScrollIndex);
-    const [error, setError] = useState<string | null>(null);
     const [sessionRestored, setSessionRestored] = useState(false);
 
     // Load PRD file
@@ -46,16 +47,22 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(
         const prdPath = join(projectPath, 'prd.json');
         const content = readFileSync(prdPath, 'utf-8');
         const data = JSON.parse(content) as PRD;
+
+        if (!Array.isArray(data.userStories)) {
+          // Keep last known good PRD — file may be mid-write
+          setPrd(prev => prev ?? null);
+          return;
+        }
+
         setPrd(data);
-        setError(null);
 
         // Bounds check selected index
         if (data.userStories.length > 0 && selectedIndex >= data.userStories.length) {
           setSelectedIndex(data.userStories.length - 1);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load prd.json');
-        setPrd(null);
+      } catch {
+        // Keep last known good PRD on transient read errors (race with concurrent writes)
+        setPrd(prev => prev ?? null);
       }
     };
 
@@ -63,7 +70,6 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(
     useEffect(() => {
       loadPRD();
 
-      const PRD_WATCH_INTERVAL_MS = 30000;
       const prdPath = join(projectPath, 'prd.json');
       watchFile(prdPath, { interval: PRD_WATCH_INTERVAL_MS }, loadPRD);
 
@@ -129,24 +135,20 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(
       { isActive: isFocused },
     );
 
-    if (error) {
-      return (
-        <Box flexDirection="column" padding={1}>
-          <Text color={theme.error}>Error loading PRD</Text>
-          <Text dimColor>{error}</Text>
-        </Box>
-      );
-    }
+    const borderColor = isFocused ? theme.borderFocused : theme.border;
 
     if (!prd) {
       return (
-        <Box flexDirection="column" padding={1}>
-          <Text dimColor>Loading prd.json...</Text>
+        <Box flexDirection="column" borderStyle="single" borderColor={borderColor} height={height}>
+          <Box paddingX={1} borderStyle="single" borderColor={borderColor}>
+            <Text dimColor>Loading...</Text>
+          </Box>
+          <Box flexDirection="column" paddingX={1} flexGrow={1}>
+            <Text dimColor>Loading prd.json...</Text>
+          </Box>
         </Box>
       );
     }
-
-    const borderColor = isFocused ? theme.borderFocused : theme.border;
 
     // Calculate completion stats
     const completed = prd.userStories.filter(s => s.passes).length;
@@ -166,6 +168,7 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(
 
     const getStatusIcon = (story: UserStory, index: number): string => {
       if (story.passes) return '[✓]';
+      if (pausedStoryIds?.has(story.id)) return '[⏸]';
       if (index === selectedIndex) return '[>]';
       return '[ ]';
     };
@@ -198,7 +201,8 @@ export const SessionsPane: React.FC<SessionsPaneProps> = memo(
             const actualIndex = scrollOffset + idx;
             const isSelected = actualIndex === selectedIndex;
             const statusIcon = getStatusIcon(story, actualIndex);
-            const statusColor = story.passes ? 'green' : isSelected ? 'yellow' : 'white';
+            const isPaused = pausedStoryIds?.has(story.id);
+            const statusColor = story.passes ? 'green' : isPaused ? 'magenta' : isSelected ? 'yellow' : 'white';
 
             const acProgress = getACProgress(story);
             const { passed, total } = acProgress || { passed: 0, total: 0 };

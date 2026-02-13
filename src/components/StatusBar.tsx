@@ -16,6 +16,8 @@ interface StatusBarProps {
   apiStatus?: AnthropicStatus | null;
   projectPath?: string;
   executionMode?: ExecutionMode;
+  currentCLI?: string | null;
+  currentModel?: string | null;
   width: number;
 }
 
@@ -65,6 +67,8 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
     apiStatus = null,
     projectPath,
     executionMode = 'balanced',
+    currentCLI = null,
+    currentModel = null,
     width,
   }) => {
     const { theme } = useTheme();
@@ -156,8 +160,9 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
     const modeLabel = getModeLabel();
 
     const branchText = gitBranch ? `⎇ ${gitBranch}` : '';
+    const agentLabel = currentCLI && currentModel ? `${currentCLI}/${currentModel}` : currentCLI || '';
 
-    const centerContent = `${progressText} [${apiIcon} ${tailscaleIcon} ${remoteIcon}${remoteConnections}] ${modeIcon}${modeLabel}${branchText ? ` ${branchText}` : ''}`;
+    const centerContent = `${progressText} [${apiIcon} ${tailscaleIcon} ${remoteIcon}${remoteConnections}] ${modeIcon}${modeLabel}${agentLabel ? ` ${agentLabel}` : ''}${branchText ? ` ${branchText}` : ''}`;
     const rightContent = APP_VERSION;
 
     const totalContent = centerContent.length + rightContent.length;
@@ -185,6 +190,12 @@ export const StatusBar: React.FC<StatusBarProps> = memo(
           {modeIcon}
           {modeLabel}
         </Text>
+        {agentLabel && (
+          <>
+            <Text> </Text>
+            <Text color={theme.accent}>{agentLabel}</Text>
+          </>
+        )}
         {gitBranch && (
           <>
             <Text> </Text>
