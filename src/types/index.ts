@@ -43,6 +43,8 @@ export interface UserStory {
   complexity: Complexity;
   priority: number;
   passes: boolean;
+  /** Set to true when story exceeded max retries - Ralph will skip it */
+  skipped?: boolean;
 }
 
 export function isTestableAC(ac: AcceptanceCriteria): ac is AcceptanceCriterion[] {
@@ -75,7 +77,15 @@ export type ProcessState = 'idle' | 'running' | 'stopping' | 'external';
 /**
  * Work pane view types
  */
-export type WorkView = 'monitor' | 'status' | 'details' | 'quota' | 'plan' | 'help' | 'version' | 'costs';
+export type WorkView =
+  | 'monitor'
+  | 'status'
+  | 'details'
+  | 'quota'
+  | 'plan'
+  | 'help'
+  | 'version'
+  | 'costs';
 
 /**
  * Complete state for a single tab/project

@@ -14,6 +14,84 @@ import {
 } from 'fs';
 import { join, basename } from 'path';
 import { homedir, tmpdir } from 'os';
+
+/**
+ * Load plugins from an OpenCode config file (with JSONC support).
+ * Returns array of plugin strings or empty array on error.
+ */
+function loadPluginsFromConfig(configPath: string): string[] {
+  if (!existsSync(configPath)) {
+    return [];
+  }
+  try {
+    const raw = readFileSync(configPath, 'utf-8');
+    // Basic JSONC support: strip // and /* */ comments
+    const withoutBlock = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+    const withoutLine = withoutBlock.replace(/^\s*\/\/.*$/gm, '');
+    const parsed = JSON.parse(withoutLine);
+    const plugins = parsed?.plugin;
+    return Array.isArray(plugins) ? plugins.filter((p: unknown) => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Create a Ralph-specific OpenCode config for headless execution.
+ * Filters non-auth plugins and auto-approves all permissions.
+ * Returns the path to the config file.
+ */
+function ensureRalphOpencodeConfig(projectPath: string): string {
+  const ralphDir = join(projectPath, '.ralph');
+  if (!existsSync(ralphDir)) {
+    mkdirSync(ralphDir, { recursive: true });
+  }
+
+  const configPath = join(ralphDir, 'ralph-opencode.config.json');
+  const userConfigPath = join(
+    process.env['XDG_CONFIG_HOME'] ?? join(homedir(), '.config'),
+    'opencode',
+    'opencode.json',
+  );
+  const projectConfigPath = join(projectPath, '.ralph', 'opencode.json');
+  const legacyProjectConfigPath = join(projectPath, '.opencode', 'opencode.json');
+
+  // Collect plugins from all config sources
+  const plugins = [
+    ...loadPluginsFromConfig(userConfigPath),
+    ...loadPluginsFromConfig(projectConfigPath),
+    ...loadPluginsFromConfig(legacyProjectConfigPath),
+  ];
+
+  // Filter to only keep auth plugins (for API authentication)
+  const authPlugins = Array.from(new Set(plugins)).filter(p => /auth/i.test(p));
+
+  // Build config with auto-approved permissions for non-interactive use
+  const config: Record<string, unknown> = {
+    $schema: 'https://opencode.ai/config.json',
+    plugin: authPlugins,
+    permission: {
+      read: 'allow',
+      edit: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      list: 'allow',
+      bash: 'allow',
+      task: 'allow',
+      webfetch: 'allow',
+      websearch: 'allow',
+      codesearch: 'allow',
+      todowrite: 'allow',
+      todoread: 'allow',
+      question: 'allow',
+      lsp: 'allow',
+      external_directory: 'allow',
+    },
+  };
+
+  writeFileSync(configPath, JSON.stringify(config, null, 2));
+  return configPath;
+}
 import type { PRD, UserStory } from '../types';
 import { isTestableAC } from '../types';
 import { runStoryTestsAndSave, type ACTestResult } from './ac-runner';
@@ -61,6 +139,13 @@ const LOG_POLL_INTERVAL_MS = 500;
 const DEFAULT_MODEL = 'sonnet';
 const DEFAULT_CLAUDE_MODEL_ID = 'claude-sonnet-4-20250514';
 
+// Anthropic models use Claude CLI, all other providers use OpenCode CLI
+const ANTHROPIC_MODELS = [
+  'claude-opus-4-20250514',
+  'claude-sonnet-4-20250514',
+  'claude-3-5-haiku-20241022',
+];
+
 // Story complexity thresholds
 const MAX_DESCRIPTION_WORDS = 100;
 const MAX_AC_COUNT = 7;
@@ -83,6 +168,42 @@ export interface ComplexityWarning {
   wordCount?: number;
   acCount?: number;
   hasComplexKeywords?: boolean;
+}
+
+/**
+ * Standalone complexity analysis - no RalphService instance needed
+ */
+export function analyzeStoryComplexity(story: UserStory): ComplexityWarning {
+  const reasons: string[] = [];
+
+  const wordCount = story.description.trim().split(/\s+/).length;
+  if (wordCount > MAX_DESCRIPTION_WORDS) {
+    reasons.push(`Description too long (${wordCount} words, max ${MAX_DESCRIPTION_WORDS})`);
+  }
+
+  const acCount = story.acceptanceCriteria.length;
+  if (acCount > MAX_AC_COUNT) {
+    reasons.push(`Too many acceptance criteria (${acCount}, max ${MAX_AC_COUNT})`);
+  }
+
+  const combinedText = `${story.title} ${story.description}`.toLowerCase();
+  const foundKeywords = COMPLEX_KEYWORDS.filter(keyword => combinedText.includes(keyword));
+  const hasComplexKeywords = foundKeywords.length >= 1;
+  if (hasComplexKeywords) {
+    reasons.push(`Contains complexity keywords: ${foundKeywords.join(', ')}`);
+  }
+
+  if (story.complexity === 'complex' && (wordCount > 50 || acCount > 5)) {
+    reasons.push('Marked as complex with high AC count or word count');
+  }
+
+  return {
+    isComplex: reasons.length >= 2,
+    reasons,
+    wordCount,
+    acCount,
+    hasComplexKeywords,
+  };
 }
 
 interface CLIHealthCache {
@@ -157,6 +278,7 @@ export class RalphService {
   }
 
   public setDebugMode(enabled: boolean): void {
+    if (this.debugMode === enabled) return;
     this.debugMode = enabled;
     this.log('INFO', `Debug mode ${enabled ? 'enabled' : 'disabled'}`);
   }
@@ -536,7 +658,23 @@ export class RalphService {
   }
 
   private getNextStory(prd: PRD): UserStory | null {
-    return prd.userStories.find(s => !s.passes) || null;
+    return prd.userStories.find(s => !s.passes && !s.skipped) || null;
+  }
+
+  private markStorySkipped(storyId: string): void {
+    const prdPath = join(this.projectPath, 'prd.json');
+    try {
+      const content = readFileSync(prdPath, 'utf-8');
+      const prd: PRD = JSON.parse(content);
+      const story = prd.userStories.find(s => s.id === storyId);
+      if (story) {
+        story.skipped = true;
+        writeFileSync(prdPath, JSON.stringify(prd, null, 2), 'utf-8');
+        this.log('INFO', `Marked ${storyId} as skipped in prd.json`);
+      }
+    } catch (err) {
+      this.log('ERROR', `Failed to mark story skipped: ${err}`);
+    }
   }
 
   private buildPrompt(story: UserStory, _prd: PRD): string {
@@ -608,13 +746,6 @@ Begin implementation now.`;
   }
 
   /**
-   * Analyze story complexity to warn about overly large or complex stories
-   */
-  private analyzeStoryComplexity(story: UserStory): ComplexityWarning {
-    return this.analyzeComplexity(story);
-  }
-
-  /**
    * Load or generate execution plan for the current PRD.
    * Caches the plan for subsequent calls.
    */
@@ -630,8 +761,17 @@ Begin implementation now.`;
 
       // Generate execution plan from PRD with learning data and execution mode
       const learningData = this.learningRecorder.getAllLearnings();
-      this.executionPlan = generateExecutionPlan(prd, undefined, this.projectPath, learningData, executionMode);
-      this.log('INFO', `Execution plan generated with ${this.executionPlan.stories.length} stories using ${executionMode} mode`);
+      this.executionPlan = generateExecutionPlan(
+        prd,
+        undefined,
+        this.projectPath,
+        learningData,
+        executionMode,
+      );
+      this.log(
+        'INFO',
+        `Execution plan generated with ${this.executionPlan.stories.length} stories using ${executionMode} mode`,
+      );
       return this.executionPlan;
     } catch (err) {
       this.log('WARN', `Failed to generate execution plan: ${err}`);
@@ -732,11 +872,7 @@ Begin implementation now.`;
    * Calculate cost based on provider and token usage
    * Uses rough estimates for pricing per 1M tokens
    */
-  private calculateCost(
-    provider: Provider,
-    inputTokens: number,
-    outputTokens: number,
-  ): number {
+  private calculateCost(provider: Provider, inputTokens: number, outputTokens: number): number {
     // Pricing per 1M tokens (USD) - approximate as of 2024
     const pricing: Record<Provider, { input: number; output: number }> = {
       anthropic: { input: 3.0, output: 15.0 }, // Claude Sonnet
@@ -751,51 +887,6 @@ Begin implementation now.`;
     const outputCost = (outputTokens / 1_000_000) * rates.output;
 
     return inputCost + outputCost;
-  }
-
-  /**
-   * Core complexity analysis implementation
-   */
-  private analyzeComplexity(story: UserStory): ComplexityWarning {
-    const reasons: string[] = [];
-    let wordCount = 0;
-    let acCount = 0;
-    let hasComplexKeywords = false;
-
-    // Count words in description
-    wordCount = story.description.trim().split(/\s+/).length;
-    if (wordCount > MAX_DESCRIPTION_WORDS) {
-      reasons.push(`Description too long (${wordCount} words, max ${MAX_DESCRIPTION_WORDS})`);
-    }
-
-    // Count acceptance criteria
-    acCount = story.acceptanceCriteria.length;
-    if (acCount > MAX_AC_COUNT) {
-      reasons.push(`Too many acceptance criteria (${acCount}, max ${MAX_AC_COUNT})`);
-    }
-
-    // Check for complexity indicators in description and title
-    const combinedText = `${story.title} ${story.description}`.toLowerCase();
-    const foundKeywords = COMPLEX_KEYWORDS.filter(keyword => combinedText.includes(keyword));
-    if (foundKeywords.length >= 1) {
-      hasComplexKeywords = true;
-      reasons.push(`Contains complexity keywords: ${foundKeywords.join(', ')}`);
-    }
-
-    // Check if story is marked as complex
-    if (story.complexity === 'complex' && (wordCount > 50 || acCount > 5)) {
-      reasons.push('Marked as complex with high AC count or word count');
-    }
-
-    // Only warn if multiple complexity indicators are present
-    // Single indicator is usually not a problem
-    return {
-      isComplex: reasons.length >= 2,
-      reasons,
-      wordCount,
-      acCount,
-      hasComplexKeywords,
-    };
   }
 
   private loadCustomPrinciples(): string | null {
@@ -873,7 +964,10 @@ Begin implementation now.`;
 
         // Health check the CLI before using it
         if (!this.checkCLIHealth(cli)) {
-          this.log('WARN', `Fallback chain: ${cli} found but failed health check, trying next option`);
+          this.log(
+            'WARN',
+            `Fallback chain: ${cli} found but failed health check, trying next option`,
+          );
           this.outputCallback?.(
             `[WARN] CLI '${cli}' is installed but not working, trying next option...\n`,
             'stderr',
@@ -909,7 +1003,10 @@ Begin implementation now.`;
 
         // Health check the CLI before using it
         if (!this.checkCLIHealth(prd.cli)) {
-          this.log('WARN', `PRD specifies CLI '${prd.cli}' but it failed health check, falling back`);
+          this.log(
+            'WARN',
+            `PRD specifies CLI '${prd.cli}' but it failed health check, falling back`,
+          );
           this.outputCallback?.(
             `[WARN] CLI '${prd.cli}' is installed but not working, falling back...\n`,
             'stderr',
@@ -1123,17 +1220,64 @@ Begin implementation now.`;
     return this.executionProgress;
   }
 
-  private buildTmuxCommand(cli: string, promptFile: string, logFile: string, modelFlag?: string): string {
+  /**
+   * Select CLI based on model/provider. Anthropic → Claude CLI, others → OpenCode CLI
+   * NOTE: OpenCode routing is currently disabled due to "Session not found" bug in v1.1.33
+   * See: https://github.com/anomalyco/opencode/issues - opencode run fails to create new sessions
+   * Enable via settings.enableOpenCodeRouting = true when bug is fixed
+   */
+  private selectCLIForModel(
+    modelId?: string,
+    provider?: Provider,
+  ): { cli: string; model: string; modelFlag: string } {
+    if (!modelId || !provider) {
+      return { cli: 'claude', model: DEFAULT_MODEL, modelFlag: DEFAULT_MODEL };
+    }
+
+    if (ANTHROPIC_MODELS.includes(modelId) || provider === 'anthropic') {
+      const shortModel = modelId.includes('opus')
+        ? 'opus'
+        : modelId.includes('haiku')
+          ? 'haiku'
+          : 'sonnet';
+      return { cli: 'claude', model: modelId, modelFlag: shortModel };
+    }
+
+    const settings = loadSettings();
+    const enableOpenCodeRouting = settings['enableOpenCodeRouting'] as boolean | undefined;
+
+    if (enableOpenCodeRouting) {
+      const opencodeCli = this.checkCLIHealth('opencode') ? 'opencode' : null;
+      if (opencodeCli) {
+        const opencodeModel = `${provider}/${modelId}`;
+        return { cli: 'opencode', model: modelId, modelFlag: opencodeModel };
+      }
+    }
+
+    this.log(
+      'WARN',
+      `Non-Anthropic model ${provider}/${modelId} requested but OpenCode routing disabled, using Claude`,
+    );
+    return { cli: 'claude', model: DEFAULT_MODEL, modelFlag: DEFAULT_MODEL };
+  }
+
+  private buildTmuxCommand(
+    cli: string,
+    promptFile: string,
+    logFile: string,
+    modelFlag?: string,
+  ): string {
     const catPrompt = `"$(cat '${promptFile}')"`;
     const signalDone = `; tmux wait-for -S "${this.tmuxSessionName}-done"`;
 
     switch (cli) {
       case 'claude':
-        // Use provided model flag or fallback to DEFAULT_MODEL
         const model = modelFlag || DEFAULT_MODEL;
         return `${cli} --print --model ${model} --dangerously-skip-permissions ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
       case 'opencode':
-        return `${cli} run --title Ralph ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
+        const opencodeModelArg = modelFlag ? `-m ${modelFlag}` : '';
+        const opencodeConfigPath = ensureRalphOpencodeConfig(this.projectPath);
+        return `OPENCODE_CONFIG="${opencodeConfigPath}" ${cli} run ${opencodeModelArg} --title Ralph ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
       case 'codex':
         return `${cli} exec ${catPrompt} 2>&1 | tee -a "${logFile}"${signalDone}`;
       case 'gemini':
@@ -1296,7 +1440,7 @@ Begin implementation now.`;
 
     // Check story complexity unless bypassed
     if (!complexityOverride) {
-      const complexityWarning = this.analyzeStoryComplexity(story);
+      const complexityWarning = analyzeStoryComplexity(story);
       if (complexityWarning.isComplex) {
         this.outputCallback?.(`\n⚠️  Warning: Story ${story.id} may be too complex:\n`, 'stderr');
         complexityWarning.reasons.forEach(reason => {
@@ -1331,15 +1475,37 @@ Begin implementation now.`;
       }
     }
 
-    let cli = this.detectAICLI();
+    // First check if execution plan recommends a specific model/provider
+    let cli: string | null = null;
+    let executionPlanModel: { modelId: string; provider: Provider; reason: string } | null = null;
+
+    const executionPlan = this.loadOrGenerateExecutionPlan(prd);
+    if (executionPlan) {
+      const storyAllocation = executionPlan.stories.find(s => s.storyId === story.id);
+      if (storyAllocation) {
+        executionPlanModel = storyAllocation.recommendedModel;
+        const selected = this.selectCLIForModel(
+          executionPlanModel.modelId,
+          executionPlanModel.provider,
+        );
+        cli = selected.cli;
+        this.log(
+          'INFO',
+          `Execution plan recommends ${executionPlanModel.provider}/${executionPlanModel.modelId} → using ${cli}`,
+        );
+      }
+    }
+
+    if (!cli) {
+      cli = this.detectAICLI();
+    }
+
     if (!cli) {
       const error = 'No AI CLI found. Install: claude, opencode, codex, gemini, aider, or cody';
       this.emitStatus({ state: 'idle', error });
       throw new Error(error);
     }
 
-    // Health check the selected CLI before execution
-    // This is the final validation before running the story
     if (!this.checkCLIHealth(cli)) {
       this.log('WARN', `Selected CLI '${cli}' failed final health check before execution`);
       this.outputCallback?.(
@@ -1438,33 +1604,38 @@ Begin implementation now.`;
         this.log('INFO', `Killing existing tmux session: ${this.tmuxSessionName}`);
         execSync(`tmux kill-session -t "${this.tmuxSessionName}" 2>/dev/null`);
       } catch {
-        // No existing session
+        // No existing session - also ensures tmux server is started
       }
 
-      execSync(`tmux new-session -d -s "${this.tmuxSessionName}" -c "${projectPath}"`);
+      try {
+        execSync(`tmux new-session -d -s "${this.tmuxSessionName}" -c "${projectPath}"`);
+      } catch (tmuxError) {
+        this.log('WARN', `tmux new-session failed, starting tmux server first`);
+        execSync(`tmux start-server`);
+        execSync(`tmux new-session -d -s "${this.tmuxSessionName}" -c "${projectPath}"`);
+      }
 
       const promptFile = this.promptTempFile;
 
-      // Get recommended model from execution plan if available
+      // Build model flag based on CLI type and execution plan
       let modelFlag: string | undefined;
-      if (cli === 'claude') {
-        const executionPlan = this.loadOrGenerateExecutionPlan(prd);
-        if (executionPlan) {
-          const storyAllocation = executionPlan.stories.find(s => s.storyId === story.id);
-          if (storyAllocation && storyAllocation.recommendedModel.provider === 'anthropic') {
-            modelFlag = this.mapModelIdToCLIFlag(storyAllocation.recommendedModel.modelId);
-            this.log('INFO', `Execution Mode: ${executionPlan.selectedMode}`);
-            this.log('INFO', `Using model from execution plan: ${storyAllocation.recommendedModel.modelId} -> ${modelFlag}`);
-            this.log('INFO', `Model selection reason: ${storyAllocation.recommendedModel.reason}`);
-            this.outputCallback?.(`Mode: ${executionPlan.selectedMode}\n`, 'stdout');
-            this.outputCallback?.(`Model: ${modelFlag} (from execution plan)\n`, 'stdout');
-          } else {
-            this.log('INFO', `No execution plan model for story ${story.id}, using default`);
-          }
+      if (executionPlanModel) {
+        if (cli === 'claude' && executionPlanModel.provider === 'anthropic') {
+          modelFlag = this.mapModelIdToCLIFlag(executionPlanModel.modelId);
+        } else if (cli === 'opencode') {
+          modelFlag = `${executionPlanModel.provider}/${executionPlanModel.modelId}`;
         }
+        this.log('INFO', `Model: ${executionPlanModel.provider}/${executionPlanModel.modelId}`);
+        this.log('INFO', `Reason: ${executionPlanModel.reason}`);
+        this.outputCallback?.(`Model: ${modelFlag} (${executionPlanModel.reason})\n`, 'stdout');
       }
 
-      const cliCommand = this.buildTmuxCommand(cli, promptFile || '', this.sessionLogFile, modelFlag);
+      const cliCommand = this.buildTmuxCommand(
+        cli,
+        promptFile || '',
+        this.sessionLogFile,
+        modelFlag,
+      );
 
       this.log('INFO', `Creating tmux session: ${this.tmuxSessionName}`);
       this.log('INFO', `CLI command: ${cliCommand}`);
@@ -1588,7 +1759,7 @@ Begin implementation now.`;
    * Check if a story is too complex and should be broken down
    */
   public checkStoryComplexity(story: UserStory): ComplexityWarning {
-    return this.analyzeStoryComplexity(story);
+    return analyzeStoryComplexity(story);
   }
 
   public retryCurrentStory(): void {
@@ -1712,7 +1883,8 @@ Begin implementation now.`;
 
       // Record performance data for learning
       const prd = this.loadPRD();
-      const executionPlan = this.executionPlan || (prd ? this.loadOrGenerateExecutionPlan(prd) : null);
+      const executionPlan =
+        this.executionPlan || (prd ? this.loadOrGenerateExecutionPlan(prd) : null);
       const storyAllocation = executionPlan?.stories.find(s => s.storyId === story.id);
       const taskType: TaskType = storyAllocation?.taskType || 'unknown';
       const { modelId } = this.mapCLIToProviderModel(cli);
@@ -1726,9 +1898,7 @@ Begin implementation now.`;
         storyTitle: story.title,
         taskType,
         complexity: story.complexity,
-        detectedCapabilities: storyAllocation?.recommendedModel
-          ? []
-          : [], // TODO: Add capability detection
+        detectedCapabilities: storyAllocation?.recommendedModel ? [] : [], // TODO: Add capability detection
         provider,
         modelId,
         durationMinutes,
@@ -1812,6 +1982,10 @@ Begin implementation now.`;
             `⚠ ${story.id} exceeded max retries (${MAX_RETRIES_PER_STORY}). Skipping to next story...\n`,
             'stderr',
           );
+
+          // Persist skipped=true to PRD so story won't be retried on restart
+          this.markStorySkipped(story.id);
+
           this.storyRetryCount.delete(story.id);
           this.storyIterationCount.delete(story.id);
           this.killCurrentSession();

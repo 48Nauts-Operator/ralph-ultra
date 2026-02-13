@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Project, TabState } from '../types';
-import { RalphService } from '../utils/ralph-service';
+import { RalphService, type RalphStatus } from '../utils/ralph-service';
 import { parseAgentTree } from '../utils/log-parser';
 import type { AgentNode } from '../components/TracingPane';
 import { useNotifications } from './useNotifications';
@@ -65,7 +65,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   const [activeTabId, setActiveTabId] = useState<string>(
     initialActiveId || initialTabs[0]?.id || '',
   );
-  const [ralphServices, setRalphServices] = useState<Map<string, RalphService>>(new Map());
+  const ralphServicesRef = useRef<Map<string, RalphService>>(new Map());
   const [agentTrees, setAgentTrees] = useState<Map<string, AgentNode[]>>(new Map());
 
   // Get the currently active tab
@@ -119,17 +119,17 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
    */
   const closeTab = useCallback(
     (tabId: string) => {
+      // Stop the Ralph service for this tab
+      const service = ralphServicesRef.current.get(tabId);
+      if (service) {
+        service.stop();
+        service.dispose();
+        ralphServicesRef.current.delete(tabId);
+      }
+
       setTabs(prev => {
         const tab = prev.find(t => t.id === tabId);
         if (!tab) return prev;
-
-        // Stop the Ralph service for this tab
-        const service = ralphServices.get(tabId);
-        if (service) {
-          service.stop();
-          ralphServices.delete(tabId);
-          setRalphServices(new Map(ralphServices));
-        }
 
         // Remove the tab
         const newTabs = prev.filter(t => t.id !== tabId);
@@ -147,7 +147,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
         return newTabs;
       });
     },
-    [activeTabId, ralphServices],
+    [activeTabId],
   );
 
   /**
@@ -208,7 +208,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
    */
   const getRalphService = useCallback(
     (tabId: string): RalphService => {
-      let service = ralphServices.get(tabId);
+      let service = ralphServicesRef.current.get(tabId);
       if (!service) {
         const tab = tabs.find(t => t.id === tabId);
         if (!tab) {
@@ -222,7 +222,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
           service.setDebugMode(true);
         }
 
-        service.onStatusChange(status => {
+        service.onStatusChange((status: RalphStatus) => {
           // Check for story completion or error
           if (status.state === 'idle' && status.currentStory) {
             if (status.storyPassed) {
@@ -256,7 +256,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
           isProjectCLIOverride: service.isProjectCLIOverride(),
         });
 
-        service.onOutput((line, type) => {
+        service.onOutput((line: string, type: 'stdout' | 'stderr') => {
           // Check for story completion or error messages
           if (line.includes('✓') && line.includes('VERIFIED - all acceptance criteria pass!')) {
             const storyMatch = line.match(/✓\s+(\S+)\s+VERIFIED/);
@@ -299,13 +299,12 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
           );
         });
 
-        ralphServices.set(tabId, service);
-        setRalphServices(new Map(ralphServices));
+        ralphServicesRef.current.set(tabId, service);
       }
 
       return service;
     },
-    [tabs, ralphServices, updateTab],
+    [tabs, updateTab, notify],
   );
 
   /**
@@ -313,12 +312,12 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
    */
   useEffect(() => {
     tabs.forEach(tab => {
-      const service = ralphServices.get(tab.id);
+      const service = ralphServicesRef.current.get(tab.id);
       if (service) {
         service.setDebugMode(tab.debugMode || false);
       }
     });
-  }, [tabs, ralphServices]);
+  }, [tabs]);
 
   /**
    * Cleanup on unmount
@@ -326,18 +325,15 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   useEffect(() => {
     return () => {
       // Stop all running services
-      ralphServices.forEach(service => service.stop());
+      ralphServicesRef.current.forEach((service: RalphService) => service.stop());
     };
-  }, [ralphServices]);
+  }, []);
 
-  const getLiveOutput = useCallback(
-    (tabId: string, maxLines: number = 15): string[] => {
-      const service = ralphServices.get(tabId);
-      if (!service) return [];
-      return service.getLiveOutput(maxLines);
-    },
-    [ralphServices],
-  );
+  const getLiveOutput = useCallback((tabId: string, maxLines: number = 15): string[] => {
+    const service = ralphServicesRef.current.get(tabId);
+    if (!service) return [];
+    return service.getLiveOutput(maxLines);
+  }, []);
 
   return {
     tabs,

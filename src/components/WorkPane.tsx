@@ -23,7 +23,7 @@ import {
   formatTokens,
   type SessionInfo,
 } from '../utils/session-tracker';
-import { RalphService, type ComplexityWarning } from '../utils/ralph-service';
+import { analyzeStoryComplexity, type ComplexityWarning } from '../utils/ralph-service';
 import { QuotaDashboard } from './QuotaDashboard';
 import { VersionView } from './VersionView';
 import { ExecutionPlanView } from './ExecutionPlanView';
@@ -290,14 +290,12 @@ export const WorkPane: React.FC<WorkPaneProps> = memo(
     // Check story complexity when selected story changes
     useEffect(() => {
       if (selectedStory) {
-        const ralphService = new RalphService(projectPath);
-        const warning = ralphService.checkStoryComplexity(selectedStory);
+        const warning = analyzeStoryComplexity(selectedStory);
         setComplexityWarning(warning);
-        ralphService.dispose();
       } else {
         setComplexityWarning(null);
       }
-    }, [selectedStory, projectPath]);
+    }, [selectedStory]);
 
     // Handle keyboard input for view switching and scrolling
     useInput(

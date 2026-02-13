@@ -21,10 +21,10 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability[]> = {
   'claude-sonnet-4-20250514': ['code-generation', 'creative', 'deep-reasoning'],
   'claude-3-5-haiku-20241022': ['code-generation', 'fast', 'cheap'],
 
-  // OpenAI Models
-  'gpt-4o': ['code-generation', 'structured-output', 'multimodal'],
-  'gpt-4o-mini': ['code-generation', 'fast', 'cheap', 'structured-output'],
-  'o3-mini': ['mathematical', 'deep-reasoning'],
+  // OpenAI Models (via OpenCode)
+  'gpt-5.2-codex': ['code-generation', 'structured-output', 'deep-reasoning'],
+  'gpt-5.1-codex-mini': ['code-generation', 'fast', 'cheap', 'structured-output'],
+  'gpt-5.2': ['mathematical', 'deep-reasoning'],
 
   // Google Models
   'gemini-2.0-flash': ['fast', 'cheap', 'creative', 'long-context'],
@@ -57,17 +57,17 @@ export const TASK_MODEL_MAPPING: Record<
     primary: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
     fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
   },
-  'mathematical': {
-    primary: { modelId: 'o3-mini', provider: 'openai' },
+  mathematical: {
+    primary: { modelId: 'gpt-5.2', provider: 'openai' },
     fallback: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
   },
   'backend-api': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
   'backend-logic': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
   'frontend-ui': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
@@ -75,39 +75,39 @@ export const TASK_MODEL_MAPPING: Record<
   },
   'frontend-logic': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'database': {
+  database: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'testing': {
-    primary: { modelId: 'gpt-4o', provider: 'openai' },
+  testing: {
+    primary: { modelId: 'gpt-5.2-codex', provider: 'openai' },
     fallback: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
   },
-  'documentation': {
+  documentation: {
     primary: { modelId: 'gemini-2.0-flash', provider: 'gemini' },
     fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
   },
-  'refactoring': {
+  refactoring: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'bugfix': {
+  bugfix: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'devops': {
+  devops: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'config': {
+  config: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'unknown': {
+  unknown: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
 };
 
@@ -117,7 +117,7 @@ export const TASK_MODEL_MAPPING: Record<
 
 /**
  * SUPER SAVER mode: Prioritize cheapest models that can still handle the task.
- * Uses haiku, gpt-4o-mini, gemini-flash, and local models.
+ * Uses haiku, gpt-5.1-codex-mini, gemini-flash, and local models.
  */
 export const SUPER_SAVER_MAPPING: Record<
   TaskType,
@@ -128,19 +128,19 @@ export const SUPER_SAVER_MAPPING: Record<
 > = {
   'complex-integration': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' }, // Complex tasks need quality
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'mathematical': {
-    primary: { modelId: 'o3-mini', provider: 'openai' }, // Math needs reasoning
+  mathematical: {
+    primary: { modelId: 'gpt-5.2', provider: 'openai' }, // Math needs reasoning
     fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
   },
   'backend-api': {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
   'backend-logic': {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
   'frontend-ui': {
     primary: { modelId: 'gemini-2.0-flash', provider: 'gemini' },
@@ -148,45 +148,45 @@ export const SUPER_SAVER_MAPPING: Record<
   },
   'frontend-logic': {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'database': {
+  database: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'testing': {
-    primary: { modelId: 'gpt-4o-mini', provider: 'openai' },
+  testing: {
+    primary: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
     fallback: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
   },
-  'documentation': {
+  documentation: {
     primary: { modelId: 'gemini-2.0-flash', provider: 'gemini' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'refactoring': {
+  refactoring: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'bugfix': {
+  bugfix: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'devops': {
+  devops: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'config': {
+  config: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
-  'unknown': {
+  unknown: {
     primary: { modelId: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o-mini', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.1-codex-mini', provider: 'openai' },
   },
 };
 
 /**
  * FAST DELIVERY mode: Prioritize premium models for speed and quality.
- * Uses opus, sonnet, gpt-4o for best results.
+ * Uses opus, sonnet, gpt-5.2-codex for best results.
  */
 export const FAST_DELIVERY_MAPPING: Record<
   TaskType,
@@ -199,57 +199,57 @@ export const FAST_DELIVERY_MAPPING: Record<
     primary: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
     fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
   },
-  'mathematical': {
-    primary: { modelId: 'o3-mini', provider: 'openai' },
+  mathematical: {
+    primary: { modelId: 'gpt-5.2', provider: 'openai' },
     fallback: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
   },
   'backend-api': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
   'backend-logic': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
   'frontend-ui': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
   'frontend-logic': {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'database': {
+  database: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'testing': {
-    primary: { modelId: 'gpt-4o', provider: 'openai' },
+  testing: {
+    primary: { modelId: 'gpt-5.2-codex', provider: 'openai' },
     fallback: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
   },
-  'documentation': {
+  documentation: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'refactoring': {
+  refactoring: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'bugfix': {
+  bugfix: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'devops': {
+  devops: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'config': {
+  config: {
     primary: { modelId: 'claude-sonnet-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
-  'unknown': {
+  unknown: {
     primary: { modelId: 'claude-opus-4-20250514', provider: 'anthropic' },
-    fallback: { modelId: 'gpt-4o', provider: 'openai' },
+    fallback: { modelId: 'gpt-5.2-codex', provider: 'openai' },
   },
 };
 
@@ -268,10 +268,10 @@ export const FAST_DELIVERY_MAPPING: Record<
 export function getRecommendedModel(
   taskType: TaskType,
   quotas?: Record<Provider, ProviderQuota>,
-  mode?: ExecutionMode
+  mode?: ExecutionMode,
 ): { modelId: string; provider: Provider; reason: string } {
   // Select the appropriate mapping based on execution mode
-  let mapping: typeof TASK_MODEL_MAPPING[TaskType];
+  let mapping: (typeof TASK_MODEL_MAPPING)[TaskType];
 
   switch (mode) {
     case 'super-saver':
@@ -320,11 +320,7 @@ export function getRecommendedModel(
   for (const [provider, quota] of Object.entries(quotas)) {
     if (isQuotaAvailable(quota)) {
       // Find a model from this provider that has the required capabilities
-      const model = findModelWithCapabilities(
-        provider as Provider,
-        requiredCapabilities,
-        quota
-      );
+      const model = findModelWithCapabilities(provider as Provider, requiredCapabilities, quota);
       if (model) {
         return {
           modelId: model,
@@ -365,7 +361,7 @@ function getRequiredCapabilities(taskType: TaskType): ModelCapability[] {
 function findModelWithCapabilities(
   _provider: Provider,
   requiredCapabilities: ModelCapability[],
-  quota: ProviderQuota
+  quota: ProviderQuota,
 ): string | null {
   // Get all models for this provider from the quota object
   const models = quota.models || [];
@@ -373,9 +369,7 @@ function findModelWithCapabilities(
   // Find a model that has all required capabilities
   for (const model of models) {
     const modelCapabilities = MODEL_CAPABILITIES[model.id] || [];
-    const hasAllCapabilities = requiredCapabilities.every(cap =>
-      modelCapabilities.includes(cap)
-    );
+    const hasAllCapabilities = requiredCapabilities.every(cap => modelCapabilities.includes(cap));
 
     if (hasAllCapabilities) {
       return model.id;
@@ -383,5 +377,5 @@ function findModelWithCapabilities(
   }
 
   // If no exact match, return the first available model from the provider
-  return models.length > 0 ? models[0]?.id ?? null : null;
+  return models.length > 0 ? (models[0]?.id ?? null) : null;
 }

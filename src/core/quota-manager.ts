@@ -35,8 +35,8 @@ const MODEL_CATALOG: Record<string, Omit<ModelInfo, 'available'>> = {
     contextWindow: 200000,
     capabilities: ['code-generation', 'fast', 'cheap'],
   },
-  'gpt-4o': {
-    id: 'gpt-4o',
+  'gpt-5.2-codex': {
+    id: 'gpt-5.2-codex',
     name: 'GPT-4o',
     provider: 'openai',
     inputCostPer1M: 2.5,
@@ -44,8 +44,8 @@ const MODEL_CATALOG: Record<string, Omit<ModelInfo, 'available'>> = {
     contextWindow: 128000,
     capabilities: ['code-generation', 'structured-output', 'multimodal'],
   },
-  'gpt-4o-mini': {
-    id: 'gpt-4o-mini',
+  'gpt-5.1-codex-mini': {
+    id: 'gpt-5.1-codex-mini',
     name: 'GPT-4o Mini',
     provider: 'openai',
     inputCostPer1M: 0.15,
@@ -53,9 +53,9 @@ const MODEL_CATALOG: Record<string, Omit<ModelInfo, 'available'>> = {
     contextWindow: 128000,
     capabilities: ['code-generation', 'fast', 'cheap', 'structured-output'],
   },
-  'o3-mini': {
-    id: 'o3-mini',
-    name: 'o3-mini',
+  'gpt-5.2': {
+    id: 'gpt-5.2',
+    name: 'gpt-5.2',
     provider: 'openai',
     inputCostPer1M: 1.1,
     outputCostPer1M: 4.4,
