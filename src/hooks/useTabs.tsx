@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { Project, TabState } from '../types';
+import type { Project, TabState, AgentActivity, OutputLine } from '../types';
 import { RalphService, type RalphStatus } from '../utils/ralph-service';
 import { parseAgentTree } from '../utils/log-parser';
 import type { AgentNode } from '../components/TracingPane';
@@ -55,10 +55,6 @@ function createInitialTabs(projects: Project[]): TabState[] {
 }
 
 export function useTabs(projects: Project[], initialActiveId?: string) {
-  if (!projects.length) {
-    throw new Error('At least one project is required');
-  }
-
   const { notify } = useNotifications();
   const [initialTabs] = useState<TabState[]>(() => createInitialTabs(projects));
   const [tabs, setTabs] = useState<TabState[]>(initialTabs);
@@ -68,8 +64,8 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   const ralphServicesRef = useRef<Map<string, RalphService>>(new Map());
   const [agentTrees, setAgentTrees] = useState<Map<string, AgentNode[]>>(new Map());
 
-  // Get the currently active tab
-  const activeTab = tabs.find(tab => tab.id === activeTabId) || tabs[0]!;
+  // Get the currently active tab (null when no tabs open)
+  const activeTab: TabState | null = tabs.find(tab => tab.id === activeTabId) || tabs[0] || null;
 
   /**
    * Helper to track project access in recent projects
@@ -248,6 +244,7 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
             lastRunDuration: status.duration ?? null,
             lastRunExitCode: status.exitCode ?? null,
             retryCount: status.retryCount ?? 0,
+            currentModel: service!.getCurrentModel(),
           });
         });
 
@@ -255,6 +252,18 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
           availableCLI: service.getAvailableCLI(),
           isProjectCLIOverride: service.isProjectCLIOverride(),
         });
+
+        // Sync initial service state to React — closes the window where
+        // constructor detects an external tmux session but the status callback
+        // hasn't been registered yet, leaving React stuck at 'idle'.
+        const initialStatus = service.getStatus();
+        if (initialStatus.state !== 'idle') {
+          updateTab(tabId, {
+            processState: initialStatus.state,
+            processPid: initialStatus.pid,
+            currentStory: initialStatus.currentStory ?? null,
+          });
+        }
 
         service.onOutput((line: string, type: 'stdout' | 'stderr') => {
           // Check for story completion or error messages
@@ -320,19 +329,27 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
   }, [tabs]);
 
   /**
-   * Cleanup on unmount
+   * Cleanup only on unmount — not on every service change.
+   * The old [ralphServices] dependency caused cleanup to fire whenever the map
+   * changed (e.g. when a new RalphService was created), which called stop() on
+   * all services — including the one currently running a story.
    */
   useEffect(() => {
     return () => {
-      // Stop all running services
       ralphServicesRef.current.forEach((service: RalphService) => service.stop());
     };
   }, []);
 
-  const getLiveOutput = useCallback((tabId: string, maxLines: number = 15): string[] => {
+  const getLiveOutput = useCallback((tabId: string, maxLines: number = 25): OutputLine[] => {
     const service = ralphServicesRef.current.get(tabId);
     if (!service) return [];
     return service.getLiveOutput(maxLines);
+  }, []);
+
+  const getAgentActivity = useCallback((tabId: string): AgentActivity | null => {
+    const service = ralphServicesRef.current.get(tabId);
+    if (!service) return null;
+    return service.getAgentActivity();
   }, []);
 
   return {
@@ -348,5 +365,6 @@ export function useTabs(projects: Project[], initialActiveId?: string) {
     getRalphService,
     getAgentTree: (tabId: string) => agentTrees.get(tabId) || [],
     getLiveOutput,
+    getAgentActivity,
   };
 }
